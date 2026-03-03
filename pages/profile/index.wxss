@@ -1,0 +1,53 @@
+.profile-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.profile-info {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.avatar-lg {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 28rpx;
+  background: #eef2ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2f5bea;
+  font-weight: 600;
+}
+
+.profile-name {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.asset-value {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #2f5bea;
+}
+
+.card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.card-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  flex: 1;
+}
+
+.card-title {
+  font-size: 28rpx;
+  font-weight: 600;
+}

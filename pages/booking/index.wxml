@@ -1,0 +1,55 @@
+<view class="container">
+  <view class="tab-row">
+    <view class="tab {{currentTab === 'court' ? 'active' : ''}}" data-tab="court" bindtap="handleTabChange">场地预订</view>
+    <view class="tab {{currentTab === 'coach' ? 'active' : ''}}" data-tab="coach" bindtap="handleTabChange">教练预约</view>
+  </view>
+
+  <view wx:if="{{currentTab === 'court'}}">
+    <view class="section-title">可预订场地</view>
+    <view class="card" wx:for="{{courts}}" wx:key="id">
+      <view class="cover placeholder">{{item.coverText}}</view>
+      <view class="card-row">
+        <view>
+          <text class="card-title">{{item.name}}</text>
+          <text class="muted">{{item.location}}</text>
+        </view>
+        <text class="price">¥{{item.price}}/小时</text>
+      </view>
+      <view class="slot-row">
+        <text class="slot" wx:for="{{timeSlots}}" wx:key="*this">{{item}}</text>
+      </view>
+      <view class="payment-row">
+        <text class="pill">微信支付</text>
+        <text class="pill">验券</text>
+        <text class="pill">积分抵扣</text>
+      </view>
+      <button class="btn-primary" bindtap="handleBook">确认预订</button>
+    </view>
+  </view>
+
+  <view wx:if="{{currentTab === 'coach'}}">
+    <view class="section-title">可预约教练</view>
+    <view class="card" wx:for="{{coaches}}" wx:key="id">
+      <view class="card-row">
+        <view class="avatar placeholder">{{item.avatarText}}</view>
+        <view class="card-col">
+          <text class="card-title">{{item.name}}</text>
+          <text class="muted">{{item.level}}</text>
+          <view class="tag-row">
+            <text class="pill" wx:for="{{item.tags}}" wx:key="*this">{{item}}</text>
+          </view>
+        </view>
+        <text class="price">¥{{item.price}}/课时</text>
+      </view>
+      <view class="slot-row">
+        <text class="slot" wx:for="{{timeSlots}}" wx:key="*this">{{item}}</text>
+      </view>
+      <view class="payment-row">
+        <text class="pill">微信支付</text>
+        <text class="pill">验券</text>
+        <text class="pill">积分抵扣</text>
+      </view>
+      <button class="btn-primary" bindtap="handleBook">确认预约</button>
+    </view>
+  </view>
+</view>

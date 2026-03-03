@@ -1,0 +1,18 @@
+<view class="venue-page">
+  <view class="venue-title">选择场馆</view>
+  <view class="venue-list">
+    <view class="venue-card" wx:for="{{venues}}" wx:key="id" data-id="{{item.id}}" bindtap="handleSelect">
+      <image class="venue-cover" src="{{item.coverImage}}" mode="aspectFill" />
+      <view class="venue-content">
+        <text class="venue-name">{{item.name}}</text>
+        <text class="venue-location">{{item.location}}</text>
+        <view class="venue-meta">
+          <text class="pill">网球</text>
+          <text class="pill">发球机</text>
+          <text class="pill">匹克球</text>
+        </view>
+        <text class="venue-distance">距离约 {{item.distance}}</text>
+      </view>
+    </view>
+  </view>
+</view>

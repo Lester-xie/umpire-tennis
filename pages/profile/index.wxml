@@ -1,0 +1,50 @@
+<view class="container">
+  <view class="hero profile-hero">
+    <view class="profile-info">
+      <view class="avatar-lg">学员</view>
+      <view>
+        <text class="profile-name">{{user.name}}</text>
+        <text class="muted">{{user.phone}}</text>
+      </view>
+    </view>
+    <button class="btn-outline" bindtap="handleLogin">微信/手机号登录</button>
+  </view>
+
+  <view class="section-title">我的资产</view>
+  <view class="grid">
+    <view class="grid-item">
+      <text class="asset-value">{{user.points}}</text>
+      <text class="muted">积分</text>
+    </view>
+    <view class="grid-item">
+      <text class="asset-value">{{user.credits}}</text>
+      <text class="muted">课时</text>
+    </view>
+    <view class="grid-item">
+      <text class="asset-value">{{user.serveMachine}}</text>
+      <text class="muted">发球机时长</text>
+    </view>
+  </view>
+
+  <view class="section-title">教练功能</view>
+  <view class="card">
+    <view class="card-row">
+      <view class="card-col">
+        <text class="card-title">课时安排</text>
+        <text class="muted">查看本周课程计划</text>
+      </view>
+      <text class="pill">进入</text>
+    </view>
+  </view>
+
+  <view class="section-title">我的订单</view>
+  <view class="card" wx:for="{{orders}}" wx:key="id">
+    <view class="card-row">
+      <view class="card-col">
+        <text class="card-title">{{item.title}}</text>
+        <text class="muted">{{item.type}} · {{item.time}}</text>
+      </view>
+      <text class="pill">{{item.status}}</text>
+    </view>
+  </view>
+</view>
