@@ -1,0 +1,224 @@
+.container {
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.content-scroll {
+  margin-top: 10px;
+  flex-shrink: 0;
+}
+
+.content {
+  background-color: #F2F6F3;
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 80px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 商品订单 */
+.goods-order {
+  display: flex;
+  flex-direction: column;
+}
+.goods-order-item {
+  display: flex;
+  align-items: center;
+  background-color: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  border-left: 3px solid #134E35;
+}
+.goods-order-image {
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.goods-order-info {
+  flex: 1;
+  margin-left: 16px;
+}
+.goods-order-desc {
+  font-size: 15px;
+  color: #134E35;
+  line-height: 1.4;
+}
+.goods-order-price {
+  font-size: 18px;
+  font-weight: 600;
+  color: #134E35;
+  margin-top: 8px;
+}
+
+.order-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #E0E0E0;
+}
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.info-label {
+  font-size: 14px;
+  color: #666;
+}
+.info-value {
+  font-size: 14px;
+  color: #134E35;
+  font-weight: 500;
+}
+.court-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.court-item {
+  padding: 16px;
+  background-color: #fff;
+  border-radius: 8px;
+  border-left: 3px solid #134E35;
+}
+.court-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #E0E0E0;
+}
+.court-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: #134E35;
+}
+.court-price {
+  font-size: 16px;
+  font-weight: 600;
+  color: #134E35;
+}
+.time-slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.time-slot-item {
+  background-color: #F2F6F3;
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.time-slot-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.time-slot-time {
+  font-size: 13px;
+  color: #134E35;
+  font-weight: 500;
+}
+.time-slot-hours {
+  font-size: 12px;
+  color: #999;
+  background-color: rgba(19, 78, 53, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.time-slot-price {
+  font-size: 14px;
+  color: #134E35;
+  font-weight: 500;
+}
+.fee-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #E0E0E0;
+}
+.fee-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.fee-item.total {
+  padding-top: 12px;
+  border-top: 1px solid #F0F0F0;
+}
+.fee-label {
+  font-size: 14px;
+  color: #666;
+}
+.fee-item.total .fee-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: #134E35;
+}
+.fee-value {
+  font-size: 14px;
+  color: #134E35;
+  font-weight: 500;
+}
+.fee-item.total .fee-value {
+  font-size: 18px;
+  font-weight: 600;
+}
+.footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  background-color: #fff;
+  border-top: 1px solid #E0E0E0;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+}
+.footer-left {
+  flex: 1;
+}
+.footer-total {
+  font-size: 14px;
+  font-weight: 500;
+  color: #134E35;
+}
+.footer-right {
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+.footer-button {
+  background: linear-gradient(135deg, #134E35 0%, #1a6b4a 100%);
+  border-radius: 20px;
+  padding: 8px 20px;
+  min-width: 80px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(19, 78, 53, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+.footer-button:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 8px rgba(19, 78, 53, 0.3);
+}
+.footer-button-text {
+  font-size: 13px;
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}

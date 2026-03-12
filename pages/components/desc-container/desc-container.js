@@ -1,43 +1,5 @@
-// pages/components/header.js
+// pages/components/desc-container/desc-container.js
 Component({
-
-  /**
-   * 组件的属性列表
-   */
-  properties: {
-    // 是否隐藏 desc-container
-    hideDesc: {
-      type: Boolean,
-      value: false,
-    },
-    // 是否显示返回按钮
-    showBackButton: {
-      type: Boolean,
-      value: false,
-    },
-    // 标题文案，不传则使用 app.globalData.brand
-    title: {
-      type: String,
-      value: '',
-    },
-    // 是否显示「选择球场」按钮，点击进入定位选球场页
-    showLocationButton: {
-      type: Boolean,
-      value: false,
-    },
-  },
-
-  observers: {
-    title(v) {
-      if (v != null && v !== this.data.title) {
-        this.setData({ title: String(v).trim() || (getApp() && getApp().globalData.brand) || '昂湃网球' });
-      }
-    },
-  },
-
-  /**
-   * 组件的初始数据
-   */
   data: {
     descWidth: 0,
     descHeight: 0,
@@ -46,18 +8,7 @@ Component({
     tennisRotate: 0, // 旋转角度
   },
 
-  /**
-   * 组件的方法列表
-   */
   methods: {
-    // 处理返回按钮点击
-    handleBack() {
-      wx.navigateBack();
-    },
-    // 进入选择球场页
-    handleLocationTap() {
-      wx.navigateTo({ url: '/pages/location/index' });
-    },
     // 初始化网球动画
     initTennisAnimation() {
       const descWidth = this.data.descWidth;
@@ -182,35 +133,24 @@ Component({
       animate();
     },
   },
+
   attached: function () {
-    const app = getApp();
-    const customTitle = this.properties.title;
-    const title = (customTitle && customTitle.trim()) ? customTitle.trim() : (app && app.globalData.brand) || '昂湃网球';
-    if (app) {
-      const { headerInfo } = app.globalData.screenInfo || {};
-      // 计算 desc 的宽高
-      const systemInfo = wx.getSystemInfoSync();
-      const screenWidth = systemInfo.windowWidth || systemInfo.screenWidth;
-      const descWidth = screenWidth - 32;
-      const aspectRatio = 1.9230769230769231;
-      const descHeight = descWidth / aspectRatio;
-      this.setData({
-        headerInfo: headerInfo || {},
-        title,
-        descWidth,
-        descHeight,
-      });
-    } else {
-      this.setData({ title });
-    }
+    // 计算 desc 的宽高
+    const systemInfo = wx.getSystemInfoSync();
+    const screenWidth = systemInfo.windowWidth || systemInfo.screenWidth;
+    const descWidth = screenWidth - 32;
+    const aspectRatio = 1.9230769230769231;
+    const descHeight = descWidth / aspectRatio;
+    
+    this.setData({
+      descWidth,
+      descHeight,
+    });
   },
   
   ready: function () {
     // 在 ready 生命周期中启动动画，确保 DOM 已渲染
-    // 只有在不隐藏 desc 的情况下才初始化动画
-    if (!this.data.hideDesc) {
-      this.initTennisAnimation();
-    }
+    this.initTennisAnimation();
   },
   
   detached() {
@@ -221,4 +161,4 @@ Component({
     }
     this.tennisAnimation = null;
   },
-})
+});

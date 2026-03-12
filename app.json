@@ -1,11 +1,12 @@
 {
   "pages": [
-    "pages/venue/index",
+    "pages/location/index",
     "pages/home/index",
     "pages/booking/index",
-    "pages/activities/index",
-    "pages/mall/index",
-    "pages/profile/index"
+    "pages/order-detail/index",
+    "pages/profile/index",
+    "pages/complete-profile/index",
+    "pages/group-buy/index"
   ],
   "window": {
     "backgroundTextStyle": "light",
@@ -24,14 +25,6 @@
       {
         "pagePath": "pages/booking/index",
         "text": "预订"
-      },
-      {
-        "pagePath": "pages/activities/index",
-        "text": "活动"
-      },
-      {
-        "pagePath": "pages/mall/index",
-        "text": "商城"
       },
       {
         "pagePath": "pages/profile/index",

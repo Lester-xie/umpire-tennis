@@ -1,4 +1,14 @@
 <view class="home-container">
-  <header />
-  <main />
+  <view class="header-wrapper">
+    <header hideDesc="{{true}}" showLocationButton="{{true}}" />
+  </view>
+  <scroll-view class="content-scroll" scroll-y="true" style="margin-top: {{headerHeight}}px; height: {{contentHeight}}px;">
+    <view class="content-wrapper">
+      <desc-container />
+      <main />
+      <goods />
+      <view style="height: {{placeholderHeight}}px;"></view>
+    </view>
+  </scroll-view>
 </view>
+

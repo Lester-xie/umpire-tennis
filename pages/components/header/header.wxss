@@ -1,9 +1,51 @@
 /* pages/components/header.wxss */
 .header {
   color: #134E35;
-  padding-top: 30px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #ffffff;
+  padding-bottom: 10px;
+  z-index: 100;
+}
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.back-button {
+  position: absolute;
+  left: 0;
+  width: 36px;
+  height: 36px;
+  background-color: #F5F5F5;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.back-button:active {
+  background-color: #E0E0E0;
+}
+.back-icon {
+  width: 18px;
+  height: 15px;
+}
+.location-button {
+  position: absolute;
+  left: 0;
+  width: 36px;
+  height: 36px;
+  background-color: #F5F5F5;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.location-button:active {
+  background-color: #E0E0E0;
+}
+.location-icon {
+  width: 20px;
+  height: 20px;
 }
 .title {
   text-align: center;
@@ -17,6 +59,8 @@
   margin-top: 14px;
   margin-left: auto;
   margin-right: auto;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #ffffff;
 }
 
 .desc {
@@ -29,39 +73,10 @@
   height: 30px;
 }
 
-.racket {
-  margin-left: 16px;
-  width: 36px;
-  height: 36px;
-  transform-origin: center bottom;
-}
-
-.trophy {
-  width: 36px;
-  height: 36px;
-  position: relative;
-  top: 2px;
-  transform-origin: center bottom;
-}
-
 .tennis {
   position: absolute;
   left: 0;
   top: 0;
   z-index: 10;
   will-change: transform;
-}
-.shake {
-  animation: shake 0.5s ease-in-out;
-}
-@keyframes shake {
-  0%, 100% {
-    transform: rotate(0deg);
-  }
-  10%, 30%, 50%, 70%, 90% {
-    transform: rotate(-15deg);
-  }
-  20%, 40%, 60%, 80% {
-    transform: rotate(15deg);
-  }
 }

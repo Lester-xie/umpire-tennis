@@ -1,0 +1,41 @@
+.goods-container {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.goods-item {
+  display: flex;
+  align-items: center;
+  background-color: rgba(240, 246, 244, 0.8);
+  border-radius: 14px;
+  padding: 12px;
+  border: 1px solid #ffffff;
+  overflow: hidden;
+}
+
+.goods-image {
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.goods-info {
+  flex: 1;
+  margin-left: 16px;
+}
+
+.goods-desc {
+  font-size: 15px;
+  color: #2d5016;
+  line-height: 1.4;
+}
+
+.goods-price {
+  font-size: 18px;
+  font-weight: 600;
+  color: #2d5016;
+  margin-top: 12px;
+}

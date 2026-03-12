@@ -1,4 +1,29 @@
 .home-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.header-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
   padding: 0 16px;
+  box-sizing: border-box;
+}
+
+.content-scroll {
+  flex: 1;
+  width: 100%;
+  margin-top: 0;
+  box-sizing: border-box;
+}
+
+.content-wrapper {
+  padding: 0 16px;
+  min-height: 100%;
 }
 

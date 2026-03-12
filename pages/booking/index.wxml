@@ -1,55 +1,98 @@
 <view class="container">
-  <view class="tab-row">
-    <view class="tab {{currentTab === 'court' ? 'active' : ''}}" data-tab="court" bindtap="handleTabChange">场地预订</view>
-    <view class="tab {{currentTab === 'coach' ? 'active' : ''}}" data-tab="coach" bindtap="handleTabChange">教练预约</view>
-  </view>
-
-  <view wx:if="{{currentTab === 'court'}}">
-    <view class="section-title">可预订场地</view>
-    <view class="card" wx:for="{{courts}}" wx:key="id">
-      <view class="cover placeholder">{{item.coverText}}</view>
-      <view class="card-row">
-        <view>
-          <text class="card-title">{{item.name}}</text>
-          <text class="muted">{{item.location}}</text>
-        </view>
-        <text class="price">¥{{item.price}}/小时</text>
+  <header hideDesc="{{true}}" />
+  <view class="content" style="height: {{contentHeight}}px; padding-bottom: {{selectedSlots.length > 0 ? '55px' : '10px'}};">
+    <view class="content-header">
+      <view class="content-header-icon-wrapper">
+        <image class="content-header-icon" src="/assets/images/tab-bar-booking.svg" mode="aspectFit"></image>
       </view>
-      <view class="slot-row">
-        <text class="slot" wx:for="{{timeSlots}}" wx:key="*this">{{item}}</text>
+      <view class="content-header-title">
+        预订球场
       </view>
-      <view class="payment-row">
-        <text class="pill">微信支付</text>
-        <text class="pill">验券</text>
-        <text class="pill">积分抵扣</text>
-      </view>
-      <button class="btn-primary" bindtap="handleBook">确认预订</button>
     </view>
-  </view>
 
-  <view wx:if="{{currentTab === 'coach'}}">
-    <view class="section-title">可预约教练</view>
-    <view class="card" wx:for="{{coaches}}" wx:key="id">
-      <view class="card-row">
-        <view class="avatar placeholder">{{item.avatarText}}</view>
-        <view class="card-col">
-          <text class="card-title">{{item.name}}</text>
-          <text class="muted">{{item.level}}</text>
-          <view class="tag-row">
-            <text class="pill" wx:for="{{item.tags}}" wx:key="*this">{{item}}</text>
+    <scroll-view class="content-calendar" scroll-x="true" enable-flex="true">
+      <view class="content-calendar-scroll">
+        <view 
+          class="content-calendar-item" 
+          wx:for="{{dateList}}" 
+          wx:key="dateStr"
+          data-datestr="{{item.dateStr}}"
+          bindtap="handleDateClick"
+        >
+          <view class="date-weekday">{{item.weekday}}</view>
+          <view class="date-month-day {{selectedDate === item.dateStr ? 'active' : ''}} {{rippleDate === item.dateStr ? 'ripple' : ''}}">
+            <view class="date-text">{{item.monthDay}}</view>
+            <view class="ripple-effect" wx:if="{{rippleDate === item.dateStr}}"></view>
           </view>
         </view>
-        <text class="price">¥{{item.price}}/课时</text>
       </view>
-      <view class="slot-row">
-        <text class="slot" wx:for="{{timeSlots}}" wx:key="*this">{{item}}</text>
+    </scroll-view>
+    <view class="content-time">
+      <!-- 可滚动的区域 -->
+      <scroll-view class="content-time-scroll" scroll-x="true" scroll-y="true" enable-flex="true" show-scrollbar="{{false}}">
+        <view class="time-table">
+          <!-- 第一行：时间列头部 + 场地头部 -->
+          <view class="time-table-header">
+            <!-- 固定的时间列头部 -->
+            <view class="time-column-fixed">
+              <view class="time-header-fixed"></view>
+            </view>
+            <!-- 固定的场地头部 -->
+            <view class="court-header-row">
+              <view class="court-header" wx:for="{{courts}}" wx:key="id">
+                {{item.name}}
+              </view>
+            </view>
+          </view>
+          
+          <!-- 内容行：时间列 + 场地内容 -->
+          <view class="time-table-content">
+            <!-- 固定的时间列 -->
+            <view class="time-column-fixed">
+              <view class="time-slot-fixed" wx:for="{{timeSlots}}" wx:key="time">
+                {{item.time}}
+              </view>
+            </view>
+            <!-- 可滚动的内容区域 -->
+            <view class="court-content-row">
+              <view class="court-column" wx:for="{{courts}}" wx:key="id">
+                <view class="court-slots">
+                  <block wx:for="{{item.slots}}" wx:for-item="slot" wx:key="index">
+                    <view 
+                      wx:if="{{slot.available}}"
+                      class="time-slot-cell available {{selectedSlotsMap[item.id + '-' + index] ? 'active' : ''}} {{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === index ? 'ripple' : ''}}"
+                      data-courtid="{{item.id}}"
+                      data-slotindex="{{index}}"
+                      bindtap="handleSlotClick"
+                    >
+                      <view class="slot-text">
+                        <text class="slot-price">¥ {{slot.price}}</text>
+                      </view>
+                      <view class="ripple-effect" wx:if="{{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === index}}"></view>
+                    </view>
+                    <view 
+                      wx:else
+                      class="time-slot-cell"
+                    >
+                      <text class="slot-booked">已约</text>
+                    </view>
+                  </block>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+    <view class="content-footer" wx:if="{{selectedSlots.length > 0}}">
+      <view class="content-footer-left">
+        合计：¥ {{totalPrice}}
       </view>
-      <view class="payment-row">
-        <text class="pill">微信支付</text>
-        <text class="pill">验券</text>
-        <text class="pill">积分抵扣</text>
+      <view class="content-footer-right">
+        <view class="content-footer-right-button" bindtap="handleConfirmBooking">
+          <text class="content-footer-right-button-text">下单</text>
+        </view>
       </view>
-      <button class="btn-primary" bindtap="handleBook">确认预约</button>
     </view>
   </view>
 </view>

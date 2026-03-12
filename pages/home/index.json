@@ -2,6 +2,8 @@
   "navigationBarTitleText": "昂湃网球",
   "usingComponents": {
     "header": "/pages/components/header/header",
-    "main": "/pages/components/main/main"
+    "main": "/pages/components/main/main",
+    "desc-container": "/pages/components/desc-container/desc-container",
+    "goods": "/pages/components/goods/goods"
   }
 }

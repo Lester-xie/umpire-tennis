@@ -1,50 +1,111 @@
-<view class="container">
-  <view class="hero profile-hero">
-    <view class="profile-info">
-      <view class="avatar-lg">学员</view>
-      <view>
-        <text class="profile-name">{{user.name}}</text>
-        <text class="muted">{{user.phone}}</text>
+<view class="profile-container">
+  <view class="header-wrapper">
+    <header hideDesc="{{true}}" />
+  </view>
+  <scroll-view
+    class="content-scroll"
+    scroll-y="true"
+    enhanced="{{true}}"
+    show-scrollbar="{{false}}"
+    style="margin-top: {{headerHeight}}px; height: {{contentHeight}}px;"
+  >
+    <view class="content-wrapper">
+      <!-- 用户信息卡片 -->
+      <view class="card user-card" bindtap="handleUserCardTap">
+        <view class="user-avatar-wrapper">
+          <image
+            wx:if="{{isLoggedIn}}"
+            class="user-avatar"
+            src="{{userAvatar || '/assets/images/tab-bar-user-active.svg'}}"
+            mode="aspectFill"
+          ></image>
+          <image
+            wx:else
+            class="user-avatar"
+            src="/assets/images/tab-bar-user.svg"
+            mode="aspectFit"
+          ></image>
+        </view>
+        <view class="user-info">
+          <view class="user-name">{{userDisplayName}}</view>
+          <view class="user-desc">{{isLoggedIn ? (userPhone || '欢迎使用昂湃网球') : '登录后查看订场与团购记录'}}</view>
+        </view>
+        <view class="user-arrow" wx:if="{{!isLoggedIn}}">
+          <image class="arrow-icon" src="/assets/images/arrow.svg" mode="aspectFit"></image>
+        </view>
+      </view>
+
+      <!-- 订场历史卡片 -->
+      <view class="card section-card">
+        <view class="section-header">
+          <text class="section-title">订场历史</text>
+          <text class="section-count">{{courtOrders.length}} 条</text>
+        </view>
+        <view class="section-list" wx:if="{{courtOrders.length > 0}}">
+          <view
+            class="list-item court-item"
+            wx:for="{{courtOrders}}"
+            wx:key="orderNumber"
+          >
+            <view class="item-main">
+              <view class="item-date">{{item.formattedDate}}</view>
+              <view class="item-summary">{{item.displaySummary}}</view>
+            </view>
+            <view class="item-price">¥ {{item.totalPrice}}</view>
+          </view>
+        </view>
+        <view class="empty-tip" wx:else>
+          <text>暂无订场记录</text>
+          <navigator class="empty-link" url="/pages/booking/index" open-type="switchTab">去预订</navigator>
+        </view>
+      </view>
+
+      <!-- 团购购买历史卡片 -->
+      <view class="card section-card">
+        <view class="section-header">
+          <text class="section-title">团购历史</text>
+          <text class="section-count">{{goodsOrders.length}} 条</text>
+        </view>
+        <view class="section-list" wx:if="{{goodsOrders.length > 0}}">
+          <view
+            class="list-item goods-item"
+            wx:for="{{goodsOrders}}"
+            wx:key="orderNumber"
+          >
+            <image class="goods-thumb" src="{{item.goodItem.image}}" mode="aspectFill"></image>
+            <view class="item-main">
+              <view class="item-desc">{{item.goodItem.desc}}</view>
+              <view class="item-time">{{item.formattedTime}}</view>
+            </view>
+            <view class="item-price">¥ {{item.totalPrice}}</view>
+          </view>
+        </view>
+        <view class="empty-tip" wx:else>
+          <text>暂无团购记录</text>
+          <navigator class="empty-link" url="/pages/group-buy/index">去团购</navigator>
+        </view>
+      </view>
+
+      <view class="placeholder" style="height: {{placeholderHeight}}px;"></view>
+    </view>
+  </scroll-view>
+
+  <!-- 登录：先手机号注册，成功后再补全资料 -->
+  <view class="login-modal-mask" wx:if="{{showLoginModal}}" catchtap="handleCloseLoginModal">
+    <view class="login-modal" catchtap="">
+      <view class="login-modal-title">手机号注册</view>
+      <view class="login-modal-desc">请先授权手机号完成注册，注册成功后即可补全资料</view>
+      <view class="login-modal-btns">
+        <view class="login-modal-btn cancel" bindtap="handleCloseLoginModal">取消</view>
+        <button
+          class="login-modal-btn confirm"
+          open-type="getPhoneNumber"
+          bindgetphonenumber="onPhoneRegister"
+        >
+          授权手机号注册
+        </button>
       </view>
     </view>
-    <button class="btn-outline" bindtap="handleLogin">微信/手机号登录</button>
   </view>
 
-  <view class="section-title">我的资产</view>
-  <view class="grid">
-    <view class="grid-item">
-      <text class="asset-value">{{user.points}}</text>
-      <text class="muted">积分</text>
-    </view>
-    <view class="grid-item">
-      <text class="asset-value">{{user.credits}}</text>
-      <text class="muted">课时</text>
-    </view>
-    <view class="grid-item">
-      <text class="asset-value">{{user.serveMachine}}</text>
-      <text class="muted">发球机时长</text>
-    </view>
-  </view>
-
-  <view class="section-title">教练功能</view>
-  <view class="card">
-    <view class="card-row">
-      <view class="card-col">
-        <text class="card-title">课时安排</text>
-        <text class="muted">查看本周课程计划</text>
-      </view>
-      <text class="pill">进入</text>
-    </view>
-  </view>
-
-  <view class="section-title">我的订单</view>
-  <view class="card" wx:for="{{orders}}" wx:key="id">
-    <view class="card-row">
-      <view class="card-col">
-        <text class="card-title">{{item.title}}</text>
-        <text class="muted">{{item.type}} · {{item.time}}</text>
-      </view>
-      <text class="pill">{{item.status}}</text>
-    </view>
-  </view>
 </view>

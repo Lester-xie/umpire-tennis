@@ -1,0 +1,138 @@
+.complete-profile-page {
+  min-height: 100vh;
+  background: linear-gradient(to bottom, #dbefd0 0%, #dbefd0 40%, #dae4de 100%);
+  box-sizing: border-box;
+  padding: 0 16px;
+}
+
+.content {
+  padding: 24px 0;
+}
+
+.section-title {
+  font-size: 15px;
+  color: #666;
+  text-align: center;
+  margin-bottom: 32px;
+  line-height: 1.5;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.form-label {
+  width: 72px;
+  font-size: 15px;
+  color: #333;
+  flex-shrink: 0;
+}
+
+/* 昵称输入框容器：聚焦时高亮 */
+.form-row-nickname.form-row-focus .nickname-input {
+  border-color: #134E35;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(19, 78, 53, 0.12);
+}
+
+.nickname-input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 16px;
+  font-size: 16px;
+  color: #134E35;
+  letter-spacing: 0.5px;
+  border: 1.5px solid #E8EFEB;
+  border-radius: 12px;
+  box-sizing: border-box;
+  background: #F7FBF8;
+  margin-left: 16px;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.nickname-placeholder {
+  color: #B0C4B8;
+  font-size: 15px;
+}
+
+.avatar-btn {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  width: 64px !important;
+  height: 64px;
+  overflow: hidden;
+  flex-shrink: 0;
+  margin-left: 16px !important;
+}
+
+.avatar-btn::after {
+  border: none;
+}
+
+.avatar-img {
+  width: 64px;
+  height: 64px;
+  display: block;
+  background: linear-gradient(135deg, #F2F6F3 0%, #E8EFEB 100%);
+  border-radius: 50%;
+}
+
+.form-value {
+  flex: 1;
+  min-width: 0;
+}
+
+.phone-auth-btn {
+  margin-left: 16px !important;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #134E35;
+  background-color: #F2F6F3;
+  border: 1px solid #134E35;
+  border-radius: 8px;
+}
+
+.phone-auth-btn::after {
+  border: none;
+}
+
+.phone-done {
+  font-size: 14px;
+  color: #134E35;
+}
+
+.phone-input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  font-size: 14px;
+  border: 1px solid #E0E0E0;
+  border-radius: 8px;
+  box-sizing: border-box;
+  background: #F7F9FF;
+}
+
+.submit-wrap {
+  margin-top: 40px;
+}
+
+.submit-btn {
+  padding: 14px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 500;
+  color: #fff;
+  background: linear-gradient(135deg, #134E35 0%, #1a6b4a 100%);
+  border-radius: 12px;
+}

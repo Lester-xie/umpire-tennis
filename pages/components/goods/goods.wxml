@@ -1,0 +1,9 @@
+<view class="goods-container">
+  <view class="goods-item" wx:for="{{goods}}" wx:key="id" data-index="{{index}}" bindtap="handleGoodClick">
+    <image class="goods-image" src="{{item.image}}" mode="aspectFill"></image>
+    <view class="goods-info">
+      <view class="goods-desc">{{item.desc}}</view>
+      <view class="goods-price">¥ {{item.price}}</view>
+    </view>
+  </view>
+</view>

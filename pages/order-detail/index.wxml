@@ -1,0 +1,83 @@
+<view class="container">
+  <header hideDesc="{{true}}" showBackButton="{{true}}" />
+  <scroll-view class="content-scroll" scroll-y="true" enhanced="{{true}}" show-scrollbar="{{false}}" style="height: {{contentScrollHeight}}px;">
+  <view class="content">
+    <!-- 商品订单 -->
+    <block wx:if="{{orderType === 'goods'}}">
+      <view class="goods-order" wx:if="{{goodItem}}">
+        <view class="goods-order-item">
+          <image class="goods-order-image" src="{{goodItem.image}}" mode="aspectFill"></image>
+          <view class="goods-order-info">
+            <view class="goods-order-desc">{{goodItem.desc}}</view>
+            <view class="goods-order-price">¥ {{goodItem.price}}</view>
+          </view>
+        </view>
+      </view>
+      <view class="fee-detail">
+        <view class="fee-item total">
+          <text class="fee-label">合计</text>
+          <text class="fee-value">¥ {{totalPrice}}</text>
+        </view>
+      </view>
+    </block>
+
+    <!-- 场地订单 -->
+    <block wx:if="{{orderType === 'court'}}">
+    <!-- 订单信息 -->
+    <view class="order-info">
+      <view class="info-item">
+        <text class="info-label">预订日期</text>
+        <text class="info-value">{{formattedDate}}</text>
+      </view>
+      <view class="info-item">
+        <text class="info-label">球馆</text>
+        <text class="info-value">{{campusName}}</text>
+      </view>
+    </view>
+    
+    <!-- 场地信息 -->
+    <view class="court-list">
+      <view class="court-item" wx:for="{{orderItems}}" wx:key="courtId">
+        <view class="court-item-header">
+          <text class="court-name">{{item.courtName}}</text>
+          <text class="court-price">¥ {{item.totalPrice}}</text>
+        </view>
+        <view class="time-slot-list">
+          <view class="time-slot-item" wx:for="{{item.timeSlots}}" wx:for-item="slot" wx:key="index">
+            <view class="time-slot-info">
+              <text class="time-slot-time">{{slot.timeRange}}</text>
+              <text class="time-slot-hours">{{slot.hours}}小时</text>
+            </view>
+            <text class="time-slot-price">¥ {{slot.price}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 费用明细 -->
+    <view class="fee-detail">
+      <view class="fee-item">
+        <text class="fee-label">场地费用</text>
+        <text class="fee-value">¥ {{totalPrice}}</text>
+      </view>
+      <view class="fee-item total">
+        <text class="fee-label">合计</text>
+        <text class="fee-value">¥ {{totalPrice}}</text>
+      </view>
+    </view>
+    </block>
+  </view>
+  </scroll-view>
+
+  <!-- 底部按钮 -->
+  <view class="footer">
+    <view class="footer-left">
+      <text class="footer-total">合计：¥ {{totalPrice}}</text>
+    </view>
+    <view class="footer-right">
+      <view class="footer-button" bindtap="handleSubmitOrder">
+        <text class="footer-button-text">{{footerButtonText}}</text>
+      </view>
+    </view>
+  </view>
+</view>

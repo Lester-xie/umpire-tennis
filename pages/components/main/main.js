@@ -19,6 +19,17 @@ Component({
    * 组件的方法列表
    */
   methods: {
-
+    // 处理预订球场点击事件
+    handleBookingClick() {
+      wx.switchTab({
+        url: '/pages/booking/index',
+      });
+    },
+    // 处理全部团购点击事件
+    handleGroupBuyClick() {
+      wx.navigateTo({
+        url: '/pages/group-buy/index',
+      });
+    },
   }
 })
