@@ -13,6 +13,7 @@
 .back-button {
   position: absolute;
   left: 0;
+  top: 0;
   width: 36px;
   height: 36px;
   background-color: #F5F5F5;
@@ -32,6 +33,7 @@
 .location-button {
   position: absolute;
   left: 0;
+  top: 0;
   width: 36px;
   height: 36px;
   background-color: #F5F5F5;

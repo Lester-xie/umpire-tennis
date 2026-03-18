@@ -10,6 +10,7 @@ Page({
     selectedSlotsMap: {}, // 选中状态映射 {courtId-slotIndex: true}
     rippleSlot: null, // 当前显示波纹动画的时间段 {courtId, slotIndex}
     totalPrice: 0, // 总价
+    selectedVenueName: '', // 当前选定的球场名称
   },
   
   // 动画定时器
@@ -17,18 +18,45 @@ Page({
   slotRippleTimer: null,
   
   onLoad() {
+    this.syncSelectedVenueName();
     // 生成最近两个月的日期列表
     this.generateDateList();
     // 生成时间段和场地数据
     this.generateTimeSchedule();
   },
-  
+
   onShow() {
+    this.syncSelectedVenueName();
     // 检查是否需要清空数据（下单成功后返回）
     const app = getApp();
     if (app && app.globalData && app.globalData.shouldClearBookingData) {
       this.clearBookingData();
       app.globalData.shouldClearBookingData = false;
+    }
+  },
+
+  syncSelectedVenueName() {
+    const app = getApp();
+    const venue = app && app.globalData && app.globalData.selectedVenue;
+    const name = (venue && venue.name) ? venue.name : '';
+    if (name !== this.data.selectedVenueName) {
+      this.setData({ selectedVenueName: name });
+      // 切换球馆后重置已选择的时间段
+      this.resetSelectedSlots();
+    }
+  },
+
+  // 仅重置已选时间段（不重新生成场地/时段数据）
+  resetSelectedSlots() {
+    this.setData({
+      selectedSlots: [],
+      selectedSlotsMap: {},
+      totalPrice: 0,
+      rippleSlot: null,
+    });
+    if (this.slotRippleTimer) {
+      clearTimeout(this.slotRippleTimer);
+      this.slotRippleTimer = null;
     }
   },
   

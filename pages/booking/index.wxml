@@ -6,7 +6,7 @@
         <image class="content-header-icon" src="/assets/images/tab-bar-booking.svg" mode="aspectFit"></image>
       </view>
       <view class="content-header-title">
-        预订球场
+        预订球场{{selectedVenueName ? ' ——' + selectedVenueName : ''}}
       </view>
     </view>
 

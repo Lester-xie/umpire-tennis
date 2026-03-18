@@ -3,7 +3,7 @@ Page({
     orderType: 'court', // 订单类型：court 场地订单 | goods 商品订单
     orderDate: '', // 预订日期
     formattedDate: '', // 格式化后的日期
-    campusName: '昂湃网球学练馆',
+    campusName: '', // 球馆名称，来自当前选定的球场
     orderNumber: '', // 订单编号
     orderItems: [], // 场地订单项 [{courtId, courtName, timeSlots: [{timeRange, price, hours}], totalPrice}]
     goodItem: null, // 商品订单项 {id, image, desc, price}
@@ -13,6 +13,7 @@ Page({
   },
 
   onLoad(options) {
+    this.syncCampusName();
     if (options.type === 'goods') {
       // 商品订单：从 group-buy 页面跳转
       try {
@@ -47,9 +48,20 @@ Page({
       orderItems: orderItems,
       totalPrice: totalPrice,
     });
+    this.syncCampusName();
+  },
+
+  syncCampusName() {
+    const app = getApp();
+    const venue = app && app.globalData && app.globalData.selectedVenue;
+    const campusName = (venue && venue.name) ? venue.name : '昂湃网球学练馆';
+    if (campusName !== this.data.campusName) {
+      this.setData({ campusName });
+    }
   },
 
   onShow() {
+    this.syncCampusName();
     this.updateFooterButtonText();
   },
 
