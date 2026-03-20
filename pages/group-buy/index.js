@@ -28,15 +28,15 @@ Page({
 
   // 动态计算 scroll-view 高度：窗口高度 - header - 间距
   calculateContentScrollHeight() {
-    const systemInfo = wx.getSystemInfoSync();
-    const windowHeight = systemInfo.windowHeight;
+    const windowInfo = wx.getWindowInfo();
+    const windowHeight = windowInfo.windowHeight;
 
     const query = wx.createSelectorQuery();
     query.select('.header').boundingClientRect();
     query.exec((res) => {
       const headerRect = res[0];
       const headerHeight = headerRect ? headerRect.height : 0;
-      const headerFallback = (systemInfo.statusBarHeight || 44) + 44;
+      const headerFallback = (windowInfo.statusBarHeight || 44) + 44;
       const finalHeaderHeight = headerHeight > 0 ? headerHeight : headerFallback;
 
       const contentScrollHeight = Math.max(

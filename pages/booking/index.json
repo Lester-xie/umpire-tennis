@@ -1,6 +1,6 @@
 {
   "navigationBarTitleText": "预订",
   "usingComponents": {
-    "header": "/pages/components/header/header"
+    "header": "/components/header/header"
   }
 }

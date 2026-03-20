@@ -1,6 +1,10 @@
 <view class="profile-container">
   <view class="header-wrapper">
-    <header hideDesc="{{true}}" />
+    <header
+      hideDesc="{{true}}"
+      showSwitchAccountButton="{{isLoggedIn && userPhone}}"
+      bind:switchaccount="onSwitchAccount"
+    />
   </view>
   <scroll-view
     class="content-scroll"
@@ -22,7 +26,7 @@
           <image
             wx:else
             class="user-avatar"
-            src="/assets/images/tab-bar-user.svg"
+            src="/assets/images/tab-bar-user-active.svg"
             mode="aspectFit"
           ></image>
         </view>
@@ -33,6 +37,14 @@
         <view class="user-arrow" wx:if="{{!isLoggedIn}}">
           <image class="arrow-icon" src="/assets/images/arrow.svg" mode="aspectFit"></image>
         </view>
+
+        <!-- 未登录时：用透明按钮覆盖整个用户卡片，点击直接触发 getPhoneNumber -->
+        <button
+          wx:if="{{!isLoggedIn}}"
+          class="user-card-auth-btn"
+          open-type="getPhoneNumber"
+          bindgetphonenumber="onPhoneRegister"
+        ></button>
       </view>
 
       <!-- 订场历史卡片 -->
@@ -89,23 +101,5 @@
       <view class="placeholder" style="height: {{placeholderHeight}}px;"></view>
     </view>
   </scroll-view>
-
-  <!-- 登录：先手机号注册，成功后再补全资料 -->
-  <view class="login-modal-mask" wx:if="{{showLoginModal}}" catchtap="handleCloseLoginModal">
-    <view class="login-modal" catchtap="">
-      <view class="login-modal-title">手机号注册</view>
-      <view class="login-modal-desc">请先授权手机号完成注册，注册成功后即可补全资料</view>
-      <view class="login-modal-btns">
-        <view class="login-modal-btn cancel" bindtap="handleCloseLoginModal">取消</view>
-        <button
-          class="login-modal-btn confirm"
-          open-type="getPhoneNumber"
-          bindgetphonenumber="onPhoneRegister"
-        >
-          授权手机号注册
-        </button>
-      </view>
-    </view>
-  </view>
 
 </view>

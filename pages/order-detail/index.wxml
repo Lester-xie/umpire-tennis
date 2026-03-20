@@ -80,4 +80,22 @@
       </view>
     </view>
   </view>
+
+  <!-- 未注册或无法静默登录时：手机号授权 -->
+  <view class="login-modal-mask" wx:if="{{showPhoneAuthModal}}" catchtap="handleClosePhoneAuthModal">
+    <view class="login-modal" catchtap="">
+      <view class="login-modal-title">手机号登录</view>
+      <view class="login-modal-desc">请先授权手机号；已注册用户将直接登录</view>
+      <view class="login-modal-btns">
+        <view class="login-modal-btn cancel" bindtap="handleClosePhoneAuthModal">取消</view>
+        <button
+          class="login-modal-btn confirm"
+          open-type="getPhoneNumber"
+          bindgetphonenumber="onPhoneRegister"
+        >
+          授权手机号
+        </button>
+      </view>
+    </view>
+  </view>
 </view>

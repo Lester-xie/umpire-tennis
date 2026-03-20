@@ -1,4 +1,4 @@
-const { goods } = require('../../../data/goods');
+const { goods } = require('../../data/goods');
 
 Component({
   properties: {},

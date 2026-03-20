@@ -30,6 +30,10 @@
   width: 18px;
   height: 15px;
 }
+.switch-account-icon {
+  width: 20px;
+  height: 20px;
+}
 .location-button {
   position: absolute;
   left: 0;

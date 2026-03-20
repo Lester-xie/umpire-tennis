@@ -32,9 +32,10 @@
     }
   },
   "compileType": "miniprogram",
-  "appid": "wx06ea3d2a3cdf2241",
+  "appid": "wx82d74e0ea1edb777",
   "projectname": "umpire-tennis",
   "condition": {},
   "simulatorPluginLibVersion": {},
-  "editorSetting": {}
+  "editorSetting": {},
+  "cloudfunctionRoot": "cloudfunctions/"
 }

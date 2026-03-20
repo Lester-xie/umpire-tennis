@@ -1,8 +1,6 @@
 <view class="complete-profile-page">
   <header hideDesc="{{true}}" showBackButton="{{true}}" />
   <view class="content">
-    <view class="section-title">请填写昵称、头像与手机号</view>
-
     <view class="form-row form-row-nickname {{nicknameFocus ? 'form-row-focus' : ''}}">
       <text class="form-label">昵称</text>
       <input
@@ -31,24 +29,7 @@
     <view class="form-row">
       <text class="form-label">手机号</text>
       <view class="form-value">
-        <button
-          wx:if="{{!phoneAuthorized && !userPhone}}"
-          class="phone-auth-btn"
-          open-type="getPhoneNumber"
-          bindgetphonenumber="onGetPhoneNumber"
-        >
-          获取微信手机号
-        </button>
-        <view wx:elif="{{phoneAuthorized}}" class="phone-done">已授权</view>
-        <input
-          wx:else
-          class="phone-input"
-          type="number"
-          maxlength="11"
-          placeholder="或手动输入手机号"
-          value="{{userPhone}}"
-          bindinput="onPhoneInput"
-        />
+        <view class="phone-done">{{ userPhone || '—' }}</view>
       </view>
     </view>
 

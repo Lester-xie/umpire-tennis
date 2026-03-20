@@ -136,8 +136,8 @@ Component({
 
   attached: function () {
     // 计算 desc 的宽高
-    const systemInfo = wx.getSystemInfoSync();
-    const screenWidth = systemInfo.windowWidth || systemInfo.screenWidth;
+    const windowInfo = wx.getWindowInfo();
+    const screenWidth = windowInfo.windowWidth || windowInfo.screenWidth;
     const descWidth = screenWidth - 32;
     const aspectRatio = 1.9230769230769231;
     const descHeight = descWidth / aspectRatio;

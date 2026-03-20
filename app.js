@@ -8,6 +8,16 @@ App({
   },
   onLaunch() {
     this.initSystemInfo();
+    this.initCloud();
+  },
+  initCloud() {
+    try {
+      if (wx.cloud && wx.cloud.init) {
+        wx.cloud.init();
+      }
+    } catch (e) {
+      console.warn('wx.cloud.init failed', e);
+    }
   },
   checkLogin() {
     return !!this.globalData.isLoggedIn;
@@ -31,16 +41,13 @@ App({
     });
   },
   initSystemInfo() {
-    wx.getSystemInfo({
-      success: (res) => {
-        console.log(res);
-        
-        this.globalData.screenInfo = {
-          headerInfo: {
-            headerPaddingTop: res.safeArea.top,
-          },
-        };
+    const windowInfo = wx.getWindowInfo();
+    const safeTop = windowInfo?.safeArea?.top;
+    const fallback = windowInfo?.statusBarHeight || 0;
+    this.globalData.screenInfo = {
+      headerInfo: {
+        headerPaddingTop: safeTop != null ? safeTop : fallback,
       },
-    });
+    };
   }
 });

@@ -1,6 +1,6 @@
 {
   "navigationBarTitleText": "全部团购",
   "usingComponents": {
-    "header": "/pages/components/header/header"
+    "header": "/components/header/header"
   }
 }

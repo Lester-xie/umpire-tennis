@@ -25,6 +25,11 @@ Component({
       type: Boolean,
       value: false,
     },
+    // 是否显示「切换账号」按钮（与 back-button 同位置、同样式）
+    showSwitchAccountButton: {
+      type: Boolean,
+      value: false,
+    },
   },
 
   observers: {
@@ -53,6 +58,10 @@ Component({
     // 处理返回按钮点击
     handleBack() {
       wx.navigateBack();
+    },
+    // 切换账号：由页面处理业务逻辑
+    handleSwitchAccount() {
+      this.triggerEvent('switchaccount', {});
     },
     // 进入选择球场页
     handleLocationTap() {
@@ -189,8 +198,8 @@ Component({
     if (app) {
       const { headerInfo } = app.globalData.screenInfo || {};
       // 计算 desc 的宽高
-      const systemInfo = wx.getSystemInfoSync();
-      const screenWidth = systemInfo.windowWidth || systemInfo.screenWidth;
+      const windowInfo = wx.getWindowInfo();
+      const screenWidth = windowInfo.windowWidth || windowInfo.screenWidth;
       const descWidth = screenWidth - 32;
       const aspectRatio = 1.9230769230769231;
       const descHeight = descWidth / aspectRatio;

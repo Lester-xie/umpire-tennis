@@ -40,6 +40,7 @@
   align-items: center;
   padding: 20px;
   min-height: 80px;
+  position: relative;
 }
 
 .user-avatar-wrapper {
@@ -57,6 +58,9 @@
 .user-avatar {
   width: 56px;
   height: 56px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 2px solid #E8EFEB;
 }
 
 .user-info {
@@ -81,6 +85,22 @@
 .user-arrow {
   padding: 8px;
   flex-shrink: 0;
+}
+
+/* 未登录时，透明覆盖按钮：点击 user-card 直接触发 getPhoneNumber */
+.user-card-auth-btn {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  border: none;
+  border-radius: 14px;
+  padding: 0;
+  margin: 0;
+  opacity: 0;
+  z-index: 2;
 }
 
 .arrow-icon {

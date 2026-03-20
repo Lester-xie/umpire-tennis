@@ -1,6 +1,6 @@
 {
   "navigationBarTitleText": "完善资料",
   "usingComponents": {
-    "header": "/pages/components/header/header"
+    "header": "/components/header/header"
   }
 }

@@ -1,9 +1,21 @@
+const STORAGE_KEYS = {
+  userPhoneCode: 'user_phone_code',
+  userPhone: 'user_phone',
+  userNickname: 'user_nickname',
+  userAvatar: 'user_avatar',
+};
+
+const { getUserByPhone, createUser, decryptPhoneNumber } = require('../../api/tennisDb');
+const { getRandomSchmoeAvatarUrl } = require('../../utils/schmoeAvatar');
+
 Page({
   data: {
+    showPhoneAuthModal: false, // 需手机号注册/授权时展示
     orderType: 'court', // 订单类型：court 场地订单 | goods 商品订单
     orderDate: '', // 预订日期
     formattedDate: '', // 格式化后的日期
     campusName: '', // 球馆名称，来自当前选定的球场
+    venueId: '', // 用于云端计算价格/订单（booking 传参）
     orderNumber: '', // 订单编号
     orderItems: [], // 场地订单项 [{courtId, courtName, timeSlots: [{timeRange, price, hours}], totalPrice}]
     goodItem: null, // 商品订单项 {id, image, desc, price}
@@ -35,6 +47,7 @@ Page({
     const selectedSlots = JSON.parse(decodeURIComponent(options.selectedSlots || '[]'));
     const selectedDate = decodeURIComponent(options.selectedDate || '');
     const courts = JSON.parse(decodeURIComponent(options.courts || '[]'));
+    const venueId = decodeURIComponent(options.venueId || '');
     
     const orderNumber = this.generateOrderNumber();
     const orderItems = this.processOrderItems(selectedSlots, courts);
@@ -47,6 +60,7 @@ Page({
       orderNumber: orderNumber,
       orderItems: orderItems,
       totalPrice: totalPrice,
+      venueId: venueId,
     });
     this.syncCampusName();
   },
@@ -79,20 +93,20 @@ Page({
 
   // 动态计算 scroll-view 高度：窗口高度 - header - footer - 间距
   calculateContentScrollHeight() {
-    const systemInfo = wx.getSystemInfoSync();
-    const windowHeight = systemInfo.windowHeight;
+    const windowInfo = wx.getWindowInfo();
+    const windowHeight = windowInfo.windowHeight;
 
     const query = wx.createSelectorQuery();
     query.select('.header').boundingClientRect();
     query.exec((res) => {
       const headerRect = res[0];
       const headerHeight = headerRect ? headerRect.height : 0;
-      const headerFallback = (systemInfo.statusBarHeight || 44) + 44; // statusBar + 导航栏
+      const headerFallback = (windowInfo.statusBarHeight || 44) + 44; // statusBar + 导航栏
       const finalHeaderHeight = headerHeight > 0 ? headerHeight : headerFallback;
 
       // footer 高度：内边距 8*2 + 按钮约 36 + 底部安全区
-      const safeAreaBottom = systemInfo.safeArea
-        ? systemInfo.screenHeight - systemInfo.safeArea.bottom
+      const safeAreaBottom = windowInfo.safeArea
+        ? windowInfo.screenHeight - windowInfo.safeArea.bottom
         : 0;
       const footerHeight = 16 + 36 + safeAreaBottom + 8;
 
@@ -288,21 +302,127 @@ Page({
     }
   },
 
-  // 处理底部按钮点击：未登录时去登录，已登录时确认付款
-  handleSubmitOrder() {
+  handleClosePhoneAuthModal() {
+    this.setData({ showPhoneAuthModal: false });
+  },
+
+  /**
+   * 手机号授权登录/注册（逻辑与 profile 页一致）
+   */
+  async onPhoneRegister(e) {
+    const { errMsg, encryptedData, iv } = e.detail || {};
+    if (!errMsg || !errMsg.includes('ok')) {
+      return;
+    }
+
+    const app = getApp();
+    if (!app) return;
+
+    wx.showLoading({ title: '处理中...' });
+    try {
+      const loginCode = await app.doLogin();
+      if (!loginCode) {
+        wx.hideLoading();
+        wx.showToast({ title: '登录失败，请重试', icon: 'none' });
+        return;
+      }
+      wx.setStorageSync(STORAGE_KEYS.userPhoneCode, loginCode);
+
+      if (!encryptedData || !iv) {
+        wx.hideLoading();
+        wx.setStorageSync(STORAGE_KEYS.userPhoneCode, '');
+        wx.setStorageSync(STORAGE_KEYS.userPhone, '');
+        wx.showToast({ title: '缺少授权数据，请重试', icon: 'none' });
+        return;
+      }
+
+      const { miniProgram } = wx.getAccountInfoSync() || {};
+      const appid = miniProgram?.appId;
+      const decryptRes = await decryptPhoneNumber({
+        code: loginCode,
+        encryptedData,
+        iv,
+        appid,
+      });
+      const phoneNumber =
+        decryptRes && decryptRes.result ? decryptRes.result.phoneNumber : decryptRes.phoneNumber;
+
+      if (!phoneNumber) {
+        wx.hideLoading();
+        wx.setStorageSync(STORAGE_KEYS.userPhoneCode, '');
+        wx.setStorageSync(STORAGE_KEYS.userPhone, '');
+        wx.showToast({ title: '手机号解密失败，请重试', icon: 'none' });
+        return;
+      }
+
+      const phone = String(phoneNumber);
+      const last4 = phone.slice(-4);
+      const defaultNickname = `昂湃用户_${last4}`;
+
+      const res = await getUserByPhone(phone);
+      const user = res && res.data && res.data.length > 0 ? res.data[0] : null;
+
+      if (user) {
+        wx.setStorageSync(STORAGE_KEYS.userPhone, phone);
+        wx.setStorageSync(STORAGE_KEYS.userAvatar, user.avatar || '');
+        wx.setStorageSync(STORAGE_KEYS.userNickname, user.name || '');
+        wx.hideLoading();
+        this.setData({ showPhoneAuthModal: false });
+        wx.showToast({ title: '登录成功', icon: 'success' });
+        this.updateFooterButtonText();
+        return;
+      }
+
+      const schmoeAvatarUrl = getRandomSchmoeAvatarUrl();
+      await createUser({
+        phone,
+        name: defaultNickname,
+        avatar: schmoeAvatarUrl,
+      });
+
+      wx.setStorageSync(STORAGE_KEYS.userPhone, phone);
+      wx.setStorageSync(STORAGE_KEYS.userNickname, defaultNickname);
+      wx.setStorageSync(STORAGE_KEYS.userAvatar, schmoeAvatarUrl);
+
+      wx.hideLoading();
+      this.setData({ showPhoneAuthModal: false });
+      wx.showToast({ title: '注册成功', icon: 'success' });
+      this.updateFooterButtonText();
+    } catch (err2) {
+      wx.hideLoading();
+      wx.showToast({ title: '处理失败，请重试', icon: 'none' });
+    }
+  },
+
+  // 处理底部按钮点击：未登录时去登录（先查库），已登录时确认付款
+  async handleSubmitOrder() {
     const app = getApp();
     if (!app.checkLogin()) {
-      wx.showLoading({ title: '登录中...' });
-      app.doLogin()
-        .then(() => {
-          wx.hideLoading();
-          wx.showToast({ title: '登录成功', icon: 'success', duration: 1000 });
-          this.updateFooterButtonText();
-        })
-        .catch(() => {
-          wx.hideLoading();
-          wx.showToast({ title: '登录失败，请重试', icon: 'none' });
-        });
+      // 1）本地已有手机号：查云库是否已注册 → 已注册则直接 wx.login 完成登录
+      const storedPhone = wx.getStorageSync(STORAGE_KEYS.userPhone) || '';
+      if (storedPhone) {
+        wx.showLoading({ title: '验证中...' });
+        try {
+          const res = await getUserByPhone(storedPhone);
+          const user = res && res.data && res.data.length > 0 ? res.data[0] : null;
+          if (user) {
+            await app.doLogin();
+            wx.setStorageSync(STORAGE_KEYS.userPhone, storedPhone);
+            wx.setStorageSync(STORAGE_KEYS.userAvatar, user.avatar || '');
+            wx.setStorageSync(STORAGE_KEYS.userNickname, user.name || '');
+            wx.hideLoading();
+            wx.showToast({ title: '登录成功', icon: 'success' });
+            this.updateFooterButtonText();
+            return;
+          }
+        } catch (e) {
+          console.error('getUserByPhone failed', e);
+        }
+        wx.hideLoading();
+      }
+
+      // 2）无手机号或库中无用户：弹出手机号授权
+      this.setData({ showPhoneAuthModal: true });
       return;
     }
 

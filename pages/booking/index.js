@@ -1,3 +1,17 @@
+const { getCourtSlotPrices } = require('../../api/tennisDb');
+
+/** 根据 YYYY-MM-DD 判断是否为周六(6)或周日(0) */
+function isWeekendDateStr(dateStr) {
+  const parts = String(dateStr || '').split('-');
+  if (parts.length !== 3) return false;
+  const y = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10) - 1;
+  const d = parseInt(parts[2], 10);
+  if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return false;
+  const wd = new Date(y, m, d).getDay();
+  return wd === 0 || wd === 6;
+}
+
 Page({
   data: {
     dateList: [], // 日期列表
@@ -11,6 +25,8 @@ Page({
     rippleSlot: null, // 当前显示波纹动画的时间段 {courtId, slotIndex}
     totalPrice: 0, // 总价
     selectedVenueName: '', // 当前选定的球场名称
+    selectedVenueId: '', // 当前选定的球场 id（用于 court_slot_prices）
+    priceLoading: false, // 加载价格规则状态
   },
   
   // 动画定时器
@@ -18,15 +34,18 @@ Page({
   slotRippleTimer: null,
   
   onLoad() {
-    this.syncSelectedVenueName();
+    const newVenueId = this.syncSelectedVenueName();
     // 生成最近两个月的日期列表
     this.generateDateList();
-    // 生成时间段和场地数据
-    this.generateTimeSchedule();
+    // 加载价格规则后再生成时间段和场地数据（保证展示/计算一致）
+    this.loadSlotPricesAndRender(newVenueId);
   },
 
   onShow() {
-    this.syncSelectedVenueName();
+    const newVenueId = this.syncSelectedVenueName();
+    if (newVenueId) {
+      this.loadSlotPricesAndRender(newVenueId);
+    }
     // 检查是否需要清空数据（下单成功后返回）
     const app = getApp();
     if (app && app.globalData && app.globalData.shouldClearBookingData) {
@@ -39,11 +58,15 @@ Page({
     const app = getApp();
     const venue = app && app.globalData && app.globalData.selectedVenue;
     const name = (venue && venue.name) ? venue.name : '';
-    if (name !== this.data.selectedVenueName) {
-      this.setData({ selectedVenueName: name });
-      // 切换球馆后重置已选择的时间段
+    const venueId = (venue && venue.id) ? venue.id : '';
+
+    if (name !== this.data.selectedVenueName || venueId !== this.data.selectedVenueId) {
+      this.setData({ selectedVenueName: name, selectedVenueId: venueId });
+      // 切换球馆后重置已选择的时间段，并重新加载价格规则
       this.resetSelectedSlots();
+      return venueId;
     }
+    return null;
   },
 
   // 仅重置已选时间段（不重新生成场地/时段数据）
@@ -62,8 +85,8 @@ Page({
   
   // 清空预订数据
   clearBookingData() {
-    // 重新生成时间段和场地数据
-    this.generateTimeSchedule();
+    // 重新加载价格规则并生成时间段和场地数据
+    this.loadSlotPricesAndRender();
     
     // 清空选中状态
     this.setData({
@@ -87,8 +110,8 @@ Page({
   
   // 计算 content 高度：100vh - header 高度 - 底部安全距离 - custom-tab-bar 高度
   calculateContentHeight() {
-    const systemInfo = wx.getSystemInfoSync();
-    const windowHeight = systemInfo.windowHeight; // 100vh 对应的像素值
+    const windowInfo = wx.getWindowInfo();
+    const windowHeight = windowInfo.windowHeight; // 100vh 对应的像素值
     
     // 查询 header 和 tab-bar 的实际高度
     const query = wx.createSelectorQuery();
@@ -116,8 +139,8 @@ Page({
       const tabBarHeight = tabBarRect ? tabBarRect.height : 60; // 默认 60px
       
       // 计算底部安全距离：屏幕高度 - 安全区域底部
-      const safeAreaBottom = systemInfo.safeArea 
-        ? systemInfo.screenHeight - systemInfo.safeArea.bottom 
+      const safeAreaBottom = windowInfo.safeArea
+        ? windowInfo.screenHeight - windowInfo.safeArea.bottom
         : 0;
       
       const contentHeight = windowHeight - finalHeaderHeight - safeAreaBottom - tabBarHeight - 30;
@@ -125,6 +148,103 @@ Page({
         contentHeight: Math.max(contentHeight, 400), // 最小高度 400px
       });
     });
+  },
+
+  async loadSlotPricesAndRender(venueIdOverride) {
+    const venueId =
+      venueIdOverride !== undefined ? venueIdOverride : this.data.selectedVenueId;
+
+    this.slotPriceMap = {}; // { 'courtId-slotIndex': price }
+
+    // 没有 venueId 时直接走旧逻辑（不可用/无价格）
+    if (!venueId) {
+      this.generateTimeSchedule();
+      return;
+    }
+
+    const app = getApp();
+    const venue = app && app.globalData && app.globalData.selectedVenue;
+    const courtList = venue && Array.isArray(venue.courtList) ? venue.courtList : [];
+
+    // 优先使用 venue 文档里的 courtList[].priceList（与时段索引一一对应）
+    if (courtList.length > 0) {
+      const priceMap = {};
+      courtList.forEach((court, cIdx) => {
+        const courtId = cIdx + 1;
+        const prices = court.priceList || [];
+        prices.forEach((price, slotIndex) => {
+          const normalizedPrice = typeof price === 'number' ? price : Number(price);
+          if (Number.isFinite(normalizedPrice)) {
+            priceMap[`${courtId}-${slotIndex}`] = normalizedPrice;
+          }
+        });
+      });
+      this.slotPriceMap = priceMap;
+      this.setData({ priceLoading: false });
+      this.generateTimeSchedule();
+      return;
+    }
+
+    // 兼容旧数据：仍从 court_slot_prices 集合读取
+    const courtIds = [1, 2];
+    this.setData({ priceLoading: true });
+    try {
+      const res = await getCourtSlotPrices({ venueId, courtIds });
+      const priceMap = {};
+
+      (res && res.data ? res.data : []).forEach((p) => {
+        if (p == null) return;
+        const courtId = p.courtId;
+        const slotIndex = p.slotIndex;
+        const price = p.price;
+        if (courtId == null || slotIndex == null) return;
+
+        const key = `${courtId}-${slotIndex}`;
+        const normalizedPrice = typeof price === 'number' ? price : Number(price);
+        if (Number.isFinite(normalizedPrice)) {
+          priceMap[key] = normalizedPrice;
+        }
+      });
+
+      this.slotPriceMap = priceMap;
+
+    } catch (e) {
+      console.error('加载 court_slot_prices 失败', e);
+      wx.showToast({ title: '加载价格失败', icon: 'none' });
+      this.slotPriceMap = {};
+    } finally {
+      this.setData({ priceLoading: false });
+      this.generateTimeSchedule();
+    }
+  },
+
+  getSlotPrice(courtId, slotIndex) {
+    if (!this.slotPriceMap) return null;
+    const key = `${courtId}-${slotIndex}`;
+    const price = this.slotPriceMap[key];
+    if (price == null) return null;
+    return Number(price);
+  },
+
+  /**
+   * 解析某时段展示/结算价格：周六、周日使用 court.specialPrice；其余日期用 priceList（slotPriceMap）
+   */
+  resolveSlotPrice(courtId, slotIndex, selectedDate) {
+    const app = getApp();
+    const venue = app && app.globalData && app.globalData.selectedVenue;
+    const courtList = venue && Array.isArray(venue.courtList) ? venue.courtList : [];
+    const court = courtList[courtId - 1];
+
+    if (court && isWeekendDateStr(selectedDate)) {
+      const sp = court.specialPrice;
+      if (sp != null && sp !== '') {
+        const n = typeof sp === 'number' ? sp : Number(sp);
+        if (Number.isFinite(n) && n >= 0) {
+          return n;
+        }
+      }
+    }
+    return this.getSlotPrice(courtId, slotIndex);
   },
   
   // 生成最近两个月的日期列表
@@ -236,9 +356,9 @@ Page({
   
   // 生成时间段和场地数据
   generateTimeSchedule() {
-    // 生成时间段：8:00-22:00
+    // 与 venue.courtList[].priceList 对齐：14 个时段，8:00–21:00 开始（至 22:00 结束）
     const timeSlots = [];
-    for (let hour = 8; hour <= 22; hour++) {
+    for (let hour = 8; hour <= 21; hour++) {
       const hourStr = hour < 10 ? `0${hour}` : `${hour}`;
       timeSlots.push({
         time: `${hourStr}:00`,
@@ -248,19 +368,31 @@ Page({
 
     const selectedDate = this.data.selectedDate || this.getTodayDateStr();
 
-    // 生成两个场地的数据
-    const courts = [
-      {
-        id: 1,
-        name: '1号场',
-        slots: this.generateCourtSlots(timeSlots, selectedDate),
-      },
-      {
-        id: 2,
-        name: '2号场',
-        slots: this.generateCourtSlots(timeSlots, selectedDate),
-      },
-    ];
+    const app = getApp();
+    const venue = app && app.globalData && app.globalData.selectedVenue;
+    const courtList = venue && Array.isArray(venue.courtList) ? venue.courtList : [];
+
+    let courts;
+    if (courtList.length > 0) {
+      courts = courtList.map((c, idx) => ({
+        id: idx + 1,
+        name: c.name || `${idx + 1}号场`,
+        slots: this.generateCourtSlots(timeSlots, selectedDate, idx + 1),
+      }));
+    } else {
+      courts = [
+        {
+          id: 1,
+          name: '1号场',
+          slots: this.generateCourtSlots(timeSlots, selectedDate, 1),
+        },
+        {
+          id: 2,
+          name: '2号场',
+          slots: this.generateCourtSlots(timeSlots, selectedDate, 2),
+        },
+      ];
+    }
 
     this.setData({
       timeSlots: timeSlots,
@@ -277,29 +409,32 @@ Page({
   },
 
   // 生成场地的可预订时间段：当前时间以前的不可用，以后的都可预订
-  generateCourtSlots(timeSlots, selectedDate) {
+  generateCourtSlots(timeSlots, selectedDate, courtId) {
     const slots = [];
-    const price = 100; // 默认价格
 
     const now = new Date();
     const todayStr = this.getTodayDateStr();
 
     for (let i = 0; i < timeSlots.length; i++) {
       const slotHour = timeSlots[i].hour;
-      let isAvailable = false;
+      let isAvailableTime = false;
 
       if (selectedDate > todayStr) {
         // 未来日期：全部可预订
-        isAvailable = true;
+        isAvailableTime = true;
       } else if (selectedDate === todayStr) {
         // 今天：当前时间以后的才可预订
         const slotTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), slotHour, 0, 0);
-        isAvailable = slotTime > now;
+        isAvailableTime = slotTime > now;
       }
+
+      // 只有在“时间可预订”和“价格规则存在”时才允许选择（周末用 specialPrice）
+      const slotPrice = this.resolveSlotPrice(courtId, i, selectedDate);
+      const isAvailable = isAvailableTime && slotPrice != null;
 
       slots.push({
         available: isAvailable,
-        price: isAvailable ? price : null,
+        price: isAvailable ? slotPrice : null,
         booked: false,
       });
     }
@@ -317,19 +452,22 @@ Page({
       ...court,
       slots: court.slots.map((slot, i) => {
         const slotHour = timeSlots[i].hour;
-        let isAvailable = false;
+        let isAvailableTime = false;
 
         if (selectedDate > todayStr) {
-          isAvailable = true;
+          isAvailableTime = true;
         } else if (selectedDate === todayStr) {
           const slotTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), slotHour, 0, 0);
-          isAvailable = slotTime > now;
+          isAvailableTime = slotTime > now;
         }
+
+        const slotPrice = this.resolveSlotPrice(court.id, i, selectedDate);
+        const isAvailable = isAvailableTime && slotPrice != null;
 
         return {
           ...slot,
           available: isAvailable,
-          price: isAvailable ? 100 : null,
+          price: isAvailable ? slotPrice : null,
         };
       }),
     }));
@@ -459,9 +597,10 @@ Page({
     const selectedSlots = encodeURIComponent(JSON.stringify(this.data.selectedSlots));
     const selectedDate = encodeURIComponent(this.data.selectedDate);
     const courts = encodeURIComponent(JSON.stringify(this.data.courts));
+    const venueId = encodeURIComponent(this.data.selectedVenueId || '');
     
     wx.navigateTo({
-      url: `/pages/order-detail/index?selectedSlots=${selectedSlots}&selectedDate=${selectedDate}&courts=${courts}`,
+      url: `/pages/order-detail/index?selectedSlots=${selectedSlots}&selectedDate=${selectedDate}&courts=${courts}&venueId=${venueId}`,
     });
   },
 });

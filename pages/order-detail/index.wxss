@@ -222,3 +222,70 @@
   font-weight: 600;
   letter-spacing: 0.5px;
 }
+
+/* 手机号授权弹窗（与 profile 一致） */
+.login-modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.login-modal {
+  width: 280px;
+  background-color: #fff;
+  border-radius: 14px;
+  padding: 24px;
+}
+
+.login-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.login-modal-desc {
+  font-size: 15px;
+  color: #666;
+  text-align: center;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+.login-modal-btns {
+  display: flex;
+  gap: 12px;
+}
+
+.login-modal-btn {
+  flex: 1;
+  padding: 12px;
+  text-align: center;
+  font-size: 15px;
+  border-radius: 10px;
+  border: none;
+  margin: 0;
+}
+
+.login-modal-btn::after {
+  border: none;
+}
+
+.login-modal-btn.cancel {
+  background-color: #F0F0F0;
+  color: #666;
+}
+
+.login-modal-btn.confirm {
+  background: linear-gradient(135deg, #134E35 0%, #1a6b4a 100%);
+  color: #fff;
+  font-weight: 500;
+}

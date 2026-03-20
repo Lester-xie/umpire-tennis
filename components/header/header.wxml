@@ -6,7 +6,10 @@
     <view class="back-button" wx:if="{{showBackButton}}" bindtap="handleBack">
       <image class="back-icon" src="/assets/images/arrow.svg" mode="aspectFit"></image>
     </view>
-    <view class="location-button" wx:if="{{showLocationButton}}" bindtap="handleLocationTap">
+    <view class="back-button" wx:elif="{{showSwitchAccountButton}}" bindtap="handleSwitchAccount">
+      <image class="switch-account-icon" src="/assets/images/exchange.svg" mode="aspectFit"></image>
+    </view>
+    <view class="location-button" wx:elif="{{showLocationButton}}" bindtap="handleLocationTap">
       <image class="location-icon" src="/assets/images/location.svg" mode="aspectFit"></image>
     </view>
     <view class="title">{{ title }}</view>
