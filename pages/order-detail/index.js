@@ -5,6 +5,9 @@ const STORAGE_KEYS = {
   userAvatar: 'user_avatar',
 };
 
+/** 与 pages/booking-success 约定：支付成功后写入，成功页读取后删除 */
+const BOOKING_SUCCESS_STORAGE_KEY = 'booking_success_payload';
+
 const { getUserByPhone, createUser, decryptPhoneNumber } = require('../../api/tennisDb');
 const { getRandomSchmoeAvatarUrl } = require('../../utils/schmoeAvatar');
 
@@ -18,6 +21,7 @@ Page({
     venueId: '', // 用于云端计算价格/订单（booking 传参）
     orderNumber: '', // 订单编号
     orderItems: [], // 场地订单项 [{courtId, courtName, timeSlots: [{timeRange, price, hours}], totalPrice}]
+    bookedSlots: [], // 与预订页 selectedSlots 一致，写入 db_booking 用于占用时段
     goodItem: null, // 商品订单项 {id, image, desc, price}
     totalPrice: 0, // 总价
     contentScrollHeight: 400, // scroll-view 可滚动区域高度，动态计算
@@ -53,12 +57,19 @@ Page({
     const orderItems = this.processOrderItems(selectedSlots, courts);
     const totalPrice = this.calculateTotalPrice(orderItems);
     const formattedDate = this.formatDate(selectedDate);
-    
+    const bookedSlots = (selectedSlots || [])
+      .map((s) => ({
+        courtId: Number(s.courtId),
+        slotIndex: Number(s.slotIndex),
+      }))
+      .filter((s) => Number.isFinite(s.courtId) && Number.isFinite(s.slotIndex));
+
     this.setData({
       orderDate: selectedDate,
       formattedDate: formattedDate,
       orderNumber: orderNumber,
       orderItems: orderItems,
+      bookedSlots,
       totalPrice: totalPrice,
       venueId: venueId,
     });
@@ -270,36 +281,89 @@ Page({
     return orderItems.reduce((total, item) => total + item.totalPrice, 0);
   },
 
-  // 保存订单到本地存储（供 profile 页面的订场/团购历史展示）
-  saveOrderToStorage() {
-    const { orderType, orderNumber, formattedDate, orderDate, campusName, orderItems, goodItem, totalPrice } = this.data;
-    const createdAt = Date.now();
-    try {
-      if (orderType === 'court') {
-        const courtOrders = wx.getStorageSync('court_orders') || [];
-        courtOrders.unshift({
-          orderNumber,
-          formattedDate,
-          orderDate,
-          campusName,
-          orderItems,
-          totalPrice,
-          createdAt,
-        });
-        wx.setStorageSync('court_orders', courtOrders);
-      } else if (orderType === 'goods' && goodItem) {
-        const goodsOrders = wx.getStorageSync('goods_orders') || [];
-        goodsOrders.unshift({
-          orderNumber,
-          goodItem,
-          totalPrice,
-          createdAt,
-        });
-        wx.setStorageSync('goods_orders', goodsOrders);
-      }
-    } catch (e) {
-      console.error('保存订单到本地失败', e);
+  // 拉起微信支付；订场成功后跳转订场成功页并清空预订页已选时段
+  saveOrderToDB() {
+    const { orderType, totalPrice } = this.data;
+    const yuan = Number(totalPrice);
+    if (!Number.isFinite(yuan) || yuan <= 0) {
+      wx.showToast({ title: '订单金额无效', icon: 'none' });
+      return;
     }
+    // 云函数要求 totalFee 为整数「分」，与页面展示「元」一致
+    // const totalFee = Math.max(1, Math.round(yuan * 100));
+    const totalFee = 1;
+
+    const payPayload = {
+      totalFee,
+    };
+    if (orderType === 'court') {
+      payPayload.phone = wx.getStorageSync(STORAGE_KEYS.userPhone) || '';
+      payPayload.booking = {
+        type: 'court',
+        orderNumber: this.data.orderNumber,
+        campusName: this.data.campusName,
+        venueId: this.data.venueId,
+        orderDate: this.data.orderDate,
+        formattedDate: this.data.formattedDate,
+        orderItems: this.data.orderItems,
+        bookedSlots: this.data.bookedSlots || [],
+        totalPrice: this.data.totalPrice,
+      };
+    }
+
+    wx.showLoading({ title: '支付中...', mask: true });
+    wx.cloud.callFunction({
+      name: 'pay',
+      data: payPayload,
+      success: (res) => {
+        wx.hideLoading();
+        const result = res.result || {};
+        const payment = result.payment;
+        if (result.returnCode !== 'SUCCESS' || !payment) {
+          console.error('unifiedOrder 失败', result);
+          wx.showToast({
+            title: result.returnMsg || '下单失败',
+            icon: 'none',
+          });
+          return;
+        }
+        wx.requestPayment({
+          ...payment,
+          success: () => {
+            if (orderType === 'court') {
+              try {
+                wx.setStorageSync(BOOKING_SUCCESS_STORAGE_KEY, {
+                  campusName: this.data.campusName,
+                  orderItems: this.data.orderItems,
+                });
+              } catch (e) {
+                console.error('写入订场成功缓存失败', e);
+              }
+              const app = getApp();
+              if (app && app.globalData) {
+                app.globalData.shouldClearBookingData = true;
+              }
+              wx.redirectTo({ url: '/pages/booking-success/index' });
+              return;
+            }
+            // 商品订单：后续流程待定
+            wx.showToast({ title: '支付成功', icon: 'success' });
+          },
+          fail: (err) => {
+            console.error('pay fail', err);
+            wx.showToast({
+              title: err.errMsg && err.errMsg.indexOf('cancel') >= 0 ? '已取消支付' : '支付未完成',
+              icon: 'none',
+            });
+          },
+        });
+      },
+      fail: (err) => {
+        wx.hideLoading();
+        console.error('callFunction pay', err);
+        wx.showToast({ title: '网络异常，请重试', icon: 'none' });
+      },
+    });
   },
 
   handleClosePhoneAuthModal() {
@@ -426,19 +490,6 @@ Page({
       return;
     }
 
-    wx.showLoading({ title: '提交中...' });
-    // TODO: 调用后端接口提交订单
-    this.saveOrderToStorage();
-    setTimeout(() => {
-      wx.hideLoading();
-      wx.showToast({
-        title: '订单提交成功',
-        icon: 'success',
-      });
-      if (this.data.orderType === 'court') {
-        app.globalData.shouldClearBookingData = true;
-      }
-      setTimeout(() => wx.navigateBack(), 1500);
-    }, 1000);
+    this.saveOrderToDB();
   },
 });

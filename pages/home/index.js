@@ -1,42 +1,19 @@
+const { ALL_CATEGORY_ID } = require('../../utils/constants');
+
 Page({
   data: {
     headerHeight: 0, // header 高度
     contentHeight: 400,
     placeholderHeight: 0,
+    /** 与 category 选中项同步，传给 goods 筛选 db_course */
+    filterCategoryId: ALL_CATEGORY_ID,
   },
-  onLoad() {
-    // wx.cloud.callFunction({
-    //   name: 'pay',
-    //   data: {
-    //     // totalFee：订单金额，单位「分」，必须是整数（例如 1 表示 1 分，100 表示 1 元）
-    //     totalFee: 1,
-    //   },
-    //   success: (res) => {
-    //     const result = res.result || {};
-    //     const payment = result.payment;
-    //     // 统一下单失败时 returnCode 为 FAIL，不会有 payment；errMsg 仍可能是 cloudPay.unifiedOrder:ok（仅表示云函数调用成功）
-    //     if (result.returnCode !== 'SUCCESS' || !payment) {
-    //       console.error('unifiedOrder 失败', result);
-    //       wx.showToast({
-    //         title: result.returnMsg || '下单失败',
-    //         icon: 'none',
-    //       });
-    //       return;
-    //     }
-    //     console.log('payment', payment);
-    //     wx.requestPayment({
-    //       ...payment,
-    //       success(payRes) {
-    //         console.log('pay success', payRes);
-    //       },
-    //       fail(err) {
-    //         console.error('pay fail', err);
-    //       },
-    //     });
-    //   },
-    //   fail: console.error,
-    // });
+  onCategoryTap(e) {
+    const id = e.detail && e.detail.id;
+    if (!id) return;
+    this.setData({ filterCategoryId: id });
   },
+  onLoad() {},
   onReady() {
     // 页面渲染完成后计算 header 高度（只计算 title 部分）
     this.calculateHeaderHeight();

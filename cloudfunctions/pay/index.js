@@ -114,7 +114,41 @@ exports.main = async (event, context) => {
     tradeType: 'JSAPI',
     subOpenid: openid, // 用户在子商户 subAppid 下的 openid
   }
-  console.log('params', params);
   const res = await cloud.cloudPay.unifiedOrder(params);
+
+  // 订场：统一下单成功后再写入 db_booking（与 outTradeNo 关联，支付结果由 payCallback 更新为 paid）
+  if (res.returnCode === 'SUCCESS' && event.booking && event.booking.type === 'court') {
+    const db = cloud.database();
+    try {
+      await db.collection('db_booking').add({
+        data: {
+          _openid: openid,
+          phone: String(event.phone || '').trim(),
+          outTradeNo,
+          totalFee,
+          status: 'pending',
+          orderNumber: event.booking.orderNumber || '',
+          campusName: event.booking.campusName || '',
+          venueId: event.booking.venueId || '',
+          orderDate: event.booking.orderDate || '',
+          formattedDate: event.booking.formattedDate || '',
+          orderItems: event.booking.orderItems || [],
+          bookedSlots: Array.isArray(event.booking.bookedSlots)
+            ? event.booking.bookedSlots
+            : [],
+          totalPrice: Number(event.booking.totalPrice) || totalFee / 100,
+          createdAt: Date.now(),
+        },
+      });
+    } catch (err) {
+      console.error('db_booking 写入失败', err);
+      return {
+        returnCode: 'FAIL',
+        returnMsg: '订场订单保存失败，请重试',
+        payment: undefined,
+      };
+    }
+  }
+
   return res;
 };

@@ -22,7 +22,10 @@ Page({
     mapMarkers: [],
   },
 
-  onLoad() {
+  onLoad(options) {
+    /** 从预订页进入：选场后 navigateBack，不跳首页 */
+    this.returnToBooking = !!(options && options.from === 'booking');
+
     const selected = wx.getStorageSync(STORAGE_KEYS.selectedVenue) || null;
     const selectedVenueId = (selected && selected.id) ? selected.id : '';
 
@@ -157,6 +160,10 @@ Page({
     });
     wx.setStorageSync(STORAGE_KEYS.selectedVenue, venue);
     getApp().globalData.selectedVenue = venue;
+    if (this.returnToBooking) {
+      wx.navigateBack();
+      return;
+    }
     wx.switchTab({ url: '/pages/home/index' });
   },
 

@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "教练约场",
+  "usingComponents": {
+    "header": "/components/header/header"
+  }
+}

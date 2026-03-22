@@ -11,7 +11,7 @@
   left: 0;
   right: 0;
   z-index: 100;
-  padding: 0 16px;
+  padding: 0 32rpx;
   box-sizing: border-box;
 }
 
@@ -23,7 +23,7 @@
 }
 
 .content-wrapper {
-  padding: 0 16px;
+  padding: 0 32rpx;
   min-height: 100%;
 }
 

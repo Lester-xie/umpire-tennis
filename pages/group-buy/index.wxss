@@ -3,51 +3,51 @@
   flex-direction: column;
   min-height: 100vh;
   box-sizing: border-box;
-  padding: 0 16px;
+  padding: 0 32rpx;
 }
 
 .content {
   box-sizing: border-box;
-  padding: 10px 0;
+  padding: 20rpx 0;
 }
 
 .goods-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 24rpx;
 }
 
 .goods-item {
   display: flex;
   align-items: center;
   background-color: rgba(240, 246, 244, 0.8);
-  border-radius: 14px;
-  padding: 12px;
-  border: 1px solid #ffffff;
+  border-radius: 28rpx;
+  padding: 24rpx;
+  border: 2rpx solid #ffffff;
   overflow: hidden;
 }
 
 .goods-image {
-  width: 80px;
-  height: 80px;
-  border-radius: 10px;
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 20rpx;
   flex-shrink: 0;
 }
 
 .goods-info {
   flex: 1;
-  margin-left: 16px;
+  margin-left: 32rpx;
 }
 
 .goods-desc {
-  font-size: 15px;
+  font-size: 30rpx;
   color: #2d5016;
   line-height: 1.4;
 }
 
 .goods-price {
-  font-size: 18px;
+  font-size: 36rpx;
   font-weight: 600;
   color: #2d5016;
-  margin-top: 8px;
+  margin-top: 16rpx;
 }

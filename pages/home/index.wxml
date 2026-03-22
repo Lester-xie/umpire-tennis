@@ -5,8 +5,8 @@
   <scroll-view class="content-scroll" scroll-y="true" style="margin-top: {{headerHeight}}px; height: {{contentHeight}}px;">
     <view class="content-wrapper">
       <desc-container />
-      <main />
-      <goods />
+      <category bind:tap="onCategoryTap" />
+      <goods category-id="{{filterCategoryId}}" />
       <view style="height: {{placeholderHeight}}px;"></view>
     </view>
   </scroll-view>

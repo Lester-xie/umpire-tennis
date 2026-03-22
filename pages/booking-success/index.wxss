@@ -1,0 +1,149 @@
+.container {
+  padding: 0 32rpx;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+.content-scroll {
+  margin-top: 20rpx;
+  flex-shrink: 0;
+}
+
+.content {
+  background-color: #f2f6f3;
+  border-radius: 28rpx;
+  padding: 32rpx;
+  margin-bottom: 160rpx;
+  display: flex;
+  flex-direction: column;
+}
+
+.done-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.order-title {
+  font-size: 44rpx;
+  font-weight: 600;
+  color: #134E35;
+  margin-bottom: 32rpx;
+  text-align: center;
+}
+.done-icon {
+  width: 200rpx;
+  height: 200rpx;
+}
+
+.order-info {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+  margin-bottom: 32rpx;
+  padding-bottom: 32rpx;
+  border-bottom: 2rpx solid #e0e0e0;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.info-label {
+  font-size: 32rpx;
+  color: #666;
+}
+
+.info-value {
+  font-size: 28rpx;
+  color: #134E35;
+  font-weight: 500;
+}
+
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #134E35;
+  margin-bottom: 24rpx;
+}
+
+.court-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.court-item {
+  background: #fff;
+  border-radius: 24rpx;
+  padding: 28rpx;
+}
+
+.court-item-header {
+  margin-bottom: 20rpx;
+}
+
+.court-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #134E35;
+}
+
+.time-slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.time-slot-item {
+  display: flex;
+  align-items: center;
+}
+
+.time-slot-info {
+  display: flex;
+  align-items: baseline;
+  gap: 20rpx;
+}
+
+.time-slot-time {
+  font-size: 30rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+.time-slot-hours {
+  font-size: 26rpx;
+  color: #888;
+}
+
+.footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16rpx 32rpx;
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+  background: #f7f9ff;
+  box-sizing: border-box;
+}
+
+.footer-button {
+  height: 88rpx;
+  border-radius: 44rpx;
+  background: #134E35;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer-button-text {
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 500;
+}

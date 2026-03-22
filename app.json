@@ -1,10 +1,16 @@
 {
   "pages": [
+    "pages/welcome/index",
     "pages/location/index",
     "pages/home/index",
     "pages/booking/index",
     "pages/order-detail/index",
+    "pages/booking-success/index",
     "pages/profile/index",
+    "pages/profile-coach-holds/index",
+    "pages/profile-court-orders/index",
+    "pages/profile-goods-orders/index",
+    "pages/coach-booking/index",
     "pages/complete-profile/index",
     "pages/group-buy/index"
   ],

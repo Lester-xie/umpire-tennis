@@ -1,0 +1,14 @@
+{
+  "name": "coachHoldSlots",
+  "version": "1.0.0",
+  "description": "教练占用场地时段，写入 db_coach_slot_hold",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

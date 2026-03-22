@@ -1,0 +1,155 @@
+<view class="container">
+  <header hideDesc="{{true}}" showBackButton="{{true}}" title="教练约场" />
+  <view class="content" style="height: {{contentHeight}}px; padding-bottom: {{selectedSlots.length > 0 ? '140rpx' : '40rpx'}};">
+    <view
+      class="content-header"
+      hover-class="content-header-title--hover"
+      hover-start-time="20"
+      hover-stay-time="100"
+      bindtap="handleContentHeaderTitleTap"
+    >
+      <image class="content-header-icon" src="/assets/images/location.png" mode="aspectFit"></image>
+      {{selectedVenueName}}
+    </view>
+
+    <scroll-view class="content-calendar" scroll-x="true" enable-flex="true">
+      <view class="content-calendar-scroll">
+        <view 
+          class="content-calendar-item" 
+          wx:for="{{dateList}}" 
+          wx:key="dateStr"
+          data-datestr="{{item.dateStr}}"
+          bindtap="handleDateClick"
+        >
+          <view class="date-weekday">{{item.weekday}}</view>
+          <view class="date-month-day {{selectedDate === item.dateStr ? 'active' : ''}} {{rippleDate === item.dateStr ? 'ripple' : ''}}">
+            <view class="date-text">{{item.monthDay}}</view>
+            <view class="ripple-effect" wx:if="{{rippleDate === item.dateStr}}"></view>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+    <view class="content-time">
+      <!-- 可滚动的区域 -->
+      <scroll-view class="content-time-scroll" scroll-x="true" scroll-y="true" enable-flex="true" show-scrollbar="{{false}}">
+        <view class="time-table">
+          <!-- 第一行：时间列头部 + 场地头部 -->
+          <view class="time-table-header">
+            <!-- 固定的时间列头部 -->
+            <view class="time-column-fixed">
+              <view class="time-header-fixed"></view>
+            </view>
+            <!-- 固定的场地头部 -->
+            <view class="court-header-row">
+              <view class="court-header" wx:for="{{courts}}" wx:key="id">
+                {{item.name}}
+              </view>
+            </view>
+          </view>
+          
+          <!-- 内容行：时间列 + 场地内容 -->
+          <view class="time-table-content">
+            <!-- 固定的时间列 -->
+            <view class="time-column-fixed">
+              <view class="time-slot-fixed" wx:for="{{timeSlots}}" wx:key="time">
+                {{item.time}}
+              </view>
+            </view>
+            <!-- 可滚动的内容区域 -->
+            <view class="court-content-row">
+              <view class="court-column" wx:for="{{courts}}" wx:key="id">
+                <view class="court-slots court-slots--stacked">
+                  <block wx:for="{{item.slots}}" wx:for-item="slot" wx:for-index="slotIndex" wx:key="slotIndex">
+                    <view 
+                      wx:if="{{!slot.coachMergeSkip && slot.available}}"
+                      class="time-slot-cell available {{selectedSlotsMap[item.id + '-' + slotIndex] ? 'active' : ''}} {{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slotIndex ? 'ripple' : ''}}"
+                      style="{{slot.slotStyle}}"
+                      data-courtid="{{item.id}}"
+                      data-slotindex="{{slotIndex}}"
+                      bindtap="handleSlotClick"
+                    >
+                      <view class="slot-text">
+                        <text class="slot-price">¥ {{slot.price}}</text>
+                      </view>
+                      <view class="ripple-effect" wx:if="{{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slotIndex}}"></view>
+                    </view>
+                    <view 
+                      wx:elif="{{!slot.coachMergeSkip && !slot.available}}"
+                      class="time-slot-cell {{slot.past ? 'slot-past' : ''}} {{slot.booked ? 'slot-occupied' : ''}} {{slot.bookedByCoach ? 'slot-coach-hold' : ''}}"
+                      style="{{slot.slotStyle}}"
+                    >
+                      <block wx:if="{{slot.past}}">
+                        <text class="slot-booked">不可预定</text>
+                      </block>
+                      <block wx:elif="{{slot.bookedByCoach}}">
+                        <view
+                          class="slot-coach-inner"
+                          catchtap="handleCoachHoldCellTap"
+                          data-holdids="{{slot.coachHoldIdsStr}}"
+                          data-canmanage="{{slot.canManageCoachHold}}"
+                          data-lessontype="{{slot.prefillLessonType}}"
+                          data-pairmode="{{slot.prefillPairMode}}"
+                          data-groupmode="{{slot.prefillGroupMode}}"
+                        >
+                          <text class="slot-coach-purpose">{{slot.coachPurpose}}</text>
+                          <text class="slot-coach-time">{{slot.coachTimeRange}}</text>
+                          <text class="slot-coach-hint">{{slot.canManageCoachHold ? '点击更改类型或取消' : '其他教练占用'}}</text>
+                        </view>
+                      </block>
+                      <block wx:elif="{{slot.booked}}">
+                        <text class="slot-booked">已订</text>
+                      </block>
+                      <block wx:else>
+                        <text class="slot-booked">已约</text>
+                      </block>
+                    </view>
+                  </block>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
+    </view>
+    <view class="content-footer" wx:if="{{selectedSlots.length > 0}}">
+      <view class="content-footer-left">
+        参考合计：¥ {{totalPrice}}
+      </view>
+      <view class="content-footer-right">
+        <view class="content-footer-right-button" bindtap="handleNextToPurpose">
+          <text class="content-footer-right-button-text">下一步</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="purpose-mask" wx:if="{{showPurposeSheet}}" catchtap="closePurposeSheet"></view>
+  <view class="purpose-sheet" wx:if="{{showPurposeSheet}}">
+    <view class="purpose-sheet-title">{{ purposeSheetMode === 'edit' ? '更改场地类型' : '填写场地用途' }}</view>
+    <view class="purpose-section-label">课程类型</view>
+    <view class="purpose-chip-row">
+      <view class="purpose-chip {{lessonType === 'experience' ? 'purpose-chip--on' : ''}}" data-v="experience" bindtap="selectLessonType">体验课</view>
+      <view class="purpose-chip {{lessonType === 'regular' ? 'purpose-chip--on' : ''}}" data-v="regular" bindtap="selectLessonType">正课</view>
+      <view class="purpose-chip {{lessonType === 'group' ? 'purpose-chip--on' : ''}}" data-v="group" bindtap="selectLessonType">团课</view>
+    </view>
+    <block wx:if="{{lessonType === 'experience' || lessonType === 'regular'}}">
+      <view class="purpose-section-label">规模</view>
+      <view class="purpose-chip-row">
+        <view class="purpose-chip {{pairMode === '1v1' ? 'purpose-chip--on' : ''}}" data-v="1v1" bindtap="selectPairMode">1V1</view>
+        <view class="purpose-chip {{pairMode === '1v2' ? 'purpose-chip--on' : ''}}" data-v="1v2" bindtap="selectPairMode">1V2</view>
+      </view>
+    </block>
+    <block wx:if="{{lessonType === 'group'}}">
+      <view class="purpose-section-label">团课规模</view>
+      <view class="purpose-chip-row">
+        <view class="purpose-chip {{groupMode === 'group35' ? 'purpose-chip--on' : ''}}" data-v="group35" bindtap="selectGroupMode">3-5人班</view>
+        <view class="purpose-chip {{groupMode === 'groupOther' ? 'purpose-chip--on' : ''}}" data-v="groupOther" bindtap="selectGroupMode">其他</view>
+      </view>
+    </block>
+    <view class="purpose-hint">{{ purposeSheetMode === 'edit' ? '保存后会员在订场页将看到更新后的用途说明' : '确定后该时段将对会员显示为已占用，不可再订' }}</view>
+    <view class="purpose-sheet-actions">
+      <view class="purpose-btn purpose-btn--ghost" bindtap="closePurposeSheet">取消</view>
+      <view class="purpose-btn purpose-btn--primary" bindtap="confirmPurposeSheet">确定</view>
+    </view>
+  </view>
+</view>

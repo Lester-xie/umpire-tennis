@@ -1,0 +1,32 @@
+<view class="profile-container">
+  <view class="header-wrapper">
+    <header hideDesc="{{true}}" showBackButton="{{true}}" title="订场历史" />
+  </view>
+  <scroll-view
+    class="content-scroll"
+    scroll-y="true"
+    enhanced="{{true}}"
+    show-scrollbar="{{false}}"
+    style="margin-top: {{headerHeight}}px; height: {{contentHeight}}px;"
+  >
+    <view class="content-wrapper">
+      <view class="card section-card">
+        <view class="section-list" wx:if="{{courtOrders.length > 0}}">
+          <view class="list-item court-item" wx:for="{{courtOrders}}" wx:key="_id">
+            <view class="item-main">
+              <view class="item-date">{{item.formattedDate}}</view>
+              <view class="item-summary">{{item.displaySummary}}</view>
+            </view>
+            <view class="item-price">¥ {{item.totalPrice}}</view>
+          </view>
+        </view>
+        <view class="empty-tip" wx:else>
+          <text wx:if="{{!isLoggedIn}}">登录后可查看订场记录</text>
+          <text wx:else>暂无订场记录</text>
+          <navigator class="empty-link" url="/pages/booking/index" open-type="switchTab">去预订</navigator>
+        </view>
+      </view>
+      <view class="placeholder" style="height: {{placeholderHeight}}px;"></view>
+    </view>
+  </scroll-view>
+</view>

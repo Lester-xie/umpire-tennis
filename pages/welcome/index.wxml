@@ -1,0 +1,28 @@
+<block wx:if="{{visible}}">
+  <view class="welcome-page">
+    <image class="welcome-bg" src="/assets/images/welcome-bg.jpg" mode="aspectFill" />
+    <view class="welcome-bottom">
+      <text class="welcome-line welcome-line--brand">昂湃</text>
+      <text class="welcome-line welcome-line--en">Tennis</text>
+      <view class="slide-wrap">
+        <view class="slide-track">
+          <image
+            class="slide-hint"
+            src="/assets/images/welcome-arrow.svg"
+            mode="widthFix"
+          />
+          <view
+            class="slide-thumb"
+            style="transform: translateX({{thumbTranslate}}px); transition: {{thumbTransition}};"
+            catchtouchstart="onThumbTouchStart"
+            catchtouchmove="onThumbTouchMove"
+            catchtouchend="onThumbTouchEnd"
+            catchtouchcancel="onThumbTouchEnd"
+          >
+            <text class="slide-thumb-text">GO</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+</block>

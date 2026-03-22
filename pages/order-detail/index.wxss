@@ -1,5 +1,5 @@
 .container {
-  padding: 0 16px;
+  padding: 0 32rpx;
   display: flex;
   flex-direction: column;
   height: 100vh;
@@ -7,15 +7,15 @@
 }
 
 .content-scroll {
-  margin-top: 10px;
+  margin-top: 20rpx;
   flex-shrink: 0;
 }
 
 .content {
   background-color: #F2F6F3;
-  border-radius: 14px;
-  padding: 16px;
-  margin-bottom: 80px;
+  border-radius: 28rpx;
+  padding: 32rpx;
+  margin-bottom: 160rpx;
   display: flex;
   flex-direction: column;
 }
@@ -29,39 +29,38 @@
   display: flex;
   align-items: center;
   background-color: #fff;
-  border-radius: 12px;
-  padding: 16px;
-  border-left: 3px solid #134E35;
+  border-radius: 24rpx;
+  padding: 32rpx;
 }
 .goods-order-image {
-  width: 80px;
-  height: 80px;
-  border-radius: 10px;
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 20rpx;
   flex-shrink: 0;
 }
 .goods-order-info {
   flex: 1;
-  margin-left: 16px;
+  margin-left: 32rpx;
 }
 .goods-order-desc {
-  font-size: 15px;
+  font-size: 30rpx;
   color: #134E35;
   line-height: 1.4;
 }
 .goods-order-price {
-  font-size: 18px;
+  font-size: 36rpx;
   font-weight: 600;
   color: #134E35;
-  margin-top: 8px;
+  margin-top: 16rpx;
 }
 
 .order-info {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #E0E0E0;
+  gap: 24rpx;
+  margin-bottom: 40rpx;
+  padding-bottom: 32rpx;
+  border-bottom: 2rpx solid #E0E0E0;
 }
 .info-item {
   display: flex;
@@ -69,52 +68,51 @@
   align-items: center;
 }
 .info-label {
-  font-size: 14px;
+  font-size: 28rpx;
   color: #666;
 }
 .info-value {
-  font-size: 14px;
+  font-size: 28rpx;
   color: #134E35;
   font-weight: 500;
 }
 .court-list {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 40rpx;
 }
 .court-item {
-  padding: 16px;
+  padding: 32rpx;
   background-color: #fff;
-  border-radius: 8px;
-  border-left: 3px solid #134E35;
+  border-radius: 16rpx;
 }
 .court-item-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #E0E0E0;
+  margin-bottom: 24rpx;
+  padding-bottom: 24rpx;
+  border-bottom: 2rpx solid #E0E0E0;
 }
 .court-name {
-  font-size: 15px;
+  font-size: 30rpx;
   font-weight: 500;
   color: #134E35;
 }
 .court-price {
-  font-size: 16px;
+  font-size: 32rpx;
   font-weight: 600;
   color: #134E35;
 }
 .time-slot-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16rpx;
 }
 .time-slot-item {
   background-color: #F2F6F3;
-  border-radius: 6px;
-  padding: 8px 12px;
+  border-radius: 12rpx;
+  padding: 16rpx 24rpx;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -122,32 +120,32 @@
 .time-slot-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 16rpx;
 }
 .time-slot-time {
-  font-size: 13px;
+  font-size: 26rpx;
   color: #134E35;
   font-weight: 500;
 }
 .time-slot-hours {
-  font-size: 12px;
+  font-size: 24rpx;
   color: #999;
   background-color: rgba(19, 78, 53, 0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
 }
 .time-slot-price {
-  font-size: 14px;
+  font-size: 28rpx;
   color: #134E35;
   font-weight: 500;
 }
 .fee-detail {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #E0E0E0;
+  gap: 24rpx;
+  margin-top: 40rpx;
+  padding-top: 40rpx;
+  border-top: 2rpx solid #E0E0E0;
 }
 .fee-item {
   display: flex;
@@ -155,25 +153,25 @@
   align-items: center;
 }
 .fee-item.total {
-  padding-top: 12px;
-  border-top: 1px solid #F0F0F0;
+  padding-top: 24rpx;
+  border-top: 2rpx solid #F0F0F0;
 }
 .fee-label {
-  font-size: 14px;
+  font-size: 28rpx;
   color: #666;
 }
 .fee-item.total .fee-label {
-  font-size: 16px;
+  font-size: 32rpx;
   font-weight: 600;
   color: #134E35;
 }
 .fee-value {
-  font-size: 14px;
+  font-size: 28rpx;
   color: #134E35;
   font-weight: 500;
 }
 .fee-item.total .fee-value {
-  font-size: 18px;
+  font-size: 36rpx;
   font-weight: 600;
 }
 .footer {
@@ -184,43 +182,43 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
-  padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  padding: 16rpx 32rpx;
+  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
   background-color: #fff;
-  border-top: 1px solid #E0E0E0;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+  border-top: 2rpx solid #E0E0E0;
+  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.05);
 }
 .footer-left {
   flex: 1;
 }
 .footer-total {
-  font-size: 14px;
+  font-size: 32rpx;
   font-weight: 500;
   color: #134E35;
 }
 .footer-right {
   flex-shrink: 0;
-  margin-left: 12px;
+  margin-left: 24rpx;
 }
 .footer-button {
   background: linear-gradient(135deg, #134E35 0%, #1a6b4a 100%);
-  border-radius: 20px;
-  padding: 8px 20px;
-  min-width: 80px;
+  border-radius: 40rpx;
+  padding: 16rpx 40rpx;
+  min-width: 160rpx;
   text-align: center;
-  box-shadow: 0 4px 12px rgba(19, 78, 53, 0.3);
+  box-shadow: 0 8rpx 24rpx rgba(19, 78, 53, 0.3);
   position: relative;
   overflow: hidden;
 }
 .footer-button:active {
   transform: scale(0.95);
-  box-shadow: 0 2px 8px rgba(19, 78, 53, 0.3);
+  box-shadow: 0 4rpx 16rpx rgba(19, 78, 53, 0.3);
 }
 .footer-button-text {
-  font-size: 13px;
+  font-size: 26rpx;
   color: #fff;
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 1rpx;
 }
 
 /* 手机号授权弹窗（与 profile 一致） */
@@ -238,39 +236,39 @@
 }
 
 .login-modal {
-  width: 280px;
+  width: 560rpx;
   background-color: #fff;
-  border-radius: 14px;
-  padding: 24px;
+  border-radius: 28rpx;
+  padding: 48rpx;
 }
 
 .login-modal-title {
-  font-size: 18px;
+  font-size: 36rpx;
   font-weight: 600;
   color: #333;
   text-align: center;
-  margin-bottom: 12px;
+  margin-bottom: 24rpx;
 }
 
 .login-modal-desc {
-  font-size: 15px;
+  font-size: 30rpx;
   color: #666;
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 48rpx;
   line-height: 1.5;
 }
 
 .login-modal-btns {
   display: flex;
-  gap: 12px;
+  gap: 24rpx;
 }
 
 .login-modal-btn {
   flex: 1;
-  padding: 12px;
+  padding: 24rpx;
   text-align: center;
-  font-size: 15px;
-  border-radius: 10px;
+  font-size: 30rpx;
+  border-radius: 20rpx;
   border: none;
   margin: 0;
 }

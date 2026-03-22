@@ -1,3 +1,6 @@
+/** 与 profile/order-detail 等页一致：本地已存手机号表示用户曾完成注册/授权 */
+const STORAGE_USER_PHONE = 'user_phone';
+
 App({
   globalData: {
     brand: "昂湃网球",
@@ -9,6 +12,18 @@ App({
   onLaunch() {
     this.initSystemInfo();
     this.initCloud();
+    this.restoreLoginSession();
+  },
+  /**
+   * 冷启动时若本地已有手机号，静默 wx.login，恢复 globalData.isLoggedIn，
+   * 避免每次重进小程序都显示未登录（仅内存态、未持久化导致）。
+   */
+  restoreLoginSession() {
+    const phone = wx.getStorageSync(STORAGE_USER_PHONE);
+    if (!phone) return;
+    this.doLogin().catch((e) => {
+      console.warn('restoreLoginSession failed', e);
+    });
   },
   initCloud() {
     try {
@@ -19,8 +34,11 @@ App({
       console.warn('wx.cloud.init failed', e);
     }
   },
+  /** 内存态 isLoggedIn 冷启动会丢；本地 user_phone 表示已注册，应视为已登录 */
   checkLogin() {
-    return !!this.globalData.isLoggedIn;
+    if (this.globalData.isLoggedIn) return true;
+    const phone = wx.getStorageSync(STORAGE_USER_PHONE);
+    return !!phone;
   },
   // 调用微信小程序 wx.login 接口登录
   doLogin() {

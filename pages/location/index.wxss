@@ -1,9 +1,9 @@
 .location-page {
   box-sizing: border-box;
-  padding: 0 16px 40px;
+  padding: 0 32rpx 80rpx;
   background-color: #F2F6F3;
-  margin: 10px 16px;
-  border-radius: 14px;
+  margin: 20rpx 32rpx;
+  border-radius: 28rpx;
 }
 
 .header-wrapper {
@@ -12,17 +12,17 @@
   left: 0;
   right: 0;
   z-index: 100;
-  padding: 0 16px;
+  padding: 0 32rpx;
   box-sizing: border-box;
 }
 
 .map-wrap {
-  margin: 0 -16px 24px;
-  height: 220px;
+  margin: 0 -32rpx 48rpx;
+  height: 440rpx;
   position: relative;
-  border-radius: 14px;
+  border-radius: 28rpx;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8rpx 40rpx rgba(0, 0, 0, 0.1);
 }
 
 .venue-map {
@@ -33,27 +33,27 @@
 .venue-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 24rpx;
 }
 
-/* 球场列表项：与页面整体风格一致（圆角 14px、浅绿背景、柔和阴影） */
+/* 球场列表项：与页面整体风格一致（圆角 28rpx、浅绿背景、柔和阴影） */
 .list-item {
   display: flex;
   align-items: center;
-  padding: 14px 16px;
+  padding: 28rpx 32rpx;
   background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 2px 12px rgba(19, 78, 53, 0.08);
+  border-radius: 28rpx;
+  box-shadow: 0 4rpx 24rpx rgba(19, 78, 53, 0.08);
 }
 /* 当前选中项：参考 date-month-day.active */
 .list-item.active {
-  border: 1px solid #134E35;
+  border: 2rpx solid #134E35;
 }
 
 .goods-item .goods-thumb {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
+  width: 112rpx;
+  height: 112rpx;
+  border-radius: 24rpx;
   flex-shrink: 0;
 }
 
@@ -63,25 +63,25 @@
 
 .goods-item .item-main {
   flex: 1;
-  margin-left: 14px;
+  margin-left: 28rpx;
   min-width: 0;
 }
 
 .goods-item .item-desc {
-  font-size: 15px;
+  font-size: 30rpx;
   font-weight: 600;
   color: #134E35;
   line-height: 1.4;
 }
 
 .goods-item .item-time {
-  font-size: 12px;
+  font-size: 24rpx;
   color: #666;
-  margin-top: 4px;
+  margin-top: 8rpx;
 }
 
 .goods-item .item-time.venue-distance {
   color: #1a6b4a;
-  font-size: 12px;
-  margin-top: 2px;
+  font-size: 24rpx;
+  margin-top: 4rpx;
 }

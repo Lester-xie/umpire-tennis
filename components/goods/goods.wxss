@@ -1,41 +1,111 @@
 .goods-container {
-  margin-top: 20px;
+  margin-top: 40rpx;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 24rpx;
 }
 
 .goods-item {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   background-color: rgba(240, 246, 244, 0.8);
-  border-radius: 14px;
-  padding: 12px;
-  border: 1px solid #ffffff;
+  border-radius: 36rpx;
+  padding: 32rpx;
+  border: 2rpx solid #ffffff;
   overflow: hidden;
 }
 
 .goods-image {
-  width: 80px;
-  height: 80px;
-  border-radius: 10px;
+  width: 240rpx;
+  height: 240rpx;
+  border-radius: 36rpx;
   flex-shrink: 0;
+  align-self: flex-start;
 }
 
 .goods-info {
   flex: 1;
-  margin-left: 16px;
+  min-width: 0;
+  margin-left: 32rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
 }
 
-.goods-desc {
-  font-size: 15px;
-  color: #2d5016;
+.goods-title {
+  font-size: 34rpx;
+  color: #000000;
   line-height: 1.4;
 }
 
+.goods-type-row {
+  margin-top: 12rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.goods-type-icon {
+  width: 32rpx;
+  height: 32rpx;
+  flex-shrink: 0;
+}
+
+.goods-type-text {
+  font-size: 28rpx;
+  color: #414141;
+  line-height: 1.35;
+}
+
+.goods-category {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 4rpx 16rpx;
+  font-size: 24rpx;
+  line-height: 1.35;
+  color: #2d6a4f;
+  background: rgba(45, 106, 79, 0.12);
+  border-radius: 999rpx;
+}
+
+.goods-unit-row {
+  margin-top: 12rpx;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.goods-unit-icon {
+  width: 32rpx;
+  height: 32rpx;
+  flex-shrink: 0;
+}
+
+.goods-subtitle {
+  font-size: 28rpx;
+  color: #535353;
+  line-height: 1.35;
+}
+
 .goods-price {
-  font-size: 18px;
-  font-weight: 600;
-  color: #2d5016;
-  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  border-top: 2rpx solid #E0E0E0;
+  padding-top: 12rpx;
+  margin-top: 12rpx;
+  font-size: 36rpx;
+  font-weight: 500;
+  color: #414141;
+}
+
+.goods-empty {
+  margin-top: 40rpx;
+  padding: 48rpx 32rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: #888888;
+  background-color: rgba(240, 246, 244, 0.6);
+  border-radius: 28rpx;
+  border: 2rpx solid #ffffff;
 }

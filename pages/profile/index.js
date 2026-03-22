@@ -1,7 +1,5 @@
 const STORAGE_KEYS = {
   profileVisited: 'profile_has_visited',
-  courtOrders: 'court_orders',
-  goodsOrders: 'goods_orders',
   userAvatar: 'user_avatar',
   userPhoneCode: 'user_phone_code',
   userPhone: 'user_phone',
@@ -37,6 +35,13 @@ function resolveAvatarForUI(avatarValue) {
   });
 }
 
+/** isCoach 优先于 isVip；均为 false 时为空串 */
+function buildUserIdentity(isCoach, isVip) {
+  if (isCoach) return '教练';
+  if (isVip) return 'VIP';
+  return '';
+}
+
 Page({
   data: {
     isLoggedIn: false,
@@ -48,8 +53,9 @@ Page({
     headerHeight: 0,
     contentHeight: 400,
     placeholderHeight: 0,
-    courtOrders: [],
-    goodsOrders: [],
+    isVip: false, // db_user.isVip
+    isCoach: false, // db_user.isCoach
+    userIdentity: '', // 教练 | VIP | ''
   },
 
   onLoad() {
@@ -70,8 +76,42 @@ Page({
     const userNickname = wx.getStorageSync(STORAGE_KEYS.userNickname) || '';
     const userPhone = wx.getStorageSync(STORAGE_KEYS.userPhone) || '';
     const userDisplayName = isLoggedIn ? (userNickname || '昂湃用户') : '点击登录';
-    this.setData({ isLoggedIn, userAvatar, userAvatarFileID, userNickname, userDisplayName, userPhone });
-    this.loadOrderHistory();
+    let isVip = false;
+    let isCoach = false;
+    if (isLoggedIn && userPhone) {
+      const flags = await this.fetchUserRoleFlags(userPhone);
+      isVip = flags.isVip;
+      isCoach = flags.isCoach;
+    }
+    const userIdentity = buildUserIdentity(isCoach, isVip);
+    this.setData({
+      isLoggedIn,
+      userAvatar,
+      userAvatarFileID,
+      userNickname,
+      userDisplayName,
+      userPhone,
+      isVip,
+      isCoach,
+      userIdentity,
+    });
+  },
+
+  /** 从 db_user 读取 isVip、isCoach（一次查询） */
+  async fetchUserRoleFlags(phone) {
+    if (!phone) return { isVip: false, isCoach: false };
+    try {
+      const res = await getUserByPhone(phone);
+      const user = res && res.data && res.data.length > 0 ? res.data[0] : null;
+      if (!user) return { isVip: false, isCoach: false };
+      return {
+        isVip: !!user.isVip,
+        isCoach: !!user.isCoach,
+      };
+    } catch (e) {
+      console.warn('fetchUserRoleFlags failed', e);
+      return { isVip: false, isCoach: false };
+    }
   },
 
   onReady() {
@@ -116,47 +156,17 @@ Page({
     });
   },
 
-  loadOrderHistory() {
-    try {
-      let courtOrders = wx.getStorageSync(STORAGE_KEYS.courtOrders) || [];
-      let goodsOrders = wx.getStorageSync(STORAGE_KEYS.goodsOrders) || [];
-      if (!Array.isArray(courtOrders)) courtOrders = [];
-      if (!Array.isArray(goodsOrders)) goodsOrders = [];
-
-      // 为订场订单生成展示摘要
-      courtOrders = courtOrders.map((order) => {
-        const parts = [];
-        (order.orderItems || []).forEach((oi) => {
-          const slots = (oi.timeSlots || []).map((ts) => ts.timeRange).join('、');
-          if (oi.courtName && slots) {
-            parts.push(`${oi.courtName} ${slots}`);
-          }
-        });
-        return { ...order, displaySummary: parts.join(' | ') || '场地预订' };
-      });
-
-      // 为团购订单生成展示时间
-      goodsOrders = goodsOrders.map((order) => {
-        const time = order.createdAt
-          ? this.formatOrderTime(order.createdAt)
-          : '';
-        return { ...order, formattedTime: time };
-      });
-
-      this.setData({ courtOrders, goodsOrders });
-    } catch (e) {
-      console.error('加载订单历史失败', e);
-    }
+  goCoachHolds() {
+    if (!this.data.isCoach) return;
+    wx.navigateTo({ url: '/pages/profile-coach-holds/index' });
   },
 
-  formatOrderTime(timestamp) {
-    if (!timestamp) return '';
-    const d = new Date(timestamp);
-    const m = d.getMonth() + 1;
-    const day = d.getDate();
-    const h = d.getHours();
-    const min = d.getMinutes();
-    return `${m}月${day}日 ${h < 10 ? '0' + h : h}:${min < 10 ? '0' + min : min}`;
+  goCourtOrders() {
+    wx.navigateTo({ url: '/pages/profile-court-orders/index' });
+  },
+
+  goGoodsOrders() {
+    wx.navigateTo({ url: '/pages/profile-goods-orders/index' });
   },
 
   // 授权手机号注册：成功后再执行 wx.login，并跳转完善资料
@@ -228,6 +238,8 @@ Page({
         wx.setStorageSync(STORAGE_KEYS.userAvatar, avatar);
         wx.setStorageSync(STORAGE_KEYS.userNickname, nickname);
 
+        const isVip = !!user.isVip;
+        const isCoach = !!user.isCoach;
         this.setData({
           isLoggedIn: true,
           userAvatar: resolvedAvatar,
@@ -235,6 +247,9 @@ Page({
           userNickname: nickname,
           userPhone: phone,
           userDisplayName: nickname || '昂湃用户',
+          isVip,
+          isCoach,
+          userIdentity: buildUserIdentity(isCoach, isVip),
         });
 
         wx.hideLoading();
@@ -261,6 +276,9 @@ Page({
         userAvatar: schmoeAvatarUrl,
         userAvatarFileID: schmoeAvatarUrl,
         userDisplayName: defaultNickname,
+        isVip: false,
+        isCoach: false,
+        userIdentity: '',
       });
 
       // wx.navigateTo({ url: '/pages/complete-profile/index' });
@@ -275,6 +293,28 @@ Page({
     if (this.data.isLoggedIn) {
       wx.navigateTo({ url: '/pages/complete-profile/index' });
     }
+  },
+
+  /** 教练：进入教练约场页（需已选场馆） */
+  handleCoachBookCourt() {
+    if (!this.data.isCoach) return;
+    const app = getApp();
+    const venue = app && app.globalData && app.globalData.selectedVenue;
+    if (!venue || venue.id == null || venue.id === '') {
+      wx.showModal({
+        title: '请先选择场馆',
+        content: '需要先在选场馆页选定要占用的球馆，再进入教练约场。',
+        confirmText: '去选场馆',
+        confirmColor: '#134E35',
+        success: (res) => {
+          if (res.confirm) {
+            wx.navigateTo({ url: '/pages/location/index?from=booking' });
+          }
+        },
+      });
+      return;
+    }
+    wx.navigateTo({ url: '/pages/coach-booking/index' });
   },
 
   // 头部「切换账号」：清除本地登录态与用户信息，便于重新授权手机号
@@ -305,6 +345,9 @@ Page({
           userNickname: '',
           userPhone: '',
           userDisplayName: '点击登录',
+          isVip: false,
+          isCoach: false,
+          userIdentity: '',
         });
       },
     });

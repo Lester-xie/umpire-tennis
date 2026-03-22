@@ -20,7 +20,7 @@
           <image
             wx:if="{{isLoggedIn}}"
             class="user-avatar"
-            src="{{userAvatar || '/assets/images/tab-bar-user-active.svg'}}"
+            src="{{ userAvatar || '/assets/images/default-avatar.jpg'}}"
             mode="aspectFill"
           ></image>
           <image
@@ -32,7 +32,12 @@
         </view>
         <view class="user-info">
           <view class="user-name">{{userDisplayName}}</view>
-          <view class="user-desc">{{isLoggedIn ? (userPhone || '欢迎使用昂湃网球') : '登录后查看订场与团购记录'}}</view>
+          <view class="user-desc-row">
+            <view class="user-desc">{{isLoggedIn ? (userPhone || '欢迎使用昂湃网球') : '登录后查看订场与团购记录'}}</view>
+          </view>
+        </view>
+        <view wx:if="{{userIdentity}}" class="user-identity-wrapper">
+          <view class="user-identity">{{userIdentity}}</view>
         </view>
         <view class="user-arrow" wx:if="{{!isLoggedIn}}">
           <image class="arrow-icon" src="/assets/images/arrow.svg" mode="aspectFit"></image>
@@ -46,55 +51,30 @@
           bindgetphonenumber="onPhoneRegister"
         ></button>
       </view>
-
-      <!-- 订场历史卡片 -->
-      <view class="card section-card">
-        <view class="section-header">
-          <text class="section-title">订场历史</text>
-          <text class="section-count">{{courtOrders.length}} 条</text>
-        </view>
-        <view class="section-list" wx:if="{{courtOrders.length > 0}}">
-          <view
-            class="list-item court-item"
-            wx:for="{{courtOrders}}"
-            wx:key="orderNumber"
-          >
-            <view class="item-main">
-              <view class="item-date">{{item.formattedDate}}</view>
-              <view class="item-summary">{{item.displaySummary}}</view>
-            </view>
-            <view class="item-price">¥ {{item.totalPrice}}</view>
-          </view>
-        </view>
-        <view class="empty-tip" wx:else>
-          <text>暂无订场记录</text>
-          <navigator class="empty-link" url="/pages/booking/index" open-type="switchTab">去预订</navigator>
+      <view class="booking-court-wrapper" wx:if="{{isCoach}}">
+        <view class="coach-book-card card">
+          <view class="coach-book-title">教练约场</view>
+          <view class="coach-book-desc">选择时段并填写用途后，该场地时段将对会员显示为已占用，无法预订。</view>
+          <view class="coach-book-btn" bindtap="handleCoachBookCourt">预约场地</view>
         </view>
       </view>
 
-      <!-- 团购购买历史卡片 -->
-      <view class="card section-card">
-        <view class="section-header">
-          <text class="section-title">团购历史</text>
-          <text class="section-count">{{goodsOrders.length}} 条</text>
-        </view>
-        <view class="section-list" wx:if="{{goodsOrders.length > 0}}">
-          <view
-            class="list-item goods-item"
-            wx:for="{{goodsOrders}}"
-            wx:key="orderNumber"
-          >
-            <image class="goods-thumb" src="{{item.goodItem.image}}" mode="aspectFill"></image>
-            <view class="item-main">
-              <view class="item-desc">{{item.goodItem.desc}}</view>
-              <view class="item-time">{{item.formattedTime}}</view>
-            </view>
-            <view class="item-price">¥ {{item.totalPrice}}</view>
+      <view class="card menu-card">
+        <block wx:if="{{isCoach}}">
+          <view class="menu-row" bindtap="goCoachHolds">
+            <text class="menu-title">我的场地占用</text>
+            <image class="menu-arrow" src="/assets/images/arrow.svg" mode="aspectFit"></image>
           </view>
+          <view class="menu-divider"></view>
+        </block>
+        <view class="menu-row" bindtap="goCourtOrders">
+          <text class="menu-title">订场历史</text>
+          <image class="menu-arrow" src="/assets/images/arrow.svg" mode="aspectFit"></image>
         </view>
-        <view class="empty-tip" wx:else>
-          <text>暂无团购记录</text>
-          <navigator class="empty-link" url="/pages/group-buy/index">去团购</navigator>
+        <view class="menu-divider"></view>
+        <view class="menu-row" bindtap="goGoodsOrders">
+          <text class="menu-title">团购历史</text>
+          <image class="menu-arrow" src="/assets/images/arrow.svg" mode="aspectFit"></image>
         </view>
       </view>
 

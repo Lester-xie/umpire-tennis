@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "预约成功",
+  "usingComponents": {
+    "header": "/components/header/header"
+  }
+}

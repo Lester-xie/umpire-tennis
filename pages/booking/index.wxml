@@ -1,13 +1,15 @@
 <view class="container">
-  <header hideDesc="{{true}}" />
-  <view class="content" style="height: {{contentHeight}}px; padding-bottom: {{selectedSlots.length > 0 ? '55px' : '10px'}};">
-    <view class="content-header">
-      <view class="content-header-icon-wrapper">
-        <image class="content-header-icon" src="/assets/images/tab-bar-booking.svg" mode="aspectFit"></image>
-      </view>
-      <view class="content-header-title">
-        预订球场{{selectedVenueName ? ' ——' + selectedVenueName : ''}}
-      </view>
+  <header hideDesc="{{true}}" title="预订球场" />
+  <view class="content" style="height: {{contentHeight}}px; padding-bottom: {{selectedSlots.length > 0 ? '140rpx' : '40rpx'}};">
+    <view
+      class="content-header"
+      hover-class="content-header-title--hover"
+      hover-start-time="20"
+      hover-stay-time="100"
+      bindtap="handleContentHeaderTitleTap"
+    >
+      <image class="content-header-icon" src="/assets/images/location.png" mode="aspectFit"></image>
+      {{selectedVenueName}}
     </view>
 
     <scroll-view class="content-calendar" scroll-x="true" enable-flex="true">
@@ -56,25 +58,47 @@
             <!-- 可滚动的内容区域 -->
             <view class="court-content-row">
               <view class="court-column" wx:for="{{courts}}" wx:key="id">
-                <view class="court-slots">
-                  <block wx:for="{{item.slots}}" wx:for-item="slot" wx:key="index">
+                <view class="court-slots court-slots--stacked">
+                  <block wx:for="{{item.slots}}" wx:for-item="slot" wx:for-index="slotIndex" wx:key="slotIndex">
                     <view 
-                      wx:if="{{slot.available}}"
-                      class="time-slot-cell available {{selectedSlotsMap[item.id + '-' + index] ? 'active' : ''}} {{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === index ? 'ripple' : ''}}"
+                      wx:if="{{!slot.coachMergeSkip && slot.available}}"
+                      class="time-slot-cell available {{selectedSlotsMap[item.id + '-' + slotIndex] ? 'active' : ''}} {{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slotIndex ? 'ripple' : ''}}"
+                      style="{{slot.slotStyle}}"
                       data-courtid="{{item.id}}"
-                      data-slotindex="{{index}}"
+                      data-slotindex="{{slotIndex}}"
                       bindtap="handleSlotClick"
                     >
                       <view class="slot-text">
                         <text class="slot-price">¥ {{slot.price}}</text>
                       </view>
-                      <view class="ripple-effect" wx:if="{{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === index}}"></view>
+                      <view class="ripple-effect" wx:if="{{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slotIndex}}"></view>
                     </view>
                     <view 
-                      wx:else
-                      class="time-slot-cell"
+                      wx:elif="{{!slot.coachMergeSkip && !slot.available}}"
+                      class="time-slot-cell {{slot.past ? 'slot-past' : ''}} {{slot.booked ? 'slot-occupied' : ''}} {{slot.bookedByCoach ? 'slot-coach-hold' : ''}}"
+                      style="{{slot.slotStyle}}"
                     >
-                      <text class="slot-booked">已约</text>
+                      <block wx:if="{{slot.past}}">
+                        <text class="slot-booked">不可预定</text>
+                      </block>
+                      <block wx:elif="{{slot.bookedByCoach}}">
+                        <view
+                          class="slot-coach-inner"
+                          catchtap="handleCoachHoldCellTap"
+                          data-purpose="{{slot.coachPurpose}}"
+                          data-holdids="{{slot.coachHoldIdsStr}}"
+                        >
+                          <text class="slot-coach-purpose">{{slot.coachPurpose}}</text>
+                          <text class="slot-coach-time">{{slot.coachTimeRange}}</text>
+                          <text class="slot-coach-hint">点击了解报名</text>
+                        </view>
+                      </block>
+                      <block wx:elif="{{slot.booked}}">
+                        <text class="slot-booked">已订</text>
+                      </block>
+                      <block wx:else>
+                        <text class="slot-booked">已约</text>
+                      </block>
                     </view>
                   </block>
                 </view>

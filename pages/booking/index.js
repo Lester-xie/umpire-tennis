@@ -1,4 +1,4 @@
-const { getCourtSlotPrices } = require('../../api/tennisDb');
+const { getCourtSlotPrices, getBookedSlots } = require('../../api/tennisDb');
 
 /** 根据 YYYY-MM-DD 判断是否为周六(6)或周日(0) */
 function isWeekendDateStr(dateStr) {
@@ -32,8 +32,20 @@ Page({
   // 动画定时器
   rippleTimer: null,
   slotRippleTimer: null,
-  
+  /** 已支付订单占用的格子键 Set，元素为 `${courtId}-${slotIndex}` */
+  bookedSlotKeySet: null,
+  /** 每次发起 getBookedSlots 自增，用于丢弃过期响应 */
+  _bookedSlotsFetchToken: 0,
+
+  /** 标题：去选场页，选完后返回本页 */
+  handleContentHeaderTitleTap() {
+    wx.navigateTo({
+      url: '/pages/location/index?from=booking',
+    });
+  },
+
   onLoad() {
+    this.coachHoldMeta = {};
     const newVenueId = this.syncSelectedVenueName();
     // 生成最近两个月的日期列表
     this.generateDateList();
@@ -143,7 +155,10 @@ Page({
         ? windowInfo.screenHeight - windowInfo.safeArea.bottom
         : 0;
       
-      const contentHeight = windowHeight - finalHeaderHeight - safeAreaBottom - tabBarHeight - 30;
+      /** 与底部自定义 tabBar 留白，避免主内容区贴边 */
+      const contentBottomGap = 46;
+      const contentHeight =
+        windowHeight - finalHeaderHeight - safeAreaBottom - tabBarHeight - contentBottomGap;
       this.setData({
         contentHeight: Math.max(contentHeight, 400), // 最小高度 400px
       });
@@ -156,9 +171,16 @@ Page({
 
     this.slotPriceMap = {}; // { 'courtId-slotIndex': price }
 
+    const selectedDate = this.data.selectedDate || this.getTodayDateStr();
+
     // 没有 venueId 时直接走旧逻辑（不可用/无价格）
     if (!venueId) {
+      this.bookedSlotKeySet = new Set();
+      this.coachHoldMeta = {};
       this.generateTimeSchedule();
+      this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
+        if (applied) this.generateTimeSchedule();
+      });
       return;
     }
 
@@ -181,7 +203,12 @@ Page({
       });
       this.slotPriceMap = priceMap;
       this.setData({ priceLoading: false });
+      this.bookedSlotKeySet = new Set();
+      this.coachHoldMeta = {};
       this.generateTimeSchedule();
+      this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
+        if (applied) this.generateTimeSchedule();
+      });
       return;
     }
 
@@ -214,8 +241,45 @@ Page({
       this.slotPriceMap = {};
     } finally {
       this.setData({ priceLoading: false });
+      this.bookedSlotKeySet = new Set();
+      this.coachHoldMeta = {};
       this.generateTimeSchedule();
+      this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
+        if (applied) this.generateTimeSchedule();
+      });
     }
+  },
+
+  /**
+   * 拉取某日已支付占用，写入 bookedSlotKeySet（整表替换为本次 keys）。
+   * resolve(true) 表示本次结果已采纳，可再调 generateTimeSchedule；false 表示跳过（无场馆/过期/失败）。
+   */
+  fetchBookedSlotsForDate(orderDate) {
+    const venueId = this.data.selectedVenueId;
+    if (!venueId || !orderDate) {
+      return Promise.resolve(false);
+    }
+    this._bookedSlotsFetchToken = (this._bookedSlotsFetchToken || 0) + 1;
+    const token = this._bookedSlotsFetchToken;
+    return getBookedSlots({ venueId, orderDate })
+      .then((res) => {
+        if (token !== this._bookedSlotsFetchToken) {
+          return false;
+        }
+        const r = res && res.result ? res.result : {};
+        const keys = Array.isArray(r.keys) ? r.keys : [];
+        const coachHoldMeta =
+          r.coachHoldMeta && typeof r.coachHoldMeta === 'object' && !Array.isArray(r.coachHoldMeta)
+            ? r.coachHoldMeta
+            : {};
+        this.bookedSlotKeySet = new Set(keys);
+        this.coachHoldMeta = coachHoldMeta;
+        return true;
+      })
+      .catch((e) => {
+        console.error('getBookedSlots failed', e);
+        return false;
+      });
   },
 
   getSlotPrice(courtId, slotIndex) {
@@ -301,61 +365,36 @@ Page({
     });
   },
   
-  // 处理日期点击事件
+  // 处理日期点击事件（先切日期与格子，占用查询异步；波纹不等待网络）
   handleDateClick(e) {
     const { datestr } = e.currentTarget.dataset;
-    if (datestr) {
-      // 清除之前的定时器
-      if (this.rippleTimer) {
-        clearTimeout(this.rippleTimer);
-        this.rippleTimer = null;
-      }
-      
-      // 切换日期时更新场地可预订状态
-      this.updateSlotsAvailability(datestr);
-      // 先清除旧的波纹状态，确保动画能重新触发
-      this.setData({
-        selectedDate: datestr,
-        rippleDate: '',
-      }, () => {
-        // 在 setData 回调中触发动画，确保 DOM 已更新
-        // 使用 requestAnimationFrame 优化动画时机
-        if (typeof requestAnimationFrame !== 'undefined') {
-          requestAnimationFrame(() => {
-            this.setData({
-              rippleDate: datestr, // 触发波纹动画
-            });
-            
-            // 动画结束后清除波纹状态
-            this.rippleTimer = setTimeout(() => {
-              this.setData({
-                rippleDate: '',
-              });
-              this.rippleTimer = null;
-            }, 600); // 动画持续时间
-          });
-        } else {
-          // 兼容性处理
-          setTimeout(() => {
-            this.setData({
-              rippleDate: datestr, // 触发波纹动画
-            });
-            
-            // 动画结束后清除波纹状态
-            this.rippleTimer = setTimeout(() => {
-              this.setData({
-                rippleDate: '',
-              });
-              this.rippleTimer = null;
-            }, 600); // 动画持续时间
-          }, 16); // 约一帧的时间
-        }
-      });
+    if (!datestr) return;
+
+    if (this.rippleTimer) {
+      clearTimeout(this.rippleTimer);
+      this.rippleTimer = null;
     }
+
+    this.updateSlotsAvailability(datestr);
+
+    this.setData({ rippleDate: '' }, () => {
+      const playRipple = () => {
+        this.setData({ rippleDate: datestr });
+        this.rippleTimer = setTimeout(() => {
+          this.setData({ rippleDate: '' });
+          this.rippleTimer = null;
+        }, 600);
+      };
+      if (typeof requestAnimationFrame !== 'undefined') {
+        requestAnimationFrame(playRipple);
+      } else {
+        setTimeout(playRipple, 16);
+      }
+    });
   },
   
-  // 生成时间段和场地数据
-  generateTimeSchedule() {
+  // 生成时间段和场地数据（可选传入日期，避免与 data 不同步）
+  generateTimeSchedule(selectedDateOverride) {
     // 与 venue.courtList[].priceList 对齐：14 个时段，8:00–21:00 开始（至 22:00 结束）
     const timeSlots = [];
     for (let hour = 8; hour <= 21; hour++) {
@@ -366,7 +405,10 @@ Page({
       });
     }
 
-    const selectedDate = this.data.selectedDate || this.getTodayDateStr();
+    const selectedDate =
+      selectedDateOverride != null
+        ? selectedDateOverride
+        : this.data.selectedDate || this.getTodayDateStr();
 
     const app = getApp();
     const venue = app && app.globalData && app.globalData.selectedVenue;
@@ -408,75 +450,149 @@ Page({
     return `${today.getFullYear()}-${month < 10 ? '0' + month : month}-${day < 10 ? '0' + day : day}`;
   },
 
+  /** slotIndex 从 0 对应 8:00，span 为连续小时数 */
+  formatCoachSlotRange(startIndex, span) {
+    const startH = 8 + startIndex;
+    const endH = startH + span;
+    const pad = (x) => (x < 10 ? `0${x}` : `${x}`);
+    return `${pad(startH)}:00-${pad(endH)}:00`;
+  },
+
+  /**
+   * 教练占用且用途文案一致时合并连续格；全列绝对定位与左侧时间列对齐。
+   * 行高单元 ROW=128rpx（120+8），格内高 CELL=120rpx，缝 GAP=8rpx。
+   */
+  applyCoachHoldMergeAndLayout(slots, courtId) {
+    const n = slots.length;
+    const ROW = 128;
+    const CELL = 120;
+    const GAP = 8;
+
+    for (let i = 0; i < n; i += 1) {
+      slots[i].coachSpan = 1;
+      slots[i].coachMergeSkip = false;
+      slots[i].coachTimeRange = '';
+      slots[i].coachHoldIdsStr = '';
+    }
+
+    let i = 0;
+    while (i < n) {
+      const cur = slots[i];
+      if (!cur.booked || !cur.bookedByCoach) {
+        i += 1;
+        continue;
+      }
+      const label = (cur.coachPurpose || '').trim();
+      let span = 1;
+      let j = i + 1;
+      while (j < n) {
+        const next = slots[j];
+        if (!next.booked || !next.bookedByCoach) break;
+        if ((next.coachPurpose || '').trim() !== label) break;
+        span += 1;
+        j += 1;
+      }
+      cur.coachSpan = span;
+      cur.coachTimeRange = this.formatCoachSlotRange(i, span);
+      const ids = [];
+      const metaMap = this.coachHoldMeta || {};
+      for (let k = 0; k < span; k += 1) {
+        const m = metaMap[`${courtId}-${i + k}`];
+        if (m && m.holdId) ids.push(String(m.holdId));
+      }
+      cur.coachHoldIdsStr = ids.join(',');
+      for (let k = i + 1; k < i + span; k += 1) {
+        slots[k].coachMergeSkip = true;
+      }
+      i += span;
+    }
+
+    let cursor = 0;
+    for (let idx = 0; idx < n; idx += 1) {
+      if (slots[idx].coachMergeSkip) {
+        slots[idx].slotStyle = '';
+        continue;
+      }
+      const span = slots[idx].coachSpan || 1;
+      const h = span * CELL + (span - 1) * GAP;
+      slots[idx].slotStyle = `top:${cursor}rpx;height:${h}rpx;`;
+      cursor += span * ROW;
+    }
+  },
+
   // 生成场地的可预订时间段：当前时间以前的不可用，以后的都可预订
   generateCourtSlots(timeSlots, selectedDate, courtId) {
     const slots = [];
 
     const now = new Date();
     const todayStr = this.getTodayDateStr();
+    const metaMap = this.coachHoldMeta || {};
+    const bookedSet = this.bookedSlotKeySet || new Set();
 
     for (let i = 0; i < timeSlots.length; i++) {
       const slotHour = timeSlots[i].hour;
       let isAvailableTime = false;
 
       if (selectedDate > todayStr) {
-        // 未来日期：全部可预订
         isAvailableTime = true;
       } else if (selectedDate === todayStr) {
-        // 今天：当前时间以后的才可预订
         const slotTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), slotHour, 0, 0);
         isAvailableTime = slotTime > now;
       }
 
-      // 只有在“时间可预订”和“价格规则存在”时才允许选择（周末用 specialPrice）
       const slotPrice = this.resolveSlotPrice(courtId, i, selectedDate);
-      const isAvailable = isAvailableTime && slotPrice != null;
+      const key = `${courtId}-${i}`;
+      const isBookedByOrder = bookedSet.has(key);
+      const coachMeta = metaMap[key];
+      const bookedByCoach = !!(isBookedByOrder && coachMeta);
+      const coachPurpose = bookedByCoach
+        ? (coachMeta.capacityLabel || '教练占用')
+        : '';
+
+      const isAvailable =
+        isAvailableTime && slotPrice != null && !isBookedByOrder;
+      const past = !isAvailableTime;
 
       slots.push({
         available: isAvailable,
         price: isAvailable ? slotPrice : null,
-        booked: false,
+        booked: isBookedByOrder,
+        bookedByCoach,
+        coachPurpose,
+        past,
+        coachSpan: 1,
+        coachMergeSkip: false,
+        slotStyle: '',
+        coachTimeRange: '',
+        coachHoldIdsStr: '',
       });
     }
 
+    this.applyCoachHoldMergeAndLayout(slots, courtId);
     return slots;
   },
 
-  // 切换日期时更新场地可预订状态
+  /** 教练占用格点击：dataset 含 purpose、holdids，后续可跳转报名页 */
+  handleCoachHoldCellTap() {
+    wx.showToast({
+      title: '课程报名即将开放',
+      icon: 'none',
+    });
+  },
+
+  // 切换日期：先按「无占用」立即刷新格子，再异步合并 getBookedSlots 结果
   updateSlotsAvailability(selectedDate) {
-    const { timeSlots, courts } = this.data;
-    const now = new Date();
-    const todayStr = this.getTodayDateStr();
-
-    const newCourts = courts.map((court) => ({
-      ...court,
-      slots: court.slots.map((slot, i) => {
-        const slotHour = timeSlots[i].hour;
-        let isAvailableTime = false;
-
-        if (selectedDate > todayStr) {
-          isAvailableTime = true;
-        } else if (selectedDate === todayStr) {
-          const slotTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), slotHour, 0, 0);
-          isAvailableTime = slotTime > now;
-        }
-
-        const slotPrice = this.resolveSlotPrice(court.id, i, selectedDate);
-        const isAvailable = isAvailableTime && slotPrice != null;
-
-        return {
-          ...slot,
-          available: isAvailable,
-          price: isAvailable ? slotPrice : null,
-        };
-      }),
-    }));
-
+    this.bookedSlotKeySet = new Set();
+    this.coachHoldMeta = {};
+    this.generateTimeSchedule(selectedDate);
     this.setData({
-      courts: newCourts,
+      selectedDate,
       selectedSlots: [],
       selectedSlotsMap: {},
       totalPrice: 0,
+    });
+    this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
+      if (applied) this.generateTimeSchedule(selectedDate);
     });
   },
   

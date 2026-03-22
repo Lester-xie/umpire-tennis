@@ -1,0 +1,14 @@
+{
+  "name": "getBookedSlots",
+  "version": "1.0.0",
+  "description": "某场馆某日已支付订单占用的 courtId-slotIndex",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

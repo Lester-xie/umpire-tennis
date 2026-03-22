@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "订场历史",
+  "usingComponents": {
+    "header": "/components/header/header"
+  }
+}

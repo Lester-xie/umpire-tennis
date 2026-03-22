@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "团购历史",
+  "usingComponents": {
+    "header": "/components/header/header"
+  }
+}

@@ -1,0 +1,11 @@
+<view class="category-container" wx:if="{{categories.length}}">
+  <view
+    class="category-item {{item._id === selectedId ? 'active' : ''}}"
+    wx:for="{{categories}}"
+    wx:key="_id"
+    data-index="{{index}}"
+    bindtap="onCategoryTap"
+  >
+    <text class="category-name">{{item.name}}</text>
+  </view>
+</view>

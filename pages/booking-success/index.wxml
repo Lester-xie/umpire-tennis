@@ -1,0 +1,52 @@
+<view class="container">
+  <header hideDesc="{{true}}" showBackButton="{{true}}" title="昂湃网球" />
+  <scroll-view
+    class="content-scroll"
+    scroll-y="true"
+    enhanced="{{true}}"
+    show-scrollbar="{{false}}"
+    style="height: {{contentScrollHeight}}px;"
+  >
+    <view class="content">
+      <view class="done-wrap">
+        <image class="done-icon" src="/assets/images/done.svg" mode="aspectFit" />
+      </view>
+      <view class="order-title">预约成功</view>
+
+      <view class="order-info">
+        <view class="info-item">
+          <text class="info-label">预约球馆：</text>
+          <text class="info-value">{{campusName}}</text>
+        </view>
+      </view>
+
+      <view class="section-title">预订时间</view>
+      <view class="court-list">
+        <view class="court-item" wx:for="{{orderItems}}" wx:key="courtId">
+          <view class="court-item-header">
+            <text class="court-name">{{item.courtName}}</text>
+          </view>
+          <view class="time-slot-list">
+            <view
+              class="time-slot-item"
+              wx:for="{{item.timeSlots}}"
+              wx:for-item="slot"
+              wx:key="index"
+            >
+              <view class="time-slot-info">
+                <text class="time-slot-time">{{slot.timeRange}}</text>
+                <text class="time-slot-hours">{{slot.hours}}小时</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="footer">
+    <view class="footer-button" bindtap="handleBackToBooking">
+      <text class="footer-button-text">返回预订</text>
+    </view>
+  </view>
+</view>

@@ -1,20 +1,20 @@
 .desc-container {
   position: relative;
-  margin-top: 14px;
+  margin-top: 28rpx;
   margin-left: auto;
   margin-right: auto;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #ffffff;
+  padding-bottom: 40rpx;
+  border-bottom: 2rpx solid #ffffff;
 }
 
 .desc {
   display: block;
-  border-radius: 16px;
+  border-radius: 36rpx;
 }
 
 .svg-icon {
-  width: 30px;
-  height: 30px;
+  width: 60rpx;
+  height: 60rpx;
 }
 
 .tennis {
