@@ -79,22 +79,74 @@ async function collectOccupiedKeys(venueIdRaw, orderDateRaw) {
   return keySet;
 }
 
-function buildCapacityLabel(lessonType, pairMode, groupMode) {
-  if (lessonType === 'group') {
-    return '团课·3-5人班';
+function sanitizeScaleDisplayName(raw) {
+  const s = String(raw || '')
+    .trim()
+    .replace(/[\r\n]/g, '');
+  if (s.length > 40) return s.slice(0, 40);
+  return s;
+}
+
+function buildCapacityLabel(lessonType, pairMode, groupMode, scaleDisplayName) {
+  const disp = sanitizeScaleDisplayName(scaleDisplayName);
+  if (lessonType === 'open_play') {
+    if (disp) return `畅打·${disp}`;
+    const gm = String(groupMode || '').trim().toLowerCase();
+    if (gm === 'group36') return '畅打·3-6人';
+    return `畅打·${groupMode || ''}`.replace(/·$/, '') || '畅打';
   }
-  const pair = pairMode === '1v2' ? '1V2' : '1V1';
-  if (lessonType === 'experience') return `体验课·${pair}`;
-  if (lessonType === 'regular') return `正课·${pair}`;
+  if (lessonType === 'group') {
+    if (disp) return `团课·${disp}`;
+    return groupMode === 'group35' ? '团课·3-5人' : `团课·${groupMode}`;
+  }
+  const pair =
+    pairMode === '1v2' ? '1V2' : pairMode === '1v1' ? '1V1' : String(pairMode || '').toUpperCase();
+  if (lessonType === 'experience') {
+    return disp ? `体验课·${disp}` : `体验课·${pair}`;
+  }
+  if (lessonType === 'regular') {
+    return disp ? `正课·${disp}` : `正课·${pair}`;
+  }
   return '';
+}
+
+function isValidPairMode(pm) {
+  const s = String(pm || '')
+    .trim()
+    .toLowerCase();
+  return /^\d+v\d+$/.test(s) && s.length <= 12;
+}
+
+function isValidGroupMode(gm) {
+  const s = String(gm || '')
+    .trim()
+    .toLowerCase();
+  return /^group[a-z0-9_]+$/.test(s) && s.length >= 5 && s.length <= 40;
+}
+
+function defaultCapacityLimit(lessonType, pairMode, groupMode) {
+  const lt = String(lessonType || '').trim();
+  if (lt === 'group') return 5;
+  if (lt === 'open_play') {
+    const gm = String(groupMode || '').trim().toLowerCase();
+    if (gm === 'group36') return 6;
+    return 6;
+  }
+  const pm = String(pairMode || '')
+    .trim()
+    .toLowerCase();
+  if (pm === '1v2') return 2;
+  return 1;
 }
 
 /**
  * 教练占用场地（写入 db_coach_slot_hold，与已支付订单一并参与 getBookedSlots 占用计算）
  * event: { venueId, orderDate, slots: [{courtId, slotIndex}], lessonType, pairMode?, groupMode? }
- * lessonType: experience | regular | group
+ * lessonType: experience | regular | group | open_play（畅打，仅 isManager）
  * pairMode（体验课/正课）: 1v1 | 1v2
- * groupMode（团课）: 仅使用 group35（3-5 人班）
+ * groupMode（团课）: 如 group35，或与 db_category.scaleList.code 一致
+ * scaleDisplayName（可选）: 规模展示名，写入 capacityLabel（与 scaleList.name 一致时推荐传入）
+ * capacityLimit（可选）: 与 db_course_scale.limit 一致，课节最多可报名会员数
  */
 exports.main = async (event, context) => {
   const wxContext = cloud.getWXContext();
@@ -108,8 +160,9 @@ exports.main = async (event, context) => {
   const orderDate = normalizeOrderDate(orderDateRaw) || orderDateRaw;
   const slots = Array.isArray(event.slots) ? event.slots : [];
   const lessonType = event.lessonType != null ? String(event.lessonType).trim() : '';
-  const pairMode = event.pairMode != null ? String(event.pairMode).trim() : '';
+  let pairMode = event.pairMode != null ? String(event.pairMode).trim() : '';
   let groupMode = event.groupMode != null ? String(event.groupMode).trim() : '';
+  const scaleDisplayName = sanitizeScaleDisplayName(event.scaleDisplayName);
   const venueName =
     event.venueName != null && String(event.venueName).trim() !== ''
       ? String(event.venueName).trim()
@@ -121,17 +174,29 @@ exports.main = async (event, context) => {
 
   const userRes = await db.collection('db_user').where({ _openid: openid }).limit(1).get();
   const user = userRes.data && userRes.data[0];
-  if (!user || !user.isCoach) {
-    return { ok: false, errMsg: '仅教练账号可占用场地' };
+  if (!user) {
+    return { ok: false, errMsg: '未登录' };
   }
 
-  if (!['experience', 'regular', 'group'].includes(lessonType)) {
+  if (!['experience', 'regular', 'group', 'open_play'].includes(lessonType)) {
     return { ok: false, errMsg: '请选择场地用途' };
   }
-  if (lessonType === 'group') {
-    groupMode = 'group35';
-  } else if (!['1v1', '1v2'].includes(pairMode)) {
-    return { ok: false, errMsg: '请选择 1V1 或 1V2' };
+  if (lessonType === 'open_play') {
+    if (!user.isManager) {
+      return { ok: false, errMsg: '无权限使用该用途' };
+    }
+  } else if (!user.isCoach) {
+    return { ok: false, errMsg: '仅教练账号可占用场地' };
+  }
+  if (lessonType === 'group' || lessonType === 'open_play') {
+    if (!isValidGroupMode(groupMode)) {
+      return { ok: false, errMsg: lessonType === 'open_play' ? '请选择畅打规模' : '请选择团课规模' };
+    }
+    groupMode = groupMode.toLowerCase();
+  } else if (!isValidPairMode(pairMode)) {
+    return { ok: false, errMsg: '请选择有效规模' };
+  } else {
+    pairMode = pairMode.toLowerCase();
   }
 
   const normalized = slots
@@ -145,7 +210,18 @@ exports.main = async (event, context) => {
     return { ok: false, errMsg: '请选择有效时段' };
   }
 
-  const capacityLabel = buildCapacityLabel(lessonType, pairMode, groupMode);
+  const capacityLabel = buildCapacityLabel(lessonType, pairMode, groupMode, scaleDisplayName);
+
+  let capacityLimit = Math.floor(Number(event.capacityLimit));
+  if (!Number.isFinite(capacityLimit) || capacityLimit < 1) {
+    capacityLimit = defaultCapacityLimit(lessonType, pairMode, groupMode);
+  }
+  capacityLimit = Math.min(99, capacityLimit);
+
+  const sessionSlotKeys = normalized
+    .map((s) => `${s.courtId}-${s.slotIndex}`)
+    .sort()
+    .join('|');
 
   let occupied;
   try {
@@ -164,6 +240,8 @@ exports.main = async (event, context) => {
 
   const now = Date.now();
   const phone = user.phone != null ? String(user.phone).trim() : '';
+  const coachName =
+    user.name != null && String(user.name).trim() !== '' ? String(user.name).trim() : '';
 
   try {
     for (let i = 0; i < normalized.length; i += 1) {
@@ -172,15 +250,18 @@ exports.main = async (event, context) => {
         data: {
           _openid: openid,
           phone,
+          coachName,
           venueId,
           venueName,
           orderDate,
           courtId: s.courtId,
           slotIndex: s.slotIndex,
           lessonType,
-          pairMode: lessonType === 'group' ? '' : pairMode,
-          groupMode: lessonType === 'group' ? groupMode : '',
+          pairMode: lessonType === 'group' || lessonType === 'open_play' ? '' : pairMode,
+          groupMode: lessonType === 'group' || lessonType === 'open_play' ? groupMode : '',
           capacityLabel,
+          capacityLimit,
+          sessionSlotKeys,
           status: 'active',
           createdAt: now,
         },

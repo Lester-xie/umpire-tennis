@@ -11,6 +11,7 @@ Page({
     contentHeight: 400,
     placeholderHeight: 0,
     isCoach: false,
+    isManager: false,
     coachHolds: [],
   },
 
@@ -96,7 +97,7 @@ Page({
   },
 
   handleCancelCoachHold(e) {
-    if (!this.data.isCoach) return;
+    if (!this.data.isCoach && !this.data.isManager) return;
     const holdId = e.currentTarget.dataset.holdid;
     if (!holdId) return;
     wx.showModal({

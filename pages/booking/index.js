@@ -438,7 +438,7 @@ Page({
    */
   applyCoachHoldMergeAndLayout(slots, courtId) {
     const n = slots.length;
-    const ROW = 128;
+    const ROW = 126;
     const CELL = 120;
     const GAP = 8;
 
@@ -475,6 +475,17 @@ Page({
         if (m && m.holdId) ids.push(String(m.holdId));
       }
       cur.coachHoldIdsStr = ids.join(',');
+      const m0 = metaMap[`${courtId}-${i}`] || {};
+      cur.prefillLessonType = m0.lessonType || 'experience';
+      cur.prefillPairMode = m0.pairMode || '1v1';
+      cur.prefillGroupMode = m0.groupMode || '';
+      cur.prefillCoachName = m0.coachName != null && String(m0.coachName).trim() !== ''
+        ? String(m0.coachName).trim()
+        : cur.prefillCoachName || '';
+      cur.coachJoinedCount = m0.joinedCount != null ? Number(m0.joinedCount) : 0;
+      cur.coachCapacityLimit = m0.capacityLimit != null ? Number(m0.capacityLimit) : 1;
+      cur.coachSessionFull = !!m0.sessionFull;
+      cur.coachViewerAlreadyJoined = !!m0.viewerAlreadyJoined;
       for (let k = i + 1; k < i + span; k += 1) {
         slots[k].coachMergeSkip = true;
       }
@@ -522,6 +533,7 @@ Page({
       const coachPurpose = bookedByCoach
         ? (coachMeta.capacityLabel || '教练占用')
         : '';
+      const coachName = bookedByCoach && coachMeta.coachName ? String(coachMeta.coachName).trim() : '';
 
       const isAvailable =
         isAvailableTime && slotPrice != null && !isBookedByOrder;
@@ -530,6 +542,7 @@ Page({
       slots.push({
         available: isAvailable,
         price: isAvailable ? slotPrice : null,
+        venueSlotPrice: slotPrice,
         booked: isBookedByOrder,
         bookedByCoach,
         coachPurpose,
@@ -539,6 +552,14 @@ Page({
         slotStyle: '',
         coachTimeRange: '',
         coachHoldIdsStr: '',
+        prefillLessonType: 'experience',
+        prefillPairMode: '1v1',
+        prefillGroupMode: '',
+        prefillCoachName: coachName,
+        coachJoinedCount: 0,
+        coachCapacityLimit: 1,
+        coachSessionFull: false,
+        coachViewerAlreadyJoined: false,
       });
     }
 
@@ -546,11 +567,46 @@ Page({
     return slots;
   },
 
-  /** 教练占用格点击：dataset 含 purpose、holdids，后续可跳转报名页 */
-  handleCoachHoldCellTap() {
-    wx.showToast({
-      title: '课程报名即将开放',
-      icon: 'none',
+  /** 教练占用格：跳转订单页，可选课时抵扣或微信支付 */
+  handleCoachHoldCellTap(e) {
+    const ds = e.currentTarget.dataset || {};
+    const holdIdsStr = ds.holdids || '';
+    const courtId = parseInt(ds.courtid, 10);
+    const startIndex = parseInt(ds.slotindex, 10);
+    const span = parseInt(ds.span, 10) || 1;
+    if (!Number.isFinite(courtId) || !Number.isFinite(startIndex)) {
+      wx.showToast({ title: '参数异常', icon: 'none' });
+      return;
+    }
+    const holdIds = holdIdsStr
+      ? holdIdsStr
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+    const bookedSlots = [];
+    for (let k = 0; k < span; k += 1) {
+      bookedSlots.push({ courtId, slotIndex: startIndex + k });
+    }
+    const coachPayload = {
+      holdIds,
+      bookedSlots,
+      lessonType: ds.lessontype || 'experience',
+      pairMode: ds.pairmode || '1v1',
+      groupMode: ds.groupmode || '',
+      capacityLabel: ds.purpose || '',
+      coachName: ds.coachname != null ? String(ds.coachname).trim() : '',
+    };
+    const coachPayloadEnc = encodeURIComponent(JSON.stringify(coachPayload));
+    const selectedDate = encodeURIComponent(this.data.selectedDate || '');
+    const courtsEnc = encodeURIComponent(JSON.stringify(this.data.courts || []));
+    const venueId = encodeURIComponent(this.data.selectedVenueId || '');
+    const slotPast =
+      ds.slotpast === 1 || ds.slotpast === '1' || ds.slotpast === true || ds.slotpast === 'true'
+        ? '1'
+        : '0';
+    wx.navigateTo({
+      url: `/pages/coach-session-detail/index?coachPayload=${coachPayloadEnc}&selectedDate=${selectedDate}&courts=${courtsEnc}&venueId=${venueId}&slotPast=${slotPast}`,
     });
   },
 

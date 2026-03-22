@@ -1,24 +1,20 @@
 const { getCourses } = require('../../api/tennisDb');
-const { ALL_CATEGORY_ID } = require('../../utils/constants');
-
-const DEFAULT_GOODS_IMAGE = '/assets/images/goods/good1.jpg';
+const {
+  ALL_CATEGORY_ID,
+  collectHomeExcludedCategoryRefs,
+  isCourseInHomeExcludedCategory,
+} = require('../../utils/constants');
+const {
+  pickCourseScale,
+  pickCategory,
+  courseImageSource,
+  formatCourseRow,
+  DEFAULT_GOODS_IMAGE,
+} = require('../../utils/courseCatalog');
+const { venueIdLooseEqual, normalizeVenueId } = require('../../utils/venueId');
 
 /** cloud:// fileID → 临时 https，切换分类时复用，避免重复 getTempFileURL 卡顿 */
 const cloudTempUrlCache = Object.create(null);
-
-/** 课程图：优先 picture，其次兼容旧字段 image */
-function courseImageSource(c) {
-  const pic =
-    c.picture != null && String(c.picture).trim() !== ''
-      ? String(c.picture).trim()
-      : '';
-  if (pic) return pic;
-  const img =
-    c.image != null && String(c.image).trim() !== ''
-      ? String(c.image).trim()
-      : '';
-  return img;
-}
 
 function mapCoursesDisplayImages(list) {
   return list.map((c) => {
@@ -69,36 +65,6 @@ function resolveCourseImages(list) {
   });
 }
 
-function formatCourseRow(c) {
-  const titleRaw = c.title != null ? String(c.title).trim() : '';
-  const title = titleRaw || '课程';
-  const typeLabel =
-    c.type != null && String(c.type).trim() !== ''
-      ? String(c.type).trim()
-      : '';
-  const categoryLabel =
-    c.categoryLabel != null && String(c.categoryLabel).trim() !== ''
-      ? String(c.categoryLabel).trim()
-      : '';
-  const subtitle =
-    c.unit != null && String(c.unit).trim() !== ''
-      ? String(c.unit).trim()
-      : '';
-  const desc = [title, typeLabel, categoryLabel, subtitle]
-    .filter(Boolean)
-    .join(' · ');
-  return {
-    id: c._id,
-    image: c.displayImage || courseImageSource(c) || DEFAULT_GOODS_IMAGE,
-    title,
-    typeLabel,
-    categoryLabel,
-    subtitle,
-    desc,
-    price: c.price,
-  };
-}
-
 Component({
   properties: {
     /** 与 category 选中项 _id 一致；为 ALL_CATEGORY_ID 时不按 category 筛选 */
@@ -116,14 +82,21 @@ Component({
   data: {
     goods: [],
     courseLoaded: false,
+    goodsEmptyHint: '',
   },
 
-  /** 按分类缓存已格式化的列表，切回已点过的分类时不再跑一遍解析与 setData 大图 */
-  _formattedGoodsByCategory: null,
+  /** 缓存 key：分类 + 当前所选场馆（切换场馆需重新筛） */
+  _formattedGoodsMemo: null,
 
   lifetimes: {
     attached() {
-      this._formattedGoodsByCategory = Object.create(null);
+      this._formattedGoodsMemo = Object.create(null);
+      this.loadCourses();
+    },
+  },
+
+  pageLifetimes: {
+    show() {
       this.loadCourses();
     },
   },
@@ -131,29 +104,54 @@ Component({
   methods: {
     loadCourses() {
       const categoryId = this.properties.categoryId;
-      const memo = this._formattedGoodsByCategory;
-      if (memo && memo[categoryId]) {
+      const app = getApp();
+      const venue = app && app.globalData && app.globalData.selectedVenue;
+      const selectedVenueId = normalizeVenueId(venue && venue.id);
+      const cacheKey = `${categoryId}@@${selectedVenueId || '__none__'}`;
+      const memo = this._formattedGoodsMemo;
+      if (memo && memo[cacheKey]) {
         this.setData({
-          goods: memo[categoryId],
+          goods: memo[cacheKey].goods,
           courseLoaded: true,
+          goodsEmptyHint: memo[cacheKey].hint,
         });
         return;
       }
       getCourses(categoryId)
-        .then((res) => resolveCourseImages(res.data || []))
-        .then((rows) => {
-          const goods = rows.map(formatCourseRow);
-          if (this._formattedGoodsByCategory) {
-            this._formattedGoodsByCategory[categoryId] = goods;
+        .then(({ data, scaleById, categoryById }) =>
+          resolveCourseImages(data || []).then((rows) => ({ rows, scaleById, categoryById })),
+        )
+        .then(({ rows, scaleById, categoryById }) => {
+          const excludedCats = collectHomeExcludedCategoryRefs(categoryById);
+          let baseRows = rows.filter((c) => !isCourseInHomeExcludedCategory(c, excludedCats));
+          let hint = '';
+          let filtered = baseRows;
+          if (!selectedVenueId) {
+            filtered = [];
+            hint = '请先在顶部选择场馆，再查看该馆课程与价格';
+          } else {
+            filtered = baseRows.filter((c) => venueIdLooseEqual(c.venue, selectedVenueId));
+            if (!filtered.length) {
+              hint = '当前场馆暂无上架课程';
+            }
+          }
+          const sid = scaleById || {};
+          const cid = categoryById || {};
+          const goods = filtered.map((c) =>
+            formatCourseRow(c, pickCourseScale(sid, c.type), pickCategory(cid, c.category)),
+          );
+          if (this._formattedGoodsMemo) {
+            this._formattedGoodsMemo[cacheKey] = { goods, hint };
           }
           this.setData({
             goods,
             courseLoaded: true,
+            goodsEmptyHint: hint,
           });
         })
         .catch((err) => {
           console.warn('getCourses failed', err);
-          this.setData({ goods: [], courseLoaded: true });
+          this.setData({ goods: [], courseLoaded: true, goodsEmptyHint: '' });
         });
     },
 
@@ -161,12 +159,19 @@ Component({
       const index = e.currentTarget.dataset.index;
       const good = this.data.goods[index];
       if (!good) return;
+      const app = getApp();
+      const venue = app && app.globalData && app.globalData.selectedVenue;
+      const venueName = venue && venue.name ? String(venue.name) : '';
       const goodData = encodeURIComponent(
         JSON.stringify({
           id: good.id,
           image: good.image,
           desc: good.desc,
           price: good.price,
+          grantHours: good.grantHours,
+          lessonKey: good.lessonKey,
+          venueId: good.venueId,
+          venueName,
         }),
       );
       wx.navigateTo({

@@ -22,8 +22,9 @@
           </view>
         </view>
         <view class="empty-tip" wx:else>
-          <text>暂无团购记录</text>
-          <navigator class="empty-link" url="/pages/group-buy/index">去团购</navigator>
+          <text wx:if="{{!isLoggedIn}}">登录后可查看已购课程</text>
+          <text wx:else>暂无已支付课程订单</text>
+          <navigator class="empty-link" url="/pages/home/index" open-type="switchTab">去选课</navigator>
         </view>
       </view>
       <view class="placeholder" style="height: {{placeholderHeight}}px;"></view>

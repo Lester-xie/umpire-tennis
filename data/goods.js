@@ -16,6 +16,8 @@ const goods = [
     image: '/assets/images/goods/good3.jpg',
     desc: '1V1网球教练课',
     price: 229,
+    grantHours: 1,
+    lessonKey: 'regular:1v1',
   },
   {
     id: 4,
@@ -40,6 +42,8 @@ const goods = [
     image: '/assets/images/goods/good3.jpg',
     desc: '1V1网球教练课',
     price: 229,
+    grantHours: 1,
+    lessonKey: 'regular:1v1',
   },
   {
     id: 4,

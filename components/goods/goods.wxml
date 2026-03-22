@@ -25,5 +25,5 @@
       </view>
     </view>
   </block>
-  <view wx:elif="{{courseLoaded}}" class="goods-empty">暂无课程</view>
+  <view wx:elif="{{courseLoaded}}" class="goods-empty">{{goodsEmptyHint || '暂无课程'}}</view>
 </view>

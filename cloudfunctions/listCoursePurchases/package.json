@@ -1,0 +1,9 @@
+{
+  "name": "listCoursePurchases",
+  "version": "1.0.0",
+  "description": "会员已付课程课时订单列表",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

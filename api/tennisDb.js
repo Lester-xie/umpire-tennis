@@ -6,6 +6,9 @@ function getDb() {
   return wx.cloud.database();
 }
 
+/** 新注册用户默认头像（与 profile 页兜底图一致，小程序包内静态资源） */
+const DEFAULT_USER_AVATAR = '/assets/images/default-avatar.jpg';
+
 /**
  * 获取场馆列表
  * venue 集合建议字段：
@@ -33,11 +36,13 @@ function getCategories() {
 }
 
 /**
- * 课程列表 db_course：走内存全表缓存（见 api/courseCache.js），切换分类不再重复请求。
- * 课程图字段：picture（优先，https 或 cloud://）；兼容旧字段 image。
- * 列表展示文案：categoryLabel（如体验课/正课，与筛选字段 category 可并存）。
+ * 课程列表：courseCache 与 db_course_scale、db_category 同批拉取并缓存；切换分类仅在内存筛选。
+ * db_course 建议只保留外键：category → db_category._id，type → db_course_scale._id（无需再维护 categoryLabel / typeLabel）。
+ * 展示名与课类推断：分类用 db_category.name（可选 coachLessonType），规模用 db_course_scale.name（可选 pairMode / groupMode）。
+ * 详见 utils/courseCatalog.js；grantHours、显式 lessonKey、lessonType 等仍可写在课程文档上。
  * @param {string} filterCategoryId
  * @param {{ forceRefresh?: boolean }} [options]
+ * @returns {Promise<{ data: object[], scaleById: Record<string,object>, categoryById: Record<string,object> }>}
  */
 function getCourses(filterCategoryId, options) {
   return courseCache.getCourses(filterCategoryId, options);
@@ -62,14 +67,15 @@ function getUserByPhone(phone) {
 }
 
 /**
- * 新增用户
+ * 新增用户（未传 avatar 或为空时使用包内默认图）
  */
 function createUser({ phone, name, avatar } = {}) {
   const db = getDb();
+  const avatarTrim = avatar != null ? String(avatar).trim() : '';
   const data = {
     phone: phone || '',
     name: name || '',
-    avatar: avatar || '',
+    avatar: avatarTrim || DEFAULT_USER_AVATAR,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -109,10 +115,53 @@ function updateUserByPhone({ phone, update } = {}) {
 }
 
 /**
- * 当前登录用户已支付订场记录（云函数内按 openid 查询 db_booking）
+ * 当前登录用户已支付订场记录：以本地手机号查询 db_booking（云函数校验 db_user 与当前微信绑定）。
  */
 function getMyBookings() {
-  return wx.cloud.callFunction({ name: 'listBookings' });
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'listBookings',
+    data: { phone },
+  });
+}
+
+/** 当前用户已支付课时包订单（db_course_purchase，云函数校验 openid+phone） */
+function listCoursePurchases() {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'listCoursePurchases',
+    data: { phone },
+  });
+}
+
+/** 当前用户在指定场馆下的各课程剩余课时（db_member_course_hours 按 venueId 区分） */
+function listMemberCourseHours(venueId) {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  const vid = venueId != null ? String(venueId).trim() : '';
+  return wx.cloud.callFunction({
+    name: 'listMemberCourseHours',
+    data: { phone, venueId: vid },
+  });
+}
+
+/** 当前用户全部场馆下的剩余课时（一次查询，用于「我的课时」等） */
+function listAllMemberCourseHours() {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'listMemberCourseHours',
+    data: { phone, allVenues: true },
+  });
+}
+
+/**
+ * 使用已购课时预订教练占用时段
+ * @param {{ phone: string, holdIds: string[], snapshot: object }} payload
+ */
+function completeCoachBookingWithHours(payload) {
+  return wx.cloud.callFunction({
+    name: 'completeCoachBookingWithHours',
+    data: payload || {},
+  });
 }
 
 /**
@@ -126,7 +175,7 @@ function getBookedSlots({ venueId, orderDate } = {}) {
 }
 
 /**
- * 教练占用场地（云函数内校验 db_user.isCoach）
+ * 占用场地（云函数内：畅打需 isManager，体验/正课/团课需 isCoach）
  * @param {{ venueId: string, venueName?: string, orderDate: string, slots: Array<{courtId:number, slotIndex:number}>, lessonType: string, pairMode?: string, groupMode?: string }} payload
  */
 function coachHoldSlots(payload) {
@@ -136,12 +185,21 @@ function coachHoldSlots(payload) {
   });
 }
 
-/** 当前教练有效占用列表 */
-function listCoachHolds() {
-  return wx.cloud.callFunction({ name: 'listCoachHolds' });
+/**
+ * 当前教练占用列表
+ * @param {{ venueId?: string, orderDate?: string, includeReleasedForSession?: boolean }} [payload] 约场页传场馆+日期+includeReleasedForSession 可含 released 占用
+ */
+function listCoachHolds(payload) {
+  return wx.cloud.callFunction({
+    name: 'listCoachHolds',
+    data: payload || {},
+  });
 }
 
-/** 取消一条本人占用 @param {{ holdId: string }} payload */
+/**
+ * 取消教练占用：可传 holdId 或 holdIds；已有学员时作废同场次订单并退回已扣课时（微信实付需线下协调退款）
+ * @param {{ holdId?: string, holdIds?: string[] }} payload
+ */
 function cancelCoachHold(payload) {
   return wx.cloud.callFunction({
     name: 'cancelCoachHold',
@@ -151,7 +209,7 @@ function cancelCoachHold(payload) {
 
 /**
  * 批量更新本人占用的课程类型/规模
- * @param {{ holdIds: string[], lessonType: string, pairMode?: string, groupMode?: string }} payload
+ * @param {{ holdIds: string[], lessonType: string, pairMode?: string, groupMode?: string, scaleDisplayName?: string }} payload
  */
 function updateCoachHolds(payload) {
   return wx.cloud.callFunction({
@@ -161,6 +219,7 @@ function updateCoachHolds(payload) {
 }
 
 module.exports = {
+  DEFAULT_USER_AVATAR,
   getVenues,
   getCategories,
   getCourses,
@@ -170,6 +229,10 @@ module.exports = {
   decryptPhoneNumber,
   updateUserByPhone,
   getMyBookings,
+  listCoursePurchases,
+  listMemberCourseHours,
+  listAllMemberCourseHours,
+  completeCoachBookingWithHours,
   getBookedSlots,
   coachHoldSlots,
   listCoachHolds,

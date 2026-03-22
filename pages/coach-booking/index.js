@@ -1,10 +1,18 @@
 const {
   getBookedSlots,
+  getCategories,
+  getUserByPhone,
   coachHoldSlots,
   listCoachHolds,
   cancelCoachHold,
   updateCoachHolds,
 } = require('../../api/tennisDb');
+const {
+  indexCategoriesByCoachLessonType,
+  scalesForLessonType,
+  coerceModes,
+} = require('../../utils/coachPurposeScales');
+const { indexDocsById } = require('../../utils/courseCatalog');
 
 /** 与云函数一致，用于和「我的场地占用」、接口返回的 orderDate 对齐 */
 function normalizeOrderDateStr(d) {
@@ -55,15 +63,22 @@ Page({
     selectedVenueId: '', // 当前选定的球场 id
     priceLoading: false, // 加载价格规则状态
     showPurposeSheet: false,
-    /** experience | regular | group */
+    /** experience | regular | group | open_play（畅打，仅管理员用途） */
     lessonType: 'experience',
+    /** 管理员：用途仅畅打；与 isCoach 互斥展示（教练+管理员时管理员优先） */
+    purposeOnlyOpenPlay: false,
+    /** 非管理员教练：展示体验课/正课/团课，不含畅打 */
+    purposeShowStandardTypes: false,
     /** 体验课/正课：1v1 | 1v2 */
     pairMode: '1v1',
-    /** 团课：固定 group35（3-5 人班） */
+    /** 团课：固定 group35（3-5人） */
     groupMode: 'group35',
     /** purpose 弹层：create 新占场 | edit 改本人占用 */
     purposeSheetMode: 'create',
     editingHoldIds: [],
+    /** 来自 db_category.scaleList，随课程类型切换 */
+    purposePairScales: [],
+    purposeGroupScales: [],
   },
   
   // 动画定时器
@@ -73,6 +88,102 @@ Page({
   bookedSlotKeySet: null,
   /** 每次发起 getBookedSlots 自增，用于丢弃过期响应 */
   _bookedSlotsFetchToken: 0,
+
+  /**
+   * @param {boolean} [allowOpenPlayOpt] 传入时可避免 setData 尚未合并时读错 purposeOnlyOpenPlay
+   */
+  async loadCoachCategories(allowOpenPlayOpt) {
+    try {
+      const [catRes, scaleRes] = await Promise.all([
+        getCategories(),
+        wx.cloud
+          .database()
+          .collection('db_course_scale')
+          .get()
+          .catch(() => ({ data: [] })),
+      ]);
+      const list = (catRes && catRes.data) || [];
+      const allowOpenPlay =
+        allowOpenPlayOpt !== undefined ? !!allowOpenPlayOpt : !!this.data.purposeOnlyOpenPlay;
+      this._coachCategoryIndex = indexCategoriesByCoachLessonType(list, { allowOpenPlay });
+      this._courseScaleById = indexDocsById((scaleRes && scaleRes.data) || []);
+    } catch (err) {
+      console.error('loadCoachCategories', err);
+      this._coachCategoryIndex = {};
+      this._courseScaleById = {};
+    }
+  },
+
+  async refreshManagerAndCoachCatalog() {
+    let isManager = false;
+    let isCoach = false;
+    const phone = String(wx.getStorageSync('user_phone') || '').trim();
+    if (phone) {
+      try {
+        const res = await getUserByPhone(phone);
+        const u = res && res.data && res.data[0];
+        isManager = !!(u && u.isManager);
+        isCoach = !!(u && u.isCoach);
+      } catch (e) {
+        console.warn('refreshManagerAndCoachCatalog', e);
+      }
+    }
+    const purposeOnlyOpenPlay = !!isManager;
+    const purposeShowStandardTypes = !!isCoach && !isManager;
+    const hadPurposeOnlyOpenPlay = this.data.purposeOnlyOpenPlay;
+    this.setData({ purposeOnlyOpenPlay, purposeShowStandardTypes });
+    await this.loadCoachCategories(purposeOnlyOpenPlay);
+    if (purposeOnlyOpenPlay) {
+      const patch = this.applyPurposeScalesForLessonType('open_play', '', '');
+      this.setData({ lessonType: 'open_play', ...patch });
+    } else if (hadPurposeOnlyOpenPlay && !purposeOnlyOpenPlay && this.data.lessonType === 'open_play') {
+      const patch = this.applyPurposeScalesForLessonType('experience', '1v1', 'group35');
+      this.setData({ lessonType: 'experience', ...patch });
+    }
+  },
+
+  applyPurposeScalesForLessonType(lessonType, pairModeIn, groupModeIn) {
+    const idx = this._coachCategoryIndex || {};
+    const scaleById = this._courseScaleById || {};
+    const { pairScales, groupScales } = scalesForLessonType(lessonType, idx, scaleById);
+    const { pairMode, groupMode } = coerceModes(
+      lessonType,
+      pairModeIn,
+      groupModeIn,
+      pairScales,
+      groupScales
+    );
+    return {
+      purposePairScales: pairScales,
+      purposeGroupScales: groupScales,
+      pairMode,
+      groupMode,
+    };
+  },
+
+  resolveSelectedScaleDisplayName(lessonType, pairMode, groupMode) {
+    const { purposePairScales, purposeGroupScales } = this.data;
+    if (lessonType === 'group' || lessonType === 'open_play') {
+      const row = (purposeGroupScales || []).find((s) => s.modeCode === groupMode);
+      return row ? row.name : '';
+    }
+    const row = (purposePairScales || []).find((s) => s.modeCode === pairMode);
+    return row ? row.name : '';
+  },
+
+  resolveSelectedCapacityLimit(lessonType, pairMode, groupMode) {
+    const { purposePairScales, purposeGroupScales } = this.data;
+    if (lessonType === 'group' || lessonType === 'open_play') {
+      const row = (purposeGroupScales || []).find((s) => s.modeCode === groupMode);
+      const fb = lessonType === 'open_play' ? 6 : 5;
+      const lim = row && row.limit != null ? Math.floor(Number(row.limit)) : fb;
+      return Number.isFinite(lim) && lim >= 1 ? lim : fb;
+    }
+    const row = (purposePairScales || []).find((s) => s.modeCode === pairMode);
+    const fb = pairMode === '1v2' ? 2 : 1;
+    const lim = row && row.limit != null ? Math.floor(Number(row.limit)) : fb;
+    return Number.isFinite(lim) && lim >= 1 ? lim : fb;
+  },
 
   /** 标题：去选场页，选完后返回本页 */
   handleContentHeaderTitleTap() {
@@ -84,6 +195,9 @@ Page({
   onLoad() {
     this.coachHoldMeta = {};
     this.myCoachHoldIdSet = new Set();
+    this._coachCategoryIndex = {};
+    this._courseScaleById = {};
+    this.refreshManagerAndCoachCatalog();
     const newVenueId = this.syncSelectedVenueName();
     // 生成最近两个月的日期列表
     this.generateDateList();
@@ -92,6 +206,7 @@ Page({
   },
 
   onShow() {
+    this.refreshManagerAndCoachCatalog();
     const newVenueId = this.syncSelectedVenueName();
     if (newVenueId) {
       this.loadSlotPricesAndRender(newVenueId);
@@ -279,7 +394,11 @@ Page({
     const normDate = normalizeOrderDateStr(orderDate);
     return Promise.all([
       getBookedSlots({ venueId, orderDate }),
-      listCoachHolds().catch(() => ({ result: { data: [] } })),
+      listCoachHolds({
+        venueId,
+        orderDate: normDate,
+        includeReleasedForSession: true,
+      }).catch(() => ({ result: { data: [] } })),
     ])
       .then(([bookedRes, holdsRes]) => {
         if (token !== this._bookedSlotsFetchToken) {
@@ -299,7 +418,9 @@ Page({
             : [];
         const myHoldIdSet = new Set();
         rows.forEach((row) => {
-          if (!row || row.status !== 'active') return;
+          if (!row) return;
+          const st = String(row.status || '');
+          if (!['active', 'released'].includes(st)) return;
           if (!venueIdLooseEqual(row.venueId, venueId)) return;
           if (normalizeOrderDateStr(row.orderDate) !== normDate) return;
           const cid = Number(row.courtId);
@@ -310,11 +431,20 @@ Page({
           const k = `${cid}-${idx}`;
           const cur = coachHoldMeta[k] || {};
           coachHoldMeta[k] = {
+            ...cur,
             holdId: String(row._id),
+            sessionHoldIds:
+              cur.sessionHoldIds && cur.sessionHoldIds.length > 0
+                ? cur.sessionHoldIds
+                : [String(row._id)],
             capacityLabel:
               (row.capacityLabel && String(row.capacityLabel).trim()) ||
               cur.capacityLabel ||
               '教练占用',
+            coachName:
+              (row.coachName != null && String(row.coachName).trim()) ||
+              (cur.coachName != null && String(cur.coachName).trim()) ||
+              '',
             lessonType: row.lessonType,
             pairMode: row.pairMode,
             groupMode: row.groupMode,
@@ -508,7 +638,7 @@ Page({
 
   applyCoachHoldMergeAndLayout(slots, courtId) {
     const n = slots.length;
-    const ROW = 128;
+    const ROW = 126;
     const CELL = 120;
     const GAP = 8;
     const metaMap = this.coachHoldMeta || {};
@@ -520,9 +650,11 @@ Page({
       slots[i].coachTimeRange = '';
       slots[i].coachHoldIdsStr = '';
       slots[i].canManageCoachHold = false;
+      slots[i].coachSessionReleased = false;
       slots[i].prefillLessonType = 'experience';
       slots[i].prefillPairMode = '1v1';
       slots[i].prefillGroupMode = 'group35';
+      slots[i].prefillCoachName = '';
     }
 
     let i = 0;
@@ -544,17 +676,37 @@ Page({
       }
       cur.coachSpan = span;
       cur.coachTimeRange = this.formatCoachSlotRange(i, span);
-      const ids = [];
+      const m0 = metaMap[`${courtId}-${i}`] || {};
+      const idSet = new Set();
+      if (Array.isArray(m0.sessionHoldIds)) {
+        m0.sessionHoldIds.forEach((x) => {
+          const h = String(x || '').trim();
+          if (h) idSet.add(h);
+        });
+      }
       for (let k = 0; k < span; k += 1) {
         const m = metaMap[`${courtId}-${i + k}`];
-        if (m && m.holdId) ids.push(String(m.holdId));
+        if (m && Array.isArray(m.sessionHoldIds)) {
+          m.sessionHoldIds.forEach((x) => {
+            const h = String(x || '').trim();
+            if (h) idSet.add(h);
+          });
+        }
+        if (m && m.holdId) idSet.add(String(m.holdId));
       }
+      const ids = [...idSet];
       cur.coachHoldIdsStr = ids.join(',');
-      cur.canManageCoachHold = ids.some((id) => mySet.has(id));
-      const m0 = metaMap[`${courtId}-${i}`] || {};
+      const isMgr = this.data.purposeOnlyOpenPlay;
+      cur.canManageCoachHold =
+        ids.length > 0 && (isMgr || ids.some((id) => mySet.has(id)));
+      cur.coachSessionReleased = !!m0.fromReleasedSession;
       cur.prefillLessonType = m0.lessonType || 'experience';
       cur.prefillPairMode = m0.pairMode || '1v1';
       cur.prefillGroupMode = 'group35';
+      cur.prefillCoachName =
+        m0.coachName != null && String(m0.coachName).trim() !== ''
+          ? String(m0.coachName).trim()
+          : '';
       for (let k = i + 1; k < i + span; k += 1) {
         slots[k].coachMergeSkip = true;
       }
@@ -601,6 +753,7 @@ Page({
       const coachPurpose = bookedByCoach
         ? (coachMeta.capacityLabel || '教练占用')
         : '';
+      const coachName = bookedByCoach && coachMeta.coachName ? String(coachMeta.coachName).trim() : '';
 
       const isAvailable =
         isAvailableTime && slotPrice != null && !isBookedByOrder;
@@ -619,9 +772,11 @@ Page({
         coachTimeRange: '',
         coachHoldIdsStr: '',
         canManageCoachHold: false,
+        coachSessionReleased: false,
         prefillLessonType: 'experience',
         prefillPairMode: '1v1',
         prefillGroupMode: 'group35',
+        prefillCoachName: coachName,
       });
     }
 
@@ -640,26 +795,61 @@ Page({
       return;
     }
     const holdids = ds.holdids != null ? String(ds.holdids) : '';
-    const mySet = this.myCoachHoldIdSet || new Set();
-    const myIds = holdids
+    const idList = holdids
       .split(',')
       .map((s) => s.trim())
-      .filter((id) => mySet.has(id));
+      .filter(Boolean);
+    const mySet = this.myCoachHoldIdSet || new Set();
+    const isMgr = this.data.purposeOnlyOpenPlay;
+    const owned = idList.some((id) => mySet.has(id));
+    const myIds = isMgr ? idList : idList.filter((id) => mySet.has(id));
     if (myIds.length === 0) {
       wx.showToast({ title: '无权限操作该占用', icon: 'none' });
+      return;
+    }
+    const releasedOnly = this._isTruthyDataset(ds.released);
+    if (releasedOnly) {
+      wx.showActionSheet({
+        itemList: ['取消场次（已报名将移除，课时将退回）'],
+        success: (res) => {
+          if (res.tapIndex === 0) {
+            this.confirmCancelCoachHolds(myIds.join(','));
+          }
+        },
+      });
+      return;
+    }
+    const canEditPurpose = owned;
+    if (!canEditPurpose) {
+      wx.showActionSheet({
+        itemList: ['取消预订'],
+        success: (res) => {
+          if (res.tapIndex === 0) {
+            this.confirmCancelCoachHolds(myIds.join(','));
+          }
+        },
+      });
       return;
     }
     wx.showActionSheet({
       itemList: ['更改场地类型', '取消预订'],
       success: (res) => {
         if (res.tapIndex === 0) {
+          const pm = ds.pairmode || '1v1';
+          const gm = ds.groupmode || 'group35';
+          let lt = ds.lessontype || 'experience';
+          if (this.data.purposeOnlyOpenPlay) {
+            lt = 'open_play';
+          } else if (lt === 'open_play') {
+            lt = 'experience';
+          }
+          const scalePatch = this.applyPurposeScalesForLessonType(lt, pm, gm);
           this.setData({
             showPurposeSheet: true,
             purposeSheetMode: 'edit',
             editingHoldIds: myIds,
-            lessonType: ds.lessontype || 'experience',
-            pairMode: ds.pairmode || '1v1',
-            groupMode: ds.groupmode || 'group35',
+            lessonType: lt,
+            ...scalePatch,
           });
         } else if (res.tapIndex === 1) {
           this.confirmCancelCoachHolds(myIds.join(','));
@@ -669,35 +859,35 @@ Page({
   },
 
   confirmCancelCoachHolds(holdidsStr) {
-    const mySet = this.myCoachHoldIdSet || new Set();
-    const ids = String(holdidsStr || '')
+    const raw = String(holdidsStr || '')
       .split(',')
       .map((s) => s.trim())
-      .filter((id) => mySet.has(id));
+      .filter(Boolean);
+    const mySet = this.myCoachHoldIdSet || new Set();
+    const isMgr = this.data.purposeOnlyOpenPlay;
+    const ids = isMgr ? raw : raw.filter((id) => mySet.has(id));
     if (ids.length === 0) {
       wx.showToast({ title: '无可用占用记录', icon: 'none' });
       return;
     }
     wx.showModal({
       title: '取消预订',
-      content: '确定取消该时段占用？连续占用的时段将一并取消。',
+      content:
+        '确定取消该时段？连续占用将一并取消。若已有学员报名，相关订单将作废；使用课时的部分将自动退回，微信支付部分请联系场馆处理退款。',
       confirmText: '取消占用',
       confirmColor: '#c62828',
       success: async (res) => {
         if (!res.confirm) return;
         wx.showLoading({ title: '处理中...' });
         try {
-          for (let i = 0; i < ids.length; i += 1) {
-            const cloudRes = await cancelCoachHold({ holdId: ids[i] });
-            const r = (cloudRes && cloudRes.result) || {};
-            if (!r.ok) {
-              wx.hideLoading();
-              wx.showToast({ title: r.errMsg || '取消失败', icon: 'none' });
-              return;
-            }
-          }
+          const cloudRes = await cancelCoachHold({ holdIds: ids });
+          const r = (cloudRes && cloudRes.result) || {};
           wx.hideLoading();
-          wx.showToast({ title: '已取消占用', icon: 'success' });
+          if (!r.ok) {
+            wx.showToast({ title: r.errMsg || '取消失败', icon: 'none' });
+            return;
+          }
+          wx.showToast({ title: '已取消', icon: 'success' });
           this.loadSlotPricesAndRender();
         } catch (err) {
           wx.hideLoading();
@@ -726,13 +916,21 @@ Page({
       wx.showToast({ title: '缺少占用记录', icon: 'none' });
       return;
     }
+    const scaleDisplayName = this.resolveSelectedScaleDisplayName(
+      lessonType,
+      pairMode,
+      groupMode
+    );
     wx.showLoading({ title: '保存中...' });
     try {
+      const capacityLimit = this.resolveSelectedCapacityLimit(lessonType, pairMode, groupMode);
       const cloudRes = await updateCoachHolds({
         holdIds: ids,
         lessonType,
         pairMode,
         groupMode,
+        scaleDisplayName,
+        capacityLimit,
       });
       const r = (cloudRes && cloudRes.result) || {};
       wx.hideLoading();
@@ -897,10 +1095,23 @@ Page({
       });
       return;
     }
+    if (!this.data.purposeOnlyOpenPlay && !this.data.purposeShowStandardTypes) {
+      wx.showToast({ title: '无权限占用场地', icon: 'none' });
+      return;
+    }
+    const onlyOpen = this.data.purposeOnlyOpenPlay;
+    const lt = onlyOpen ? 'open_play' : this.data.lessonType;
+    const scalePatch = this.applyPurposeScalesForLessonType(
+      lt,
+      onlyOpen ? '' : this.data.pairMode,
+      onlyOpen ? '' : this.data.groupMode
+    );
     this.setData({
       showPurposeSheet: true,
       purposeSheetMode: 'create',
       editingHoldIds: [],
+      ...(onlyOpen ? { lessonType: 'open_play' } : {}),
+      ...scalePatch,
     });
   },
 
@@ -915,17 +1126,23 @@ Page({
   selectLessonType(e) {
     const { v } = e.currentTarget.dataset;
     if (!v) return;
-    const patch = { lessonType: v };
-    if (v === 'group') {
-      patch.groupMode = 'group35';
-    }
-    this.setData(patch);
+    if (this.data.purposeOnlyOpenPlay) return;
+    if (v === 'open_play') return;
+    const scalePatch = this.applyPurposeScalesForLessonType(v, '', '');
+    this.setData({
+      lessonType: v,
+      ...scalePatch,
+    });
   },
 
-  selectPairMode(e) {
-    const { v } = e.currentTarget.dataset;
-    if (!v) return;
-    this.setData({ pairMode: v });
+  selectPurposeScale(e) {
+    const { kind, code } = e.currentTarget.dataset;
+    if (!code) return;
+    if (kind === 'group') {
+      this.setData({ groupMode: code });
+    } else {
+      this.setData({ pairMode: code });
+    }
   },
 
   async submitCoachHold() {
@@ -943,7 +1160,13 @@ Page({
     const venue = app && app.globalData && app.globalData.selectedVenue;
     const venueName = (venue && venue.name) ? String(venue.name).trim() : '';
 
+    const scaleDisplayName = this.resolveSelectedScaleDisplayName(
+      lessonType,
+      pairMode,
+      groupMode
+    );
     try {
+      const capacityLimit = this.resolveSelectedCapacityLimit(lessonType, pairMode, groupMode);
       const cloudRes = await coachHoldSlots({
         venueId: selectedVenueId,
         venueName,
@@ -952,6 +1175,8 @@ Page({
         lessonType,
         pairMode,
         groupMode,
+        scaleDisplayName,
+        capacityLimit,
       });
       const r = (cloudRes && cloudRes.result) || {};
       wx.hideLoading();

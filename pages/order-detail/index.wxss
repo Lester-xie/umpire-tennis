@@ -25,33 +25,88 @@
   display: flex;
   flex-direction: column;
 }
+/* 与首页 components/goods 的 .goods-item 视觉一致 */
 .goods-order-item {
   display: flex;
-  align-items: center;
-  background-color: #fff;
-  border-radius: 24rpx;
+  flex-direction: column;
+  align-items: stretch;
+  background-color: #ffffff;
+  border-radius: 36rpx;
   padding: 32rpx;
+  overflow: hidden;
+}
+.goods-order-main {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
 }
 .goods-order-image {
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: 20rpx;
+  width: 240rpx;
+  height: 240rpx;
+  border-radius: 36rpx;
   flex-shrink: 0;
+  align-self: flex-start;
 }
 .goods-order-info {
   flex: 1;
+  min-width: 0;
   margin-left: 32rpx;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
 }
 .goods-order-desc {
-  font-size: 30rpx;
-  color: #134E35;
+  font-size: 34rpx;
+  color: #000000;
   line-height: 1.4;
 }
-.goods-order-price {
-  font-size: 36rpx;
+.goods-venue-section {
+  margin-top: 28rpx;
+  padding-top: 28rpx;
+  border-top: 2rpx solid #e8ece9;
+  width: 100%;
+  box-sizing: border-box;
+}
+.goods-venue-section-label {
+  font-size: 24rpx;
+  color: #666;
+  line-height: 1.4;
+}
+.goods-venue-section-value {
+  margin-top: 8rpx;
+  font-size: 30rpx;
+  color: #134e35;
   font-weight: 600;
-  color: #134E35;
+  line-height: 1.35;
+}
+.goods-venue-section-tip {
   margin-top: 16rpx;
+  font-size: 24rpx;
+  color: #8a6d3b;
+  line-height: 1.5;
+  padding: 16rpx 20rpx;
+  background: rgba(254, 243, 199, 0.45);
+  border-radius: 16rpx;
+}
+.goods-grant-hours {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #2d6a4f;
+  line-height: 1.45;
+}
+.goods-grant-hours--warn {
+  color: #b45309;
+}
+.goods-order-price {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  border-top: 2rpx solid #e0e0e0;
+  padding-top: 12rpx;
+  margin-top: 12rpx;
+  font-size: 36rpx;
+  font-weight: 500;
+  color: #414141;
 }
 
 .order-info {
@@ -76,6 +131,141 @@
   color: #134E35;
   font-weight: 500;
 }
+
+.coach-pay-panel {
+  margin-bottom: 32rpx;
+  padding: 28rpx;
+  background: rgba(240, 246, 244, 0.85);
+  border-radius: 24rpx;
+  border: 2rpx solid #ffffff;
+}
+.coach-pay-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #134e35;
+  margin-bottom: 12rpx;
+}
+.coach-balance-banner {
+  margin-bottom: 20rpx;
+  padding: 20rpx 22rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  border: 2rpx solid #e8efe9;
+}
+.coach-balance-banner-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8rpx 12rpx;
+}
+.coach-balance-banner-label {
+  font-size: 26rpx;
+  color: #555;
+  margin-right: 8rpx;
+}
+.coach-balance-banner-num {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #134e35;
+  line-height: 1;
+}
+.coach-balance-banner-unit {
+  font-size: 26rpx;
+  color: #134e35;
+  font-weight: 500;
+}
+.coach-balance-banner-hint {
+  font-size: 26rpx;
+  color: #666;
+  line-height: 1.4;
+  flex: 1;
+  min-width: 200rpx;
+}
+.coach-balance-banner-tip {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: #888;
+  line-height: 1.45;
+}
+.coach-pay-hint {
+  font-size: 24rpx;
+  color: #666;
+  line-height: 1.45;
+  margin-bottom: 20rpx;
+}
+.coach-roster-card {
+  margin-bottom: 20rpx;
+  padding: 20rpx 22rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  border: 2rpx solid #e8efe9;
+}
+.coach-roster-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+  margin-bottom: 12rpx;
+}
+.coach-roster-row:last-of-type {
+  margin-bottom: 0;
+}
+.coach-roster-label {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  color: #666;
+}
+.coach-roster-value {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #134e35;
+}
+.coach-roster-names {
+  flex: 1;
+  font-size: 24rpx;
+  color: #333;
+  line-height: 1.45;
+}
+.coach-roster-warn {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #b45309;
+  line-height: 1.4;
+}
+.coach-pay-option {
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  border-radius: 20rpx;
+  background: #fff;
+  border: 2rpx solid #e0e0e0;
+}
+.coach-pay-option:last-of-type {
+  margin-bottom: 0;
+}
+.coach-pay-option--on {
+  border-color: #2d6a4f;
+  background: rgba(45, 106, 79, 0.08);
+}
+.coach-pay-option-label {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #222;
+}
+.coach-pay-option-desc {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #666;
+  line-height: 1.4;
+}
+.coach-pay-warn {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  color: #b45309;
+  line-height: 1.45;
+}
+
 .court-list {
   display: flex;
   flex-direction: column;
@@ -173,6 +363,12 @@
 .fee-item.total .fee-value {
   font-size: 36rpx;
   font-weight: 600;
+}
+.fee-item.coach-fee-note .fee-label,
+.fee-item.coach-fee-note .fee-value {
+  font-size: 24rpx;
+  color: #888;
+  font-weight: 400;
 }
 .footer {
   position: fixed;

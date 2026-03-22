@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "全部团购",
+  "navigationBarTitleText": "课程详情",
   "usingComponents": {
     "header": "/components/header/header"
   }

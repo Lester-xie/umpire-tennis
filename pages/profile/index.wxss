@@ -146,13 +146,6 @@
   padding: 36rpx 32rpx;
 }
 
-.coach-book-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #134e35;
-  margin-bottom: 16rpx;
-}
-
 .coach-book-desc {
   font-size: 26rpx;
   color: #666;

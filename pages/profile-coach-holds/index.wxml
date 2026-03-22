@@ -10,7 +10,7 @@
     style="margin-top: {{headerHeight}}px; height: {{contentHeight}}px;"
   >
     <view class="content-wrapper">
-      <view class="card section-card" wx:if="{{isCoach}}">
+      <view class="card section-card" wx:if="{{isCoach || isManager}}">
         <view class="section-list" wx:if="{{coachHolds.length > 0}}">
           <view class="list-item coach-hold-item" wx:for="{{coachHolds}}" wx:key="_id">
             <view class="item-main">

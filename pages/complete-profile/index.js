@@ -22,7 +22,7 @@ function getTempFileURLFromFileID(fileID) {
   });
 }
 
-/** 本地缓存的 avatar：可能是云 fileID、https（Joe Schmoe 等）、本地路径 */
+/** 本地缓存的 avatar：云 fileID、https、或包内静态路径 */
 async function resolveAvatarForDisplay(stored) {
   if (!stored) return '';
   const v = String(stored);

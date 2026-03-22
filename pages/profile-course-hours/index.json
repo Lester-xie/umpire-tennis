@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "完成",
+  "navigationBarTitleText": "我的课时",
   "usingComponents": {
     "header": "/components/header/header"
   }

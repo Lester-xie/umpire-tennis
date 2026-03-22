@@ -11,42 +11,67 @@
       <view class="done-wrap">
         <image class="done-icon" src="/assets/images/done.svg" mode="aspectFit" />
       </view>
-      <view class="order-title">预约成功</view>
+      <view class="order-title">{{successTitle}}</view>
+      <view class="order-sub" wx:if="{{successSub}}">{{successSub}}</view>
 
-      <view class="order-info">
-        <view class="info-item">
-          <text class="info-label">预约球馆：</text>
-          <text class="info-value">{{campusName}}</text>
-        </view>
-      </view>
-
-      <view class="section-title">预订时间</view>
-      <view class="court-list">
-        <view class="court-item" wx:for="{{orderItems}}" wx:key="courtId">
-          <view class="court-item-header">
-            <text class="court-name">{{item.courtName}}</text>
+      <block wx:if="{{successKind === 'court'}}">
+        <view class="order-info">
+          <view class="info-item">
+            <text class="info-label">预约球馆：</text>
+            <text class="info-value">{{campusName}}</text>
           </view>
-          <view class="time-slot-list">
-            <view
-              class="time-slot-item"
-              wx:for="{{item.timeSlots}}"
-              wx:for-item="slot"
-              wx:key="index"
-            >
-              <view class="time-slot-info">
-                <text class="time-slot-time">{{slot.timeRange}}</text>
-                <text class="time-slot-hours">{{slot.hours}}小时</text>
+        </view>
+
+        <view class="section-title">预订时间</view>
+        <view class="court-list">
+          <view class="court-item" wx:for="{{orderItems}}" wx:key="courtId">
+            <view class="court-item-header">
+              <text class="court-name">{{item.courtName}}</text>
+            </view>
+            <view class="time-slot-list">
+              <view
+                class="time-slot-item"
+                wx:for="{{item.timeSlots}}"
+                wx:for-item="slot"
+                wx:key="index"
+              >
+                <view class="time-slot-info">
+                  <text class="time-slot-time">{{slot.timeRange}}</text>
+                  <text class="time-slot-hours">{{slot.hours}}小时</text>
+                </view>
               </view>
             </view>
           </view>
         </view>
-      </view>
+      </block>
+
+      <block wx:elif="{{successKind === 'coursePurchase'}}">
+        <view class="order-info">
+          <view class="info-item" wx:if="{{campusName}}">
+            <text class="info-label">场馆</text>
+            <text class="info-value">{{campusName}}</text>
+          </view>
+          <view class="info-item" wx:if="{{lessonLabel}}">
+            <text class="info-label">课程类型</text>
+            <text class="info-value">{{lessonLabel}}</text>
+          </view>
+          <view class="info-item" wx:if="{{goodDesc}}">
+            <text class="info-label">商品</text>
+            <text class="info-value info-value--wrap">{{goodDesc}}</text>
+          </view>
+          <view class="info-item" wx:if="{{grantHours > 0}}">
+            <text class="info-label">获得课时</text>
+            <text class="info-value info-value--strong">{{grantHours}} 小时</text>
+          </view>
+        </view>
+        <view class="course-hours-link" bindtap="handleViewCourseHours">查看我的课时</view>
+      </block>
     </view>
   </scroll-view>
 
   <view class="footer">
-    <view class="footer-button" bindtap="handleBackToBooking">
-      <text class="footer-button-text">返回预订</text>
+    <view class="footer-button" bindtap="handleFooterTap">
+      <text class="footer-button-text">{{footerButtonText}}</text>
     </view>
   </view>
 </view>

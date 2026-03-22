@@ -51,16 +51,15 @@
           bindgetphonenumber="onPhoneRegister"
         ></button>
       </view>
-      <view class="booking-court-wrapper" wx:if="{{isCoach}}">
+      <view class="booking-court-wrapper" wx:if="{{isCoach || isManager}}">
         <view class="coach-book-card card">
-          <view class="coach-book-title">教练约场</view>
           <view class="coach-book-desc">选择时段并填写用途后，该场地时段将对会员显示为已占用，无法预订。</view>
           <view class="coach-book-btn" bindtap="handleCoachBookCourt">预约场地</view>
         </view>
       </view>
 
       <view class="card menu-card">
-        <block wx:if="{{isCoach}}">
+        <block wx:if="{{isCoach || isManager}}">
           <view class="menu-row" bindtap="goCoachHolds">
             <text class="menu-title">我的场地占用</text>
             <image class="menu-arrow" src="/assets/images/arrow.svg" mode="aspectFit"></image>
@@ -74,6 +73,11 @@
         <view class="menu-divider"></view>
         <view class="menu-row" bindtap="goGoodsOrders">
           <text class="menu-title">课程订单</text>
+          <image class="menu-arrow" src="/assets/images/arrow.svg" mode="aspectFit"></image>
+        </view>
+        <view class="menu-divider"></view>
+        <view class="menu-row" bindtap="goCourseHours">
+          <text class="menu-title">我的课时</text>
           <image class="menu-arrow" src="/assets/images/arrow.svg" mode="aspectFit"></image>
         </view>
       </view>

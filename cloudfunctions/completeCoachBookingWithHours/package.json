@@ -1,0 +1,14 @@
+{
+  "name": "completeCoachBookingWithHours",
+  "version": "1.0.0",
+  "description": "使用课时完成教练时段预订",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

@@ -30,9 +30,18 @@
 .order-title {
   font-size: 44rpx;
   font-weight: 600;
-  color: #134E35;
-  margin-bottom: 32rpx;
+  color: #134e35;
+  margin-bottom: 16rpx;
   text-align: center;
+}
+
+.order-sub {
+  font-size: 26rpx;
+  color: #666;
+  line-height: 1.5;
+  text-align: center;
+  margin-bottom: 32rpx;
+  padding: 0 8rpx;
 }
 .done-icon {
   width: 200rpx;
@@ -51,7 +60,8 @@
 .info-item {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 24rpx;
 }
 
 .info-label {
@@ -61,8 +71,29 @@
 
 .info-value {
   font-size: 28rpx;
-  color: #134E35;
+  color: #134e35;
   font-weight: 500;
+}
+
+.info-value--wrap {
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: right;
+  max-width: 420rpx;
+}
+
+.info-value--strong {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.course-hours-link {
+  margin-top: 28rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: #2d6a4f;
+  text-decoration: underline;
 }
 
 .section-title {

@@ -1,5 +1,5 @@
 const { getCategories } = require('../../api/tennisDb');
-const { ALL_CATEGORY_ID } = require('../../utils/constants');
+const { ALL_CATEGORY_ID, isCategoryExcludedFromHome } = require('../../utils/constants');
 
 function buildAllCategoryItem() {
   return {
@@ -26,7 +26,7 @@ Component({
     loadCategories() {
       getCategories()
         .then((res) => {
-          let list = res.data || [];
+          let list = (res.data || []).filter((c) => c && !isCategoryExcludedFromHome(c));
           list = [...list].sort(
             (a, b) => (a.sortOrder ?? 9999) - (b.sortOrder ?? 9999),
           );

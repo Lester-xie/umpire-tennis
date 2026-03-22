@@ -1,9 +1,22 @@
 const STORAGE_KEY = 'booking_success_payload';
 
+function resolveSuccessKind(payload) {
+  if (!payload || typeof payload !== 'object') return 'court';
+  if (payload.successKind === 'coursePurchase') return 'coursePurchase';
+  return 'court';
+}
+
 Page({
   data: {
+    successKind: 'court',
+    successTitle: '预约成功',
+    successSub: '',
     campusName: '',
     orderItems: [],
+    goodDesc: '',
+    grantHours: 0,
+    lessonLabel: '',
+    footerButtonText: '返回预订',
     contentScrollHeight: 400,
   },
 
@@ -12,13 +25,33 @@ Page({
       const payload = wx.getStorageSync(STORAGE_KEY);
       wx.removeStorageSync(STORAGE_KEY);
       if (payload && typeof payload === 'object') {
-        this.setData({
-          campusName: payload.campusName || '',
-          orderItems: Array.isArray(payload.orderItems) ? payload.orderItems : [],
-        });
+        const kind = resolveSuccessKind(payload);
+        if (kind === 'coursePurchase') {
+          const gh = Math.floor(Number(payload.grantHours) || 0);
+          this.setData({
+            successKind: 'coursePurchase',
+            successTitle: '购买成功',
+            successSub: '课时将在几秒内计入账户，您可在「我的 — 我的课时」中查看余额。',
+            campusName: payload.campusName || '',
+            goodDesc: payload.goodDesc || '',
+            grantHours: gh,
+            lessonLabel: payload.lessonLabel || '',
+            orderItems: [],
+            footerButtonText: '返回首页',
+          });
+        } else {
+          this.setData({
+            successKind: 'court',
+            successTitle: '预约成功',
+            successSub: '',
+            campusName: payload.campusName || '',
+            orderItems: Array.isArray(payload.orderItems) ? payload.orderItems : [],
+            footerButtonText: '返回预订',
+          });
+        }
       }
     } catch (e) {
-      console.error('读取订场成功信息失败', e);
+      console.error('读取成功页信息失败', e);
     }
     this.calculateContentScrollHeight();
   },
@@ -43,13 +76,21 @@ Page({
       const footerHeight = 16 + 44 + safeAreaBottom + 8;
       const contentScrollHeight = Math.max(
         windowHeight - finalHeaderHeight - footerHeight - 10,
-        200
+        200,
       );
       this.setData({ contentScrollHeight });
     });
   },
 
-  handleBackToBooking() {
+  handleFooterTap() {
+    if (this.data.successKind === 'coursePurchase') {
+      wx.switchTab({ url: '/pages/home/index' });
+      return;
+    }
     wx.switchTab({ url: '/pages/booking/index' });
+  },
+
+  handleViewCourseHours() {
+    wx.navigateTo({ url: '/pages/profile-course-hours/index' });
   },
 });

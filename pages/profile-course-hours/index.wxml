@@ -1,0 +1,44 @@
+<view class="profile-container">
+  <view class="header-wrapper">
+    <header hideDesc="{{true}}" showBackButton="{{true}}" title="我的课时" />
+  </view>
+  <scroll-view
+    class="content-scroll"
+    scroll-y="true"
+    enhanced="{{true}}"
+    show-scrollbar="{{false}}"
+    style="margin-top: {{headerHeight}}px; height: {{contentHeight}}px;"
+  >
+    <view class="content-wrapper">
+      <view class="hint-banner" wx:if="{{isLoggedIn && sections.length > 0}}">
+        不同场馆间的课时不可通用，订教练场时请在该场馆下使用对应课时。
+      </view>
+      <block wx:if="{{sections.length > 0}}">
+        <view class="card section-card" wx:for="{{sections}}" wx:key="venueId">
+          <view class="venue-title">{{item.venueName}}</view>
+          <view class="hour-list">
+            <view class="hour-row" wx:for="{{item.rows}}" wx:for-item="row" wx:key="lessonKey">
+              <text class="hour-label">{{row.lessonLabel}}</text>
+              <text class="hour-value">剩余 {{row.hours}} 小时</text>
+            </view>
+          </view>
+        </view>
+      </block>
+      <view class="card section-card" wx:else>
+        <view class="empty-tip">
+          <text wx:if="{{!isLoggedIn}}">登录后可查看各场馆剩余课时</text>
+          <text wx:else>暂无剩余课时，购买课程包后将显示在此</text>
+          <navigator wx:if="{{!isLoggedIn}}" class="empty-link" url="/pages/profile/index" open-type="switchTab">去登录</navigator>
+          <navigator wx:elif="{{isLoggedIn}}" class="empty-link" url="/pages/home/index" open-type="switchTab">去选课</navigator>
+        </view>
+      </view>
+      <view class="card link-card" wx:if="{{isLoggedIn}}">
+        <navigator class="link-row" url="/pages/profile-goods-orders/index" hover-class="none">
+          <text class="link-text">查看课程购买记录</text>
+          <image class="link-arrow" src="/assets/images/arrow.svg" mode="aspectFit"></image>
+        </navigator>
+      </view>
+      <view class="placeholder" style="height: {{placeholderHeight}}px;"></view>
+    </view>
+  </scroll-view>
+</view>

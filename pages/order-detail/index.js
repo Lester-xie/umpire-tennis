@@ -5,11 +5,19 @@ const STORAGE_KEYS = {
   userAvatar: 'user_avatar',
 };
 
-/** 与 pages/booking-success 约定：支付成功后写入，成功页读取后删除 */
+/** 与 pages/booking-success 约定：支付/纯课时订场成功后写入，成功页读取后删除 */
 const BOOKING_SUCCESS_STORAGE_KEY = 'booking_success_payload';
 
-const { getUserByPhone, createUser, decryptPhoneNumber } = require('../../api/tennisDb');
-const { getRandomSchmoeAvatarUrl } = require('../../utils/schmoeAvatar');
+const {
+  getUserByPhone,
+  createUser,
+  decryptPhoneNumber,
+  DEFAULT_USER_AVATAR,
+  listMemberCourseHours,
+  completeCoachBookingWithHours,
+  getBookedSlots,
+} = require('../../api/tennisDb');
+const { buildLessonKey, formatLessonKeyDisplay } = require('../../utils/lessonKey');
 
 Page({
   data: {
@@ -26,12 +34,44 @@ Page({
     totalPrice: 0, // 总价
     contentScrollHeight: 400, // scroll-view 可滚动区域高度，动态计算
     footerButtonText: '确认付款', // 底部按钮文案：未登录时为「去登录」
+    /** 教练占用时段订单：课时 / 微信支付 */
+    isCoachCourseOrder: false,
+    coachHoldIds: [],
+    coachCapacityLabel: '',
+    /** 占用教练的展示名（db_user.name，经 getBookedSlots / 订场页传入） */
+    coachName: '',
+    lessonKey: '',
+    requiredCourseHours: 0,
+    courseHoursBalance: 0,
+    /** 是否已从云端拿到本单 lessonKey 在本场馆的课时余额（未登录等为 false） */
+    coachCourseBalanceReady: false,
+    /** 未就绪时的说明文案 */
+    coachCourseBalanceHint: '',
+    /** 教练课节报名情况（getBookedSlots） */
+    coachSessionRosterReady: false,
+    coachSessionJoined: 0,
+    coachSessionLimit: 1,
+    coachSessionFull: false,
+    coachViewerAlreadyJoined: false,
+    coachSessionParticipantNamesStr: '',
+    payMethod: 'wechat', // course_hours | wechat | mixed
+    /** 按场地、时段排序后的每格标价（元），与 bookedSlots 一一对应，用于组合支付拆分 */
+    coachSlotPrices: [],
+    /** 组合支付：本次微信支付前拟扣课时数（与 pay 云函数 coachCourseHoursDeduct 一致） */
+    coachHoursDeductForPay: 0,
+    /** 组合支付或纯微信时的微信应付金额（元） */
+    comboCashYuan: 0,
+    /** 有余额但不足整单时：组合支付的预览（与当前 payMethod 无关） */
+    coachMixedPreviewDeduct: 0,
+    coachMixedPreviewCash: 0,
+    /** 用户是否手动切换过教练单支付方式（余额刷新时尽量保留「仅微信」等选择） */
+    coachPayUserChose: false,
   },
 
   onLoad(options) {
     this.syncCampusName();
     if (options.type === 'goods') {
-      // 商品订单：从 group-buy 页面跳转
+      // 商品订单：从首页课程列表跳转
       try {
         const goodItem = JSON.parse(decodeURIComponent(options.goodData || '{}'));
         if (goodItem && goodItem.price != null) {
@@ -44,6 +84,72 @@ Page({
         }
       } catch (e) {
         console.error('解析商品数据失败', e);
+      }
+    }
+
+    // 教练课程时段：从预订页点击教练占用格
+    if (options.orderSource === 'coachCourse' && options.coachPayload) {
+      try {
+        const coachPayload = JSON.parse(decodeURIComponent(options.coachPayload || '{}'));
+        const courts = JSON.parse(decodeURIComponent(options.courts || '[]'));
+        const selectedDate = decodeURIComponent(options.selectedDate || '');
+        const venueId = decodeURIComponent(options.venueId || '');
+        const {
+          holdIds,
+          bookedSlots,
+          lessonType,
+          pairMode,
+          groupMode,
+          capacityLabel,
+          coachName: coachNameRaw,
+        } = coachPayload;
+        if (
+          Array.isArray(holdIds) &&
+          holdIds.length > 0 &&
+          Array.isArray(bookedSlots) &&
+          bookedSlots.length > 0
+        ) {
+          const orderItems = this.processCoachCourseOrderItems(bookedSlots, courts);
+          const totalPrice = this.calculateTotalPrice(orderItems);
+          const formattedDate = this.formatDate(selectedDate);
+          const lessonKey = buildLessonKey(lessonType, pairMode, groupMode);
+          const requiredCourseHours = bookedSlots.length;
+          const coachSlotPrices = this.computeCoachSlotPrices(bookedSlots, courts);
+          this.setData({
+            orderType: 'court',
+            isCoachCourseOrder: true,
+            coachHoldIds: holdIds.map((id) => String(id)),
+            coachCapacityLabel: String(capacityLabel || '').trim(),
+            coachName: String(coachNameRaw || '').trim(),
+            lessonKey,
+            requiredCourseHours,
+            orderDate: selectedDate,
+            formattedDate,
+            orderNumber: this.generateOrderNumber(),
+            orderItems,
+            totalPrice,
+            bookedSlots,
+            venueId,
+            payMethod: 'wechat',
+            courseHoursBalance: 0,
+            coachSlotPrices,
+            coachPayUserChose: false,
+            coachHoursDeductForPay: 0,
+            comboCashYuan: totalPrice,
+            coachCourseBalanceReady: false,
+            coachCourseBalanceHint: '加载中...',
+            coachSessionRosterReady: false,
+            coachSessionJoined: 0,
+            coachSessionLimit: 1,
+            coachSessionFull: false,
+            coachViewerAlreadyJoined: false,
+            coachSessionParticipantNamesStr: '',
+          });
+          this.syncCampusName();
+          return;
+        }
+      } catch (err) {
+        console.error('解析教练课程订单失败', err);
       }
     }
 
@@ -87,7 +193,224 @@ Page({
 
   onShow() {
     this.syncCampusName();
+    this.loadCoachCourseHoursBalance();
+    this.loadCoachSessionRoster();
     this.updateFooterButtonText();
+  },
+
+  async loadCoachSessionRoster() {
+    if (!this.data.isCoachCourseOrder || !this.data.venueId || !this.data.orderDate) return;
+    const bs = this.data.bookedSlots;
+    if (!bs || !bs[0]) return;
+    try {
+      const res = await getBookedSlots({
+        venueId: this.data.venueId,
+        orderDate: this.data.orderDate,
+      });
+      const r = res && res.result ? res.result : {};
+      const metaMap =
+        r.coachHoldMeta && typeof r.coachHoldMeta === 'object' && !Array.isArray(r.coachHoldMeta)
+          ? r.coachHoldMeta
+          : {};
+      const first = bs[0];
+      const key = `${Number(first.courtId)}-${Number(first.slotIndex)}`;
+      const m = metaMap[key] || {};
+      const participants = Array.isArray(m.participants) ? m.participants : [];
+      const namesStr = participants
+        .map((p) => (p && p.displayName ? String(p.displayName).trim() : ''))
+        .filter(Boolean)
+        .join('、');
+      this.setData({
+        coachSessionRosterReady: true,
+        coachSessionJoined: m.joinedCount != null ? Number(m.joinedCount) : 0,
+        coachSessionLimit: m.capacityLimit != null ? Number(m.capacityLimit) : 1,
+        coachSessionFull: !!m.sessionFull,
+        coachViewerAlreadyJoined: !!m.viewerAlreadyJoined,
+        coachSessionParticipantNamesStr: namesStr,
+      });
+      this.updateFooterButtonText();
+    } catch (e) {
+      console.error('loadCoachSessionRoster', e);
+    }
+  },
+
+  selectPayMethod(e) {
+    const method = e.currentTarget.dataset.method;
+    if (method !== 'course_hours' && method !== 'wechat' && method !== 'mixed') return;
+    const need = this.data.requiredCourseHours || 0;
+    const bal = Math.floor(Number(this.data.courseHoursBalance) || 0);
+    if (method === 'course_hours') {
+      if (bal < need) return;
+    }
+    if (method === 'mixed') {
+      if (!(bal > 0 && bal < need)) return;
+    }
+    this.setData({ payMethod: method, coachPayUserChose: true }, () => {
+      this.recomputeCoachPayAmounts();
+      this.updateFooterButtonText();
+    });
+  },
+
+  /**
+   * 与组合支付一致：先按 courtId、slotIndex 排序，前若干小时走课时，其余按各格 venueSlotPrice 累计为微信金额。
+   */
+  computeCoachSlotPrices(selectedSlots, courts) {
+    const slots = (selectedSlots || [])
+      .map((s) => ({
+        courtId: Number(s.courtId),
+        slotIndex: Number(s.slotIndex),
+      }))
+      .filter((s) => Number.isFinite(s.courtId) && Number.isFinite(s.slotIndex));
+    slots.sort((a, b) =>
+      a.courtId !== b.courtId ? a.courtId - b.courtId : a.slotIndex - b.slotIndex,
+    );
+    const prices = [];
+    slots.forEach((s) => {
+      const court = (courts || []).find((c) => c.id === s.courtId);
+      if (!court || !court.slots) return;
+      const slotData = court.slots[s.slotIndex];
+      if (!slotData) return;
+      const raw =
+        slotData.venueSlotPrice != null ? slotData.venueSlotPrice : slotData.price;
+      const price = Number(raw);
+      if (!Number.isFinite(price)) return;
+      prices.push(price);
+    });
+    return prices;
+  },
+
+  recomputeCoachPayAmounts() {
+    if (!this.data.isCoachCourseOrder) return;
+    const need = this.data.requiredCourseHours || 0;
+    const balance = Math.floor(Number(this.data.courseHoursBalance) || 0);
+    const prices = this.data.coachSlotPrices || [];
+    const totalPrice = Number(this.data.totalPrice) || 0;
+    const pm = this.data.payMethod;
+    let deduct = 0;
+    let cash = totalPrice;
+    if (pm === 'wechat') {
+      deduct = 0;
+      cash = totalPrice;
+    } else if (pm === 'mixed') {
+      deduct = Math.min(balance, need);
+      if (prices.length === need && need > 0) {
+        cash = prices.slice(deduct).reduce((a, b) => a + b, 0);
+      } else if (need > 0) {
+        const per = totalPrice / need;
+        cash = per * Math.max(0, need - deduct);
+      }
+      cash = Math.round(cash * 100) / 100;
+    } else {
+      deduct = 0;
+      cash = 0;
+    }
+    let mixedPreviewDeduct = 0;
+    let mixedPreviewCash = 0;
+    if (balance > 0 && balance < need && need > 0) {
+      mixedPreviewDeduct = Math.min(balance, need);
+      if (prices.length === need) {
+        mixedPreviewCash = prices.slice(mixedPreviewDeduct).reduce((a, b) => a + b, 0);
+      } else {
+        const per = totalPrice / need;
+        mixedPreviewCash = per * Math.max(0, need - mixedPreviewDeduct);
+      }
+      mixedPreviewCash = Math.round(mixedPreviewCash * 100) / 100;
+    }
+    this.setData({
+      coachHoursDeductForPay: deduct,
+      comboCashYuan: cash,
+      coachMixedPreviewDeduct: mixedPreviewDeduct,
+      coachMixedPreviewCash: mixedPreviewCash,
+    });
+  },
+
+  async loadCoachCourseHoursBalance() {
+    if (!this.data.isCoachCourseOrder || !this.data.lessonKey) return;
+    const app = getApp();
+    if (!app || !app.checkLogin()) {
+      this.setData(
+        {
+          courseHoursBalance: 0,
+          payMethod: 'wechat',
+          coachPayUserChose: false,
+          coachCourseBalanceReady: false,
+          coachCourseBalanceHint: '请登录后查看本场馆该课程类型的剩余课时',
+        },
+        () => {
+          this.recomputeCoachPayAmounts();
+          this.updateFooterButtonText();
+        },
+      );
+      return;
+    }
+    const venueId = String(this.data.venueId || '').trim();
+    if (!venueId) {
+      this.setData({
+        coachCourseBalanceReady: false,
+        coachCourseBalanceHint: '缺少场馆信息，无法查询课时',
+      });
+      return;
+    }
+    this.setData({
+      coachCourseBalanceReady: false,
+      coachCourseBalanceHint: '加载中...',
+    });
+    try {
+      const cloudRes = await listMemberCourseHours(venueId);
+      const rows =
+        cloudRes && cloudRes.result && Array.isArray(cloudRes.result.data)
+          ? cloudRes.result.data
+          : [];
+      let hours = 0;
+      const key = this.data.lessonKey;
+      rows.forEach((r) => {
+        if (String(r.lessonKey || '').trim() === key) {
+          hours = Number(r.hours) || 0;
+        }
+      });
+      const need = this.data.requiredCourseHours || 0;
+      const bal = Math.floor(Number(hours) || 0);
+      const defaultMethod = () => {
+        if (need <= 0) return 'wechat';
+        if (bal >= need) return 'course_hours';
+        if (bal > 0) return 'mixed';
+        return 'wechat';
+      };
+      let payMethod = defaultMethod();
+      let nextChose = this.data.coachPayUserChose;
+      if (nextChose) {
+        const cur = this.data.payMethod;
+        if (cur === 'course_hours' && bal < need) {
+          payMethod = defaultMethod();
+          nextChose = false;
+        } else if (cur === 'mixed' && !(bal > 0 && bal < need)) {
+          payMethod = defaultMethod();
+          nextChose = false;
+        } else {
+          payMethod = cur;
+        }
+      }
+      this.setData(
+        {
+          courseHoursBalance: hours,
+          payMethod,
+          coachPayUserChose: nextChose,
+          coachCourseBalanceReady: true,
+          coachCourseBalanceHint: '',
+        },
+        () => {
+          this.recomputeCoachPayAmounts();
+          this.updateFooterButtonText();
+        },
+      );
+    } catch (e) {
+      console.error('loadCoachCourseHoursBalance', e);
+      this.setData({
+        coachCourseBalanceReady: false,
+        coachCourseBalanceHint: '课时加载失败，请稍后重试',
+      });
+      this.updateFooterButtonText();
+    }
   },
 
   onReady() {
@@ -98,8 +421,33 @@ Page({
   // 根据登录状态更新底部按钮文案
   updateFooterButtonText() {
     const app = getApp();
-    const footerButtonText = app.checkLogin() ? '确认付款' : '去登录';
-    this.setData({ footerButtonText });
+    if (!app.checkLogin()) {
+      this.setData({ footerButtonText: '去登录' });
+      return;
+    }
+    if (this.data.orderType === 'court' && this.data.isCoachCourseOrder) {
+      if (this.data.coachSessionRosterReady && this.data.coachSessionFull) {
+        this.setData({ footerButtonText: '名额已满' });
+        return;
+      }
+      if (this.data.coachSessionRosterReady && this.data.coachViewerAlreadyJoined) {
+        this.setData({ footerButtonText: '您已在名单中' });
+        return;
+      }
+      if (this.data.payMethod === 'course_hours') {
+        const h = this.data.requiredCourseHours || 0;
+        this.setData({ footerButtonText: `确认使用课时（${h} 小时）` });
+        return;
+      }
+      if (this.data.payMethod === 'mixed') {
+        const y = this.data.comboCashYuan;
+        this.setData({ footerButtonText: `微信支付 ¥${y}` });
+        return;
+      }
+      this.setData({ footerButtonText: '微信支付' });
+      return;
+    }
+    this.setData({ footerButtonText: '确认付款' });
   },
 
   // 动态计算 scroll-view 高度：窗口高度 - header - footer - 间距
@@ -152,6 +500,41 @@ Page({
     };
     
     return `${year}${formatNumber(month)}${formatNumber(day)}${formatNumber(hours)}${formatNumber(minutes)}${formatNumber(seconds)}${formatRandom(random)}`;
+  },
+
+  /** 教练占用格：用 venueSlotPrice 计价（与会员订场单价一致） */
+  processCoachCourseOrderItems(selectedSlots, courts) {
+    const orderMap = {};
+    (selectedSlots || []).forEach((slot) => {
+      const court = courts.find((c) => c.id === slot.courtId);
+      if (!court) return;
+      const slotData = court.slots[slot.slotIndex];
+      if (!slotData) return;
+      const raw =
+        slotData.venueSlotPrice != null ? slotData.venueSlotPrice : slotData.price;
+      const price = Number(raw);
+      if (!Number.isFinite(price)) return;
+      const key = slot.courtId;
+      if (!orderMap[key]) {
+        orderMap[key] = {
+          courtId: slot.courtId,
+          courtName: court.name,
+          timeSlots: [],
+          totalPrice: 0,
+        };
+      }
+      const timeSlot = {
+        slotIndex: slot.slotIndex,
+        time: this.getTimeSlotTime(slot.slotIndex),
+        price,
+      };
+      orderMap[key].timeSlots.push(timeSlot);
+      orderMap[key].totalPrice += price;
+    });
+    Object.keys(orderMap).forEach((key) => {
+      orderMap[key].timeSlots = this.mergeTimeSlots(orderMap[key].timeSlots);
+    });
+    return Object.values(orderMap);
   },
 
   // 处理订单项，按场地分组
@@ -289,15 +672,79 @@ Page({
       wx.showToast({ title: '订单金额无效', icon: 'none' });
       return;
     }
-    // 云函数要求 totalFee 为整数「分」，与页面展示「元」一致
-    // const totalFee = Math.max(1, Math.round(yuan * 100));
-    const totalFee = 1;
+    const isCoachWx =
+      orderType === 'court' &&
+      this.data.isCoachCourseOrder &&
+      (this.data.payMethod === 'wechat' || this.data.payMethod === 'mixed');
+    if (isCoachWx && this.data.payMethod === 'mixed') {
+      const cash = Number(this.data.comboCashYuan);
+      const d = Math.floor(Number(this.data.coachHoursDeductForPay) || 0);
+      if (!Number.isFinite(cash) || cash <= 0) {
+        wx.showToast({ title: '微信应付金额无效', icon: 'none' });
+        return;
+      }
+      if (d <= 0) {
+        wx.showToast({ title: '组合支付课时数无效', icon: 'none' });
+        return;
+      }
+    }
+    let totalFee = 1;
+    if (isCoachWx) {
+      const cashYuan =
+        this.data.payMethod === 'mixed'
+          ? Number(this.data.comboCashYuan)
+          : Number(totalPrice);
+      totalFee = Math.max(1, Math.round(cashYuan * 100));
+    }
 
     const payPayload = {
       totalFee,
     };
+    if (orderType === 'goods') {
+      const phone = String(wx.getStorageSync(STORAGE_KEYS.userPhone) || '').trim();
+      if (!phone) {
+        wx.showToast({ title: '请先登录并授权手机号', icon: 'none' });
+        return;
+      }
+      const g = this.data.goodItem;
+      if (!g) {
+        wx.showToast({ title: '商品信息缺失', icon: 'none' });
+        return;
+      }
+      const grantHours = Math.floor(Number(g.grantHours) || 0);
+      const lessonKey = String(g.lessonKey || '').trim();
+      const goodsVenueId = String(g.venueId || '').trim();
+      if (!lessonKey || grantHours <= 0) {
+        wx.showToast({
+          title: '无法识别课时或课程类型，请检查 db_course / db_course_scale 与 unit，或填写 grantHours、lessonKey',
+          icon: 'none',
+        });
+        return;
+      }
+      if (!goodsVenueId) {
+        wx.showToast({
+          title: '课程未绑定场馆，请从首页选择场馆后再购买',
+          icon: 'none',
+        });
+        return;
+      }
+      payPayload.goodsPurchase = {
+        type: 'course_hours',
+        phone,
+        courseId: g.id,
+        grantHours,
+        lessonKey,
+        venueId: goodsVenueId,
+        goodDesc: g.desc || '',
+      };
+    }
     if (orderType === 'court') {
-      payPayload.phone = wx.getStorageSync(STORAGE_KEYS.userPhone) || '';
+      const phone = String(wx.getStorageSync(STORAGE_KEYS.userPhone) || '').trim();
+      if (!phone) {
+        wx.showToast({ title: '请先登录并授权手机号', icon: 'none' });
+        return;
+      }
+      payPayload.phone = phone;
       payPayload.booking = {
         type: 'court',
         orderNumber: this.data.orderNumber,
@@ -308,6 +755,19 @@ Page({
         orderItems: this.data.orderItems,
         bookedSlots: this.data.bookedSlots || [],
         totalPrice: this.data.totalPrice,
+        coachHoldIds: this.data.isCoachCourseOrder ? this.data.coachHoldIds || [] : [],
+        bookingSubtype: this.data.isCoachCourseOrder ? 'coach_course' : '',
+        lessonKey: this.data.isCoachCourseOrder ? String(this.data.lessonKey || '').trim() : '',
+        coachCapacityLabel: this.data.isCoachCourseOrder
+          ? String(this.data.coachCapacityLabel || '').trim()
+          : '',
+        coachCourseHoursDeduct:
+          this.data.isCoachCourseOrder && this.data.payMethod === 'mixed'
+            ? Math.floor(Number(this.data.coachHoursDeductForPay) || 0)
+            : 0,
+        memberDisplayName: this.data.isCoachCourseOrder
+          ? String(wx.getStorageSync(STORAGE_KEYS.userNickname) || '').trim().slice(0, 40)
+          : '',
       };
     }
 
@@ -333,6 +793,7 @@ Page({
             if (orderType === 'court') {
               try {
                 wx.setStorageSync(BOOKING_SUCCESS_STORAGE_KEY, {
+                  successKind: 'court',
                   campusName: this.data.campusName,
                   orderItems: this.data.orderItems,
                 });
@@ -346,7 +807,23 @@ Page({
               wx.redirectTo({ url: '/pages/booking-success/index' });
               return;
             }
-            // 商品订单：后续流程待定
+            if (orderType === 'goods') {
+              const g = this.data.goodItem;
+              const gh = Math.floor(Number(g && g.grantHours) || 0);
+              try {
+                wx.setStorageSync(BOOKING_SUCCESS_STORAGE_KEY, {
+                  successKind: 'coursePurchase',
+                  campusName: this.data.campusName || (g && g.venueName) || '',
+                  goodDesc: (g && g.desc) || '',
+                  grantHours: gh,
+                  lessonLabel: formatLessonKeyDisplay(String((g && g.lessonKey) || '')),
+                });
+              } catch (e) {
+                console.error('写入买课成功缓存失败', e);
+              }
+              wx.redirectTo({ url: '/pages/booking-success/index' });
+              return;
+            }
             wx.showToast({ title: '支付成功', icon: 'success' });
           },
           fail: (err) => {
@@ -434,24 +911,26 @@ Page({
         this.setData({ showPhoneAuthModal: false });
         wx.showToast({ title: '登录成功', icon: 'success' });
         this.updateFooterButtonText();
+        this.loadCoachCourseHoursBalance();
+        this.loadCoachSessionRoster();
         return;
       }
 
-      const schmoeAvatarUrl = getRandomSchmoeAvatarUrl();
       await createUser({
         phone,
         name: defaultNickname,
-        avatar: schmoeAvatarUrl,
       });
 
       wx.setStorageSync(STORAGE_KEYS.userPhone, phone);
       wx.setStorageSync(STORAGE_KEYS.userNickname, defaultNickname);
-      wx.setStorageSync(STORAGE_KEYS.userAvatar, schmoeAvatarUrl);
+      wx.setStorageSync(STORAGE_KEYS.userAvatar, DEFAULT_USER_AVATAR);
 
       wx.hideLoading();
       this.setData({ showPhoneAuthModal: false });
       wx.showToast({ title: '注册成功', icon: 'success' });
       this.updateFooterButtonText();
+      this.loadCoachCourseHoursBalance();
+      this.loadCoachSessionRoster();
     } catch (err2) {
       wx.hideLoading();
       wx.showToast({ title: '处理失败，请重试', icon: 'none' });
@@ -477,6 +956,8 @@ Page({
             wx.hideLoading();
             wx.showToast({ title: '登录成功', icon: 'success' });
             this.updateFooterButtonText();
+            this.loadCoachCourseHoursBalance();
+            this.loadCoachSessionRoster();
             return;
           }
         } catch (e) {
@@ -490,6 +971,96 @@ Page({
       return;
     }
 
+    if (
+      this.data.orderType === 'court' &&
+      this.data.isCoachCourseOrder &&
+      this.data.coachSessionRosterReady &&
+      (this.data.coachSessionFull || this.data.coachViewerAlreadyJoined)
+    ) {
+      wx.showToast({
+        title: this.data.coachSessionFull ? '该课节名额已满' : '您已在该课节名单中',
+        icon: 'none',
+      });
+      return;
+    }
+
+    if (
+      this.data.orderType === 'court' &&
+      this.data.isCoachCourseOrder &&
+      this.data.payMethod === 'course_hours'
+    ) {
+      this.submitCoachCourseWithHours();
+      return;
+    }
+
     this.saveOrderToDB();
+  },
+
+  async submitCoachCourseWithHours() {
+    if (
+      this.data.coachSessionRosterReady &&
+      (this.data.coachSessionFull || this.data.coachViewerAlreadyJoined)
+    ) {
+      wx.showToast({
+        title: this.data.coachSessionFull ? '该课节名额已满' : '您已在该课节名单中',
+        icon: 'none',
+      });
+      return;
+    }
+    const phone = String(wx.getStorageSync(STORAGE_KEYS.userPhone) || '').trim();
+    if (!phone) {
+      wx.showToast({ title: '请先登录并授权手机号', icon: 'none' });
+      return;
+    }
+    const need = this.data.requiredCourseHours || 0;
+    if ((this.data.courseHoursBalance || 0) < need) {
+      wx.showToast({ title: '课时不足', icon: 'none' });
+      return;
+    }
+    const snapshot = {
+      orderNumber: this.data.orderNumber,
+      campusName: this.data.campusName,
+      venueId: this.data.venueId,
+      orderDate: this.data.orderDate,
+      formattedDate: this.data.formattedDate,
+      orderItems: this.data.orderItems,
+      bookedSlots: this.data.bookedSlots || [],
+      totalPrice: this.data.totalPrice,
+      lessonKey: this.data.lessonKey,
+      coachCapacityLabel: this.data.coachCapacityLabel,
+      memberDisplayName: String(wx.getStorageSync(STORAGE_KEYS.userNickname) || '').trim().slice(0, 40),
+    };
+    wx.showLoading({ title: '提交中...', mask: true });
+    try {
+      const cloudRes = await completeCoachBookingWithHours({
+        phone,
+        holdIds: this.data.coachHoldIds || [],
+        snapshot,
+      });
+      wx.hideLoading();
+      const r = cloudRes && cloudRes.result ? cloudRes.result : {};
+      if (!r.ok) {
+        wx.showToast({ title: r.errMsg || '提交失败', icon: 'none' });
+        return;
+      }
+      try {
+        wx.setStorageSync(BOOKING_SUCCESS_STORAGE_KEY, {
+          successKind: 'court',
+          campusName: this.data.campusName,
+          orderItems: this.data.orderItems,
+        });
+      } catch (e) {
+        console.error('写入订场成功缓存失败', e);
+      }
+      const app = getApp();
+      if (app && app.globalData) {
+        app.globalData.shouldClearBookingData = true;
+      }
+      wx.redirectTo({ url: '/pages/booking-success/index' });
+    } catch (e) {
+      wx.hideLoading();
+      console.error('completeCoachBookingWithHours', e);
+      wx.showToast({ title: '网络异常，请重试', icon: 'none' });
+    }
   },
 });

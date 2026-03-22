@@ -6,11 +6,15 @@ const STORAGE_KEYS = {
   userNickname: 'user_nickname',
 };
 
-const { getUserByPhone, createUser, decryptPhoneNumber } = require('../../api/tennisDb');
-const { getRandomSchmoeAvatarUrl } = require('../../utils/schmoeAvatar');
+const {
+  getUserByPhone,
+  createUser,
+  decryptPhoneNumber,
+  DEFAULT_USER_AVATAR,
+} = require('../../api/tennisDb');
 
 function resolveAvatarForUI(avatarValue) {
-  // 新逻辑：user.avatar/userAvatar 存的是云 fileID（cloud://）、或网络图 https://（如 Joe Schmoe）
+  // user.avatar/userAvatar：云 fileID（cloud://）、https、或包内路径如 /assets/...
   // 旧逻辑：可能存的是本地文件路径（仍允许回退显示）
   if (!avatarValue) return Promise.resolve('');
   const v = String(avatarValue).trim();
@@ -55,6 +59,7 @@ Page({
     placeholderHeight: 0,
     isVip: false, // db_user.isVip
     isCoach: false, // db_user.isCoach
+    isManager: false, // db_user.isManager（畅打占用等）
     userIdentity: '', // 教练 | VIP | ''
   },
 
@@ -78,10 +83,12 @@ Page({
     const userDisplayName = isLoggedIn ? (userNickname || '昂湃用户') : '点击登录';
     let isVip = false;
     let isCoach = false;
+    let isManager = false;
     if (isLoggedIn && userPhone) {
       const flags = await this.fetchUserRoleFlags(userPhone);
       isVip = flags.isVip;
       isCoach = flags.isCoach;
+      isManager = flags.isManager;
     }
     const userIdentity = buildUserIdentity(isCoach, isVip);
     this.setData({
@@ -93,24 +100,26 @@ Page({
       userPhone,
       isVip,
       isCoach,
+      isManager,
       userIdentity,
     });
   },
 
-  /** 从 db_user 读取 isVip、isCoach（一次查询） */
+  /** 从 db_user 读取 isVip、isCoach、isManager（一次查询） */
   async fetchUserRoleFlags(phone) {
-    if (!phone) return { isVip: false, isCoach: false };
+    if (!phone) return { isVip: false, isCoach: false, isManager: false };
     try {
       const res = await getUserByPhone(phone);
       const user = res && res.data && res.data.length > 0 ? res.data[0] : null;
-      if (!user) return { isVip: false, isCoach: false };
+      if (!user) return { isVip: false, isCoach: false, isManager: false };
       return {
         isVip: !!user.isVip,
         isCoach: !!user.isCoach,
+        isManager: !!user.isManager,
       };
     } catch (e) {
       console.warn('fetchUserRoleFlags failed', e);
-      return { isVip: false, isCoach: false };
+      return { isVip: false, isCoach: false, isManager: false };
     }
   },
 
@@ -157,7 +166,7 @@ Page({
   },
 
   goCoachHolds() {
-    if (!this.data.isCoach) return;
+    if (!this.data.isCoach && !this.data.isManager) return;
     wx.navigateTo({ url: '/pages/profile-coach-holds/index' });
   },
 
@@ -167,6 +176,10 @@ Page({
 
   goGoodsOrders() {
     wx.navigateTo({ url: '/pages/profile-goods-orders/index' });
+  },
+
+  goCourseHours() {
+    wx.navigateTo({ url: '/pages/profile-course-hours/index' });
   },
 
   // 授权手机号注册：成功后再执行 wx.login，并跳转完善资料
@@ -240,6 +253,7 @@ Page({
 
         const isVip = !!user.isVip;
         const isCoach = !!user.isCoach;
+        const isManager = !!user.isManager;
         this.setData({
           isLoggedIn: true,
           userAvatar: resolvedAvatar,
@@ -249,6 +263,7 @@ Page({
           userDisplayName: nickname || '昂湃用户',
           isVip,
           isCoach,
+          isManager,
           userIdentity: buildUserIdentity(isCoach, isVip),
         });
 
@@ -257,27 +272,26 @@ Page({
         return;
       }
 
-      // 未注册：写入 user 集合并继续走完善资料流程（默认头像：Joe Schmoe 随机官方名）
-      const schmoeAvatarUrl = getRandomSchmoeAvatarUrl();
+      // 未注册：写入 user 集合并继续走完善资料流程（默认头像：包内 default-avatar.jpg）
       await createUser({
         phone,
         name: defaultNickname,
-        avatar: schmoeAvatarUrl,
       });
 
       // 必须先写 storage，再 setData，否则 onShow 可能先读到空 user_avatar 并覆盖头像
       wx.setStorageSync(STORAGE_KEYS.userPhone, phone);
       wx.setStorageSync(STORAGE_KEYS.userNickname, defaultNickname);
-      wx.setStorageSync(STORAGE_KEYS.userAvatar, schmoeAvatarUrl);
+      wx.setStorageSync(STORAGE_KEYS.userAvatar, DEFAULT_USER_AVATAR);
 
       wx.hideLoading();
       this.setData({
         isLoggedIn: true,
-        userAvatar: schmoeAvatarUrl,
-        userAvatarFileID: schmoeAvatarUrl,
+        userAvatar: DEFAULT_USER_AVATAR,
+        userAvatarFileID: DEFAULT_USER_AVATAR,
         userDisplayName: defaultNickname,
         isVip: false,
         isCoach: false,
+        isManager: false,
         userIdentity: '',
       });
 
@@ -295,9 +309,9 @@ Page({
     }
   },
 
-  /** 教练：进入教练约场页（需已选场馆） */
+  /** 教练或管理员：进入教练约场页（需已选场馆） */
   handleCoachBookCourt() {
-    if (!this.data.isCoach) return;
+    if (!this.data.isCoach && !this.data.isManager) return;
     const app = getApp();
     const venue = app && app.globalData && app.globalData.selectedVenue;
     if (!venue || venue.id == null || venue.id === '') {
@@ -347,6 +361,7 @@ Page({
           userDisplayName: '点击登录',
           isVip: false,
           isCoach: false,
+          isManager: false,
           userIdentity: '',
         });
       },
