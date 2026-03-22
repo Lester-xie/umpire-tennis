@@ -81,7 +81,7 @@ async function collectOccupiedKeys(venueIdRaw, orderDateRaw) {
 
 function buildCapacityLabel(lessonType, pairMode, groupMode) {
   if (lessonType === 'group') {
-    return groupMode === 'group35' ? '团课·3-5人班' : '团课·其他班型';
+    return '团课·3-5人班';
   }
   const pair = pairMode === '1v2' ? '1V2' : '1V1';
   if (lessonType === 'experience') return `体验课·${pair}`;
@@ -94,7 +94,7 @@ function buildCapacityLabel(lessonType, pairMode, groupMode) {
  * event: { venueId, orderDate, slots: [{courtId, slotIndex}], lessonType, pairMode?, groupMode? }
  * lessonType: experience | regular | group
  * pairMode（体验课/正课）: 1v1 | 1v2
- * groupMode（团课）: group35 | groupOther
+ * groupMode（团课）: 仅使用 group35（3-5 人班）
  */
 exports.main = async (event, context) => {
   const wxContext = cloud.getWXContext();
@@ -109,7 +109,7 @@ exports.main = async (event, context) => {
   const slots = Array.isArray(event.slots) ? event.slots : [];
   const lessonType = event.lessonType != null ? String(event.lessonType).trim() : '';
   const pairMode = event.pairMode != null ? String(event.pairMode).trim() : '';
-  const groupMode = event.groupMode != null ? String(event.groupMode).trim() : '';
+  let groupMode = event.groupMode != null ? String(event.groupMode).trim() : '';
   const venueName =
     event.venueName != null && String(event.venueName).trim() !== ''
       ? String(event.venueName).trim()
@@ -129,9 +129,7 @@ exports.main = async (event, context) => {
     return { ok: false, errMsg: '请选择场地用途' };
   }
   if (lessonType === 'group') {
-    if (!['group35', 'groupOther'].includes(groupMode)) {
-      return { ok: false, errMsg: '请选择团课班型' };
-    }
+    groupMode = 'group35';
   } else if (!['1v1', '1v2'].includes(pairMode)) {
     return { ok: false, errMsg: '请选择 1V1 或 1V2' };
   }

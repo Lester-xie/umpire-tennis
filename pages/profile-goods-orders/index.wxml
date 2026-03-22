@@ -1,6 +1,6 @@
 <view class="profile-container">
   <view class="header-wrapper">
-    <header hideDesc="{{true}}" showBackButton="{{true}}" title="团购历史" />
+    <header hideDesc="{{true}}" showBackButton="{{true}}" title="课程订单" />
   </view>
   <scroll-view
     class="content-scroll"

@@ -1,5 +1,4 @@
 const {
-  getCourtSlotPrices,
   getBookedSlots,
   coachHoldSlots,
   listCoachHolds,
@@ -53,14 +52,14 @@ Page({
     rippleSlot: null, // 当前显示波纹动画的时间段 {courtId, slotIndex}
     totalPrice: 0, // 总价
     selectedVenueName: '', // 当前选定的球场名称
-    selectedVenueId: '', // 当前选定的球场 id（用于 court_slot_prices）
+    selectedVenueId: '', // 当前选定的球场 id
     priceLoading: false, // 加载价格规则状态
     showPurposeSheet: false,
     /** experience | regular | group */
     lessonType: 'experience',
     /** 体验课/正课：1v1 | 1v2 */
     pairMode: '1v1',
-    /** 团课：group35 | groupOther */
+    /** 团课：固定 group35（3-5 人班） */
     groupMode: 'group35',
     /** purpose 弹层：create 新占场 | edit 改本人占用 */
     purposeSheetMode: 'create',
@@ -204,7 +203,7 @@ Page({
     });
   },
 
-  async loadSlotPricesAndRender(venueIdOverride) {
+  loadSlotPricesAndRender(venueIdOverride) {
     const venueId =
       venueIdOverride !== undefined ? venueIdOverride : this.data.selectedVenueId;
 
@@ -253,43 +252,17 @@ Page({
       return;
     }
 
-    // 兼容旧数据：仍从 court_slot_prices 集合读取
-    const courtIds = [1, 2];
-    this.setData({ priceLoading: true });
-    try {
-      const res = await getCourtSlotPrices({ venueId, courtIds });
-      const priceMap = {};
-
-      (res && res.data ? res.data : []).forEach((p) => {
-        if (p == null) return;
-        const courtId = p.courtId;
-        const slotIndex = p.slotIndex;
-        const price = p.price;
-        if (courtId == null || slotIndex == null) return;
-
-        const key = `${courtId}-${slotIndex}`;
-        const normalizedPrice = typeof price === 'number' ? price : Number(price);
-        if (Number.isFinite(normalizedPrice)) {
-          priceMap[key] = normalizedPrice;
-        }
-      });
-
-      this.slotPriceMap = priceMap;
-
-    } catch (e) {
-      console.error('加载 court_slot_prices 失败', e);
-      wx.showToast({ title: '加载价格失败', icon: 'none' });
-      this.slotPriceMap = {};
-    } finally {
-      this.setData({ priceLoading: false });
-      this.bookedSlotKeySet = new Set();
-      this.coachHoldMeta = {};
-      this.myCoachHoldIdSet = new Set();
-      this.generateTimeSchedule();
-      this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
-        if (applied) this.generateTimeSchedule();
-      });
-    }
+    // 无 courtList / priceList 时无法在客户端展示单价
+    this.slotPriceMap = {};
+    wx.showToast({ title: '场馆未配置场地价格', icon: 'none' });
+    this.setData({ priceLoading: false });
+    this.bookedSlotKeySet = new Set();
+    this.coachHoldMeta = {};
+    this.myCoachHoldIdSet = new Set();
+    this.generateTimeSchedule();
+    this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
+      if (applied) this.generateTimeSchedule();
+    });
   },
 
   /**
@@ -581,7 +554,7 @@ Page({
       const m0 = metaMap[`${courtId}-${i}`] || {};
       cur.prefillLessonType = m0.lessonType || 'experience';
       cur.prefillPairMode = m0.pairMode || '1v1';
-      cur.prefillGroupMode = m0.groupMode || 'group35';
+      cur.prefillGroupMode = 'group35';
       for (let k = i + 1; k < i + span; k += 1) {
         slots[k].coachMergeSkip = true;
       }
@@ -942,19 +915,17 @@ Page({
   selectLessonType(e) {
     const { v } = e.currentTarget.dataset;
     if (!v) return;
-    this.setData({ lessonType: v });
+    const patch = { lessonType: v };
+    if (v === 'group') {
+      patch.groupMode = 'group35';
+    }
+    this.setData(patch);
   },
 
   selectPairMode(e) {
     const { v } = e.currentTarget.dataset;
     if (!v) return;
     this.setData({ pairMode: v });
-  },
-
-  selectGroupMode(e) {
-    const { v } = e.currentTarget.dataset;
-    if (!v) return;
-    this.setData({ groupMode: v });
   },
 
   async submitCoachHold() {

@@ -421,6 +421,13 @@
   text-align: center;
 }
 
+.purpose-group-fixed {
+  font-size: 28rpx;
+  color: #134e35;
+  font-weight: 500;
+  padding: 8rpx 0 4rpx;
+}
+
 .purpose-section-label {
   font-size: 26rpx;
   color: #535353;

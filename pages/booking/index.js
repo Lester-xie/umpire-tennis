@@ -1,4 +1,4 @@
-const { getCourtSlotPrices, getBookedSlots } = require('../../api/tennisDb');
+const { getBookedSlots } = require('../../api/tennisDb');
 
 /** 根据 YYYY-MM-DD 判断是否为周六(6)或周日(0) */
 function isWeekendDateStr(dateStr) {
@@ -25,7 +25,7 @@ Page({
     rippleSlot: null, // 当前显示波纹动画的时间段 {courtId, slotIndex}
     totalPrice: 0, // 总价
     selectedVenueName: '', // 当前选定的球场名称
-    selectedVenueId: '', // 当前选定的球场 id（用于 court_slot_prices）
+    selectedVenueId: '', // 当前选定的球场 id
     priceLoading: false, // 加载价格规则状态
   },
   
@@ -165,7 +165,7 @@ Page({
     });
   },
 
-  async loadSlotPricesAndRender(venueIdOverride) {
+  loadSlotPricesAndRender(venueIdOverride) {
     const venueId =
       venueIdOverride !== undefined ? venueIdOverride : this.data.selectedVenueId;
 
@@ -212,42 +212,16 @@ Page({
       return;
     }
 
-    // 兼容旧数据：仍从 court_slot_prices 集合读取
-    const courtIds = [1, 2];
-    this.setData({ priceLoading: true });
-    try {
-      const res = await getCourtSlotPrices({ venueId, courtIds });
-      const priceMap = {};
-
-      (res && res.data ? res.data : []).forEach((p) => {
-        if (p == null) return;
-        const courtId = p.courtId;
-        const slotIndex = p.slotIndex;
-        const price = p.price;
-        if (courtId == null || slotIndex == null) return;
-
-        const key = `${courtId}-${slotIndex}`;
-        const normalizedPrice = typeof price === 'number' ? price : Number(price);
-        if (Number.isFinite(normalizedPrice)) {
-          priceMap[key] = normalizedPrice;
-        }
-      });
-
-      this.slotPriceMap = priceMap;
-
-    } catch (e) {
-      console.error('加载 court_slot_prices 失败', e);
-      wx.showToast({ title: '加载价格失败', icon: 'none' });
-      this.slotPriceMap = {};
-    } finally {
-      this.setData({ priceLoading: false });
-      this.bookedSlotKeySet = new Set();
-      this.coachHoldMeta = {};
-      this.generateTimeSchedule();
-      this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
-        if (applied) this.generateTimeSchedule();
-      });
-    }
+    // 无 courtList / priceList 时无法在客户端展示单价
+    this.slotPriceMap = {};
+    wx.showToast({ title: '场馆未配置场地价格', icon: 'none' });
+    this.setData({ priceLoading: false });
+    this.bookedSlotKeySet = new Set();
+    this.coachHoldMeta = {};
+    this.generateTimeSchedule();
+    this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
+      if (applied) this.generateTimeSchedule();
+    });
   },
 
   /**

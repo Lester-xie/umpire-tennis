@@ -6,7 +6,7 @@ const db = cloud.database();
 
 function buildCapacityLabel(lessonType, pairMode, groupMode) {
   if (lessonType === 'group') {
-    return groupMode === 'group35' ? '团课·3-5人班' : '团课·其他班型';
+    return '团课·3-5人班';
   }
   const pair = pairMode === '1v2' ? '1V2' : '1V1';
   if (lessonType === 'experience') return `体验课·${pair}`;
@@ -28,7 +28,7 @@ exports.main = async (event) => {
   const holdIds = Array.isArray(event.holdIds) ? event.holdIds : [];
   const lessonType = event.lessonType != null ? String(event.lessonType).trim() : '';
   const pairMode = event.pairMode != null ? String(event.pairMode).trim() : '';
-  const groupMode = event.groupMode != null ? String(event.groupMode).trim() : '';
+  let groupMode = event.groupMode != null ? String(event.groupMode).trim() : '';
 
   const normalizedIds = holdIds
     .map((id) => (id != null ? String(id).trim() : ''))
@@ -41,9 +41,7 @@ exports.main = async (event) => {
     return { ok: false, errMsg: '请选择课程类型' };
   }
   if (lessonType === 'group') {
-    if (!['group35', 'groupOther'].includes(groupMode)) {
-      return { ok: false, errMsg: '请选择团课班型' };
-    }
+    groupMode = 'group35';
   } else if (!['1v1', '1v2'].includes(pairMode)) {
     return { ok: false, errMsg: '请选择 1V1 或 1V2' };
   }

@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "团购历史",
+  "navigationBarTitleText": "课程订单",
   "usingComponents": {
     "header": "/components/header/header"
   }

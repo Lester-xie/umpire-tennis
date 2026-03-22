@@ -141,10 +141,7 @@
     </block>
     <block wx:if="{{lessonType === 'group'}}">
       <view class="purpose-section-label">团课规模</view>
-      <view class="purpose-chip-row">
-        <view class="purpose-chip {{groupMode === 'group35' ? 'purpose-chip--on' : ''}}" data-v="group35" bindtap="selectGroupMode">3-5人班</view>
-        <view class="purpose-chip {{groupMode === 'groupOther' ? 'purpose-chip--on' : ''}}" data-v="groupOther" bindtap="selectGroupMode">其他</view>
-      </view>
+      <view class="purpose-group-fixed">3-5 人班</view>
     </block>
     <view class="purpose-hint">{{ purposeSheetMode === 'edit' ? '保存后会员在订场页将看到更新后的用途说明' : '确定后该时段将对会员显示为已占用，不可再订' }}</view>
     <view class="purpose-sheet-actions">

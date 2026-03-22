@@ -1,29 +1,9 @@
-// 云数据库封装：给前端提供“读 court_slot_prices 等数据”的方法
+// 云数据库封装
 
 const courseCache = require('./courseCache');
 
 function getDb() {
   return wx.cloud.database();
-}
-
-/**
- * 获取某场馆/球场的 slot 价格规则
- * court_slot_prices 建议字段：
- * - venueId
- * - courtId
- * - slotIndex（0..14）
- * - price（number）
- */
-function getCourtSlotPrices({ venueId, courtIds } = {}) {
-  const db = getDb();
-  const cond = {};
-  if (venueId != null) cond.venueId = venueId;
-
-  if (courtIds && Array.isArray(courtIds) && courtIds.length > 0) {
-    cond.courtId = db.command.in(courtIds);
-  }
-
-  return db.collection('court_slot_prices').where(cond).get();
 }
 
 /**
@@ -181,7 +161,6 @@ function updateCoachHolds(payload) {
 }
 
 module.exports = {
-  getCourtSlotPrices,
   getVenues,
   getCategories,
   getCourses,
