@@ -46,7 +46,21 @@ async function emitBookingRealtimeSignal({ venueId, orderDate }) {
   const orderDateNorm = normalizeOrderDate(orderDate);
   if (!venueIdNorm || !orderDateNorm) return;
   const now = Date.now();
-  await db.collection('db_booking_realtime_signal').add({
+  const coll = db.collection('db_booking_realtime_signal');
+  const hit = await coll
+    .where({ venueId: venueIdNorm, orderDate: orderDateNorm })
+    .limit(1)
+    .get();
+  if (hit.data && hit.data[0] && hit.data[0]._id) {
+    await coll.doc(hit.data[0]._id).update({
+      data: {
+        eventType: 'coach_hold_changed',
+        updatedAt: now,
+      },
+    });
+    return;
+  }
+  await coll.add({
     data: {
       venueId: venueIdNorm,
       orderDate: orderDateNorm,

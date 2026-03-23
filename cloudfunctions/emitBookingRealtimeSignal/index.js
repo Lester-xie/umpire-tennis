@@ -76,9 +76,25 @@ function normalizeCollectionName(raw) {
   return seg.length > 0 ? seg[seg.length - 1] : s
 }
 
-async function appendSignalRow(row) {
+async function upsertSignalRow(row) {
   const now = Date.now()
-  return db.collection('db_booking_realtime_signal').add({
+  const coll = db.collection('db_booking_realtime_signal')
+  const hit = await coll
+    .where({
+      venueId: row.venueId,
+      orderDate: row.orderDate,
+    })
+    .limit(1)
+    .get()
+  if (hit.data && hit.data[0] && hit.data[0]._id) {
+    return coll.doc(hit.data[0]._id).update({
+      data: {
+        eventType: 'booking_changed',
+        updatedAt: now,
+      },
+    })
+  }
+  return coll.add({
     data: {
       venueId: row.venueId,
       orderDate: row.orderDate,
@@ -87,6 +103,29 @@ async function appendSignalRow(row) {
       createdAt: now,
     },
   })
+}
+
+async function purgeOldSignals() {
+  const keepMs = 45 * 24 * 60 * 60 * 1000
+  const threshold = Date.now() - keepMs
+  const coll = db.collection('db_booking_realtime_signal')
+  const old = await coll
+    .where({
+      updatedAt: db.command.lt(threshold),
+    })
+    .field({ _id: true })
+    .limit(20)
+    .get()
+  const rows = old.data || []
+  for (let i = 0; i < rows.length; i += 1) {
+    const id = rows[i] && rows[i]._id ? String(rows[i]._id) : ''
+    if (!id) continue
+    try {
+      await coll.doc(id).remove()
+    } catch (e) {
+      /* ignore cleanup failures */
+    }
+  }
 }
 
 exports.main = async (event) => {
@@ -122,7 +161,12 @@ exports.main = async (event) => {
     finalRows.push(row)
   })
 
-  await Promise.all(finalRows.map((row) => appendSignalRow(row)))
+  await Promise.all(finalRows.map((row) => upsertSignalRow(row)))
+  try {
+    await purgeOldSignals()
+  } catch (e) {
+    /* ignore cleanup failures */
+  }
   return {
     updated: finalRows.length,
     ignored: false,
