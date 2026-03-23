@@ -96,7 +96,8 @@
                           data-slotpast="{{slot.past ? 1 : 0}}"
                         >
                           <text class="slot-coach-purpose">{{slot.coachPurpose}}</text>
-                          <text class="slot-coach-cap" wx:if="{{slot.coachCapacityLimit > 0}}">名额 {{slot.coachJoinedCount}}/{{slot.coachCapacityLimit}}</text>
+                          <text class="slot-coach-cap" wx:if="{{slot.past}}">已结束</text>
+                          <text class="slot-coach-cap" wx:elif="{{slot.coachCapacityLimit > 0}}">名额 {{slot.coachJoinedCount}}/{{slot.coachCapacityLimit}}</text>
                         </view>
                       </block>
                       <block wx:elif="{{slot.past}}">

@@ -1,16 +1,14 @@
 const { getBookedSlots } = require('../../api/tennisDb');
-
-/** 根据 YYYY-MM-DD 判断是否为周六(6)或周日(0) */
-function isWeekendDateStr(dateStr) {
-  const parts = String(dateStr || '').split('-');
-  if (parts.length !== 3) return false;
-  const y = parseInt(parts[0], 10);
-  const m = parseInt(parts[1], 10) - 1;
-  const d = parseInt(parts[2], 10);
-  if (Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) return false;
-  const wd = new Date(y, m, d).getDay();
-  return wd === 0 || wd === 6;
-}
+const { getTodayDateStr, buildBookingDateList } = require('../../utils/bookingDate');
+const {
+  buildSlotPriceMapFromCourtList,
+  resolveCourtSlotPrice,
+} = require('../../utils/bookingSlotPrice');
+const { buildBookingTimeSlots } = require('../../utils/bookingTimeSlots');
+const {
+  computeBookingMainContentHeightPx,
+  estimateBookingHeaderHeightPx,
+} = require('../../utils/bookingLayout');
 
 Page({
   data: {
@@ -120,48 +118,35 @@ Page({
     this.calculateContentHeight();
   },
   
-  // 计算 content 高度：100vh - header 高度 - 底部安全距离 - custom-tab-bar 高度
   calculateContentHeight() {
     const windowInfo = wx.getWindowInfo();
-    const windowHeight = windowInfo.windowHeight; // 100vh 对应的像素值
-    
-    // 查询 header 和 tab-bar 的实际高度
+    const app = getApp();
+    const screenInfo = app && app.globalData && app.globalData.screenInfo;
+
     const query = wx.createSelectorQuery();
     query.select('.header').boundingClientRect();
     query.select('.tab-bar').boundingClientRect();
     query.exec((res) => {
       const headerRect = res[0];
       const tabBarRect = res[1];
-      
-      // 获取 header 高度
-      const headerHeight = headerRect ? headerRect.height : 0;
-      
-      // 如果查询不到 header，使用默认值（headerPaddingTop + 25）
-      let finalHeaderHeight = headerHeight;
-      if (!headerHeight || headerHeight === 0) {
-        const app = getApp();
-        let headerPaddingTop = 0;
-        if (app && app.globalData && app.globalData.screenInfo && app.globalData.screenInfo.headerInfo) {
-          headerPaddingTop = app.globalData.screenInfo.headerInfo.headerPaddingTop || 0;
-        }
-        finalHeaderHeight = headerPaddingTop + 25; // padding-top + title 高度
-      }
-      
-      // 获取 tab-bar 高度
-      const tabBarHeight = tabBarRect ? tabBarRect.height : 60; // 默认 60px
-      
-      // 计算底部安全距离：屏幕高度 - 安全区域底部
+
+      const finalHeaderHeight = estimateBookingHeaderHeightPx(
+        headerRect ? headerRect.height : 0,
+        screenInfo
+      );
+      const tabBarHeight = tabBarRect ? tabBarRect.height : 60;
+
       const safeAreaBottom = windowInfo.safeArea
         ? windowInfo.screenHeight - windowInfo.safeArea.bottom
         : 0;
-      
-      /** 与底部自定义 tabBar 留白，避免主内容区贴边 */
-      const contentBottomGap = 46;
-      const contentHeight =
-        windowHeight - finalHeaderHeight - safeAreaBottom - tabBarHeight - contentBottomGap;
-      this.setData({
-        contentHeight: Math.max(contentHeight, 400), // 最小高度 400px
+
+      const contentHeight = computeBookingMainContentHeightPx({
+        windowHeight: windowInfo.windowHeight,
+        finalHeaderHeight,
+        safeAreaBottom,
+        tabBarHeight,
       });
+      this.setData({ contentHeight });
     });
   },
 
@@ -171,7 +156,7 @@ Page({
 
     this.slotPriceMap = {}; // { 'courtId-slotIndex': price }
 
-    const selectedDate = this.data.selectedDate || this.getTodayDateStr();
+    const selectedDate = this.data.selectedDate || getTodayDateStr();
 
     // 没有 venueId 时直接走旧逻辑（不可用/无价格）
     if (!venueId) {
@@ -190,18 +175,7 @@ Page({
 
     // 优先使用 venue 文档里的 courtList[].priceList（与时段索引一一对应）
     if (courtList.length > 0) {
-      const priceMap = {};
-      courtList.forEach((court, cIdx) => {
-        const courtId = cIdx + 1;
-        const prices = court.priceList || [];
-        prices.forEach((price, slotIndex) => {
-          const normalizedPrice = typeof price === 'number' ? price : Number(price);
-          if (Number.isFinite(normalizedPrice)) {
-            priceMap[`${courtId}-${slotIndex}`] = normalizedPrice;
-          }
-        });
-      });
-      this.slotPriceMap = priceMap;
+      this.slotPriceMap = buildSlotPriceMapFromCourtList(courtList);
       this.setData({ priceLoading: false });
       this.bookedSlotKeySet = new Set();
       this.coachHoldMeta = {};
@@ -256,87 +230,26 @@ Page({
       });
   },
 
-  getSlotPrice(courtId, slotIndex) {
-    if (!this.slotPriceMap) return null;
-    const key = `${courtId}-${slotIndex}`;
-    const price = this.slotPriceMap[key];
-    if (price == null) return null;
-    return Number(price);
-  },
-
-  /**
-   * 解析某时段展示/结算价格：周六、周日使用 court.specialPrice；其余日期用 priceList（slotPriceMap）
-   */
   resolveSlotPrice(courtId, slotIndex, selectedDate) {
     const app = getApp();
     const venue = app && app.globalData && app.globalData.selectedVenue;
     const courtList = venue && Array.isArray(venue.courtList) ? venue.courtList : [];
-    const court = courtList[courtId - 1];
-
-    if (court && isWeekendDateStr(selectedDate)) {
-      const sp = court.specialPrice;
-      if (sp != null && sp !== '') {
-        const n = typeof sp === 'number' ? sp : Number(sp);
-        if (Number.isFinite(n) && n >= 0) {
-          return n;
-        }
-      }
-    }
-    return this.getSlotPrice(courtId, slotIndex);
+    return resolveCourtSlotPrice(
+      courtList,
+      courtId,
+      slotIndex,
+      selectedDate,
+      this.slotPriceMap
+    );
   },
   
-  // 生成最近两个月的日期列表
   generateDateList() {
-    const dateList = [];
-    const today = new Date();
-    const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-    
-    // 获取今天的年月日，用于比较
-    const todayYear = today.getFullYear();
-    const todayMonth = today.getMonth();
-    const todayDate = today.getDate();
-    
-    // 生成未来60天的日期
-    for (let i = 0; i < 60; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      
-      const month = date.getMonth() + 1; // 月份（1-12）
-      const day = date.getDate(); // 日期
-      
-      // 判断是否是今天
-      const isToday = date.getFullYear() === todayYear && 
-                      date.getMonth() === todayMonth && 
-                      date.getDate() === todayDate;
-      
-      // 如果是今天，显示"今天"，否则显示星期几
-      const weekday = isToday ? '今天' : weekdays[date.getDay()];
-      
-      // 格式化月份和日期，确保是两位数
-      const monthStr = month < 10 ? `0${month}` : `${month}`;
-      const dayStr = day < 10 ? `0${day}` : `${day}`;
-      
-      const dateStr = `${date.getFullYear()}-${monthStr}-${dayStr}`;
-      
-      dateList.push({
-        weekday: weekday,
-        monthDay: `${month}.${day}`, // 格式：3.6, 4.15
-        date: date, // 保存完整日期对象，方便后续使用
-        dateStr: dateStr, // 标准日期字符串
-        isToday: isToday, // 标记是否是今天
-      });
-      
-      // 如果是今天，设置为默认选中（不触发动画）
-      if (isToday && !this.data.selectedDate) {
-        this.setData({
-          selectedDate: dateStr,
-        });
-      }
+    const { dateList, defaultSelectedDate } = buildBookingDateList(60, this.data.selectedDate);
+    const patch = { dateList };
+    if (!this.data.selectedDate && defaultSelectedDate) {
+      patch.selectedDate = defaultSelectedDate;
     }
-    
-    this.setData({
-      dateList: dateList,
-    });
+    this.setData(patch);
   },
   
   // 处理日期点击事件（先切日期与格子，占用查询异步；波纹不等待网络）
@@ -369,20 +282,12 @@ Page({
   
   // 生成时间段和场地数据（可选传入日期，避免与 data 不同步）
   generateTimeSchedule(selectedDateOverride) {
-    // 与 venue.courtList[].priceList 对齐：14 个时段，8:00–21:00 开始（至 22:00 结束）
-    const timeSlots = [];
-    for (let hour = 8; hour <= 21; hour++) {
-      const hourStr = hour < 10 ? `0${hour}` : `${hour}`;
-      timeSlots.push({
-        time: `${hourStr}:00`,
-        hour: hour,
-      });
-    }
+    const timeSlots = buildBookingTimeSlots();
 
     const selectedDate =
       selectedDateOverride != null
         ? selectedDateOverride
-        : this.data.selectedDate || this.getTodayDateStr();
+        : this.data.selectedDate || getTodayDateStr();
 
     const app = getApp();
     const venue = app && app.globalData && app.globalData.selectedVenue;
@@ -414,14 +319,6 @@ Page({
       timeSlots: timeSlots,
       courts: courts,
     });
-  },
-
-  // 获取今日日期字符串
-  getTodayDateStr() {
-    const today = new Date();
-    const month = today.getMonth() + 1;
-    const day = today.getDate();
-    return `${today.getFullYear()}-${month < 10 ? '0' + month : month}-${day < 10 ? '0' + day : day}`;
   },
 
   /** slotIndex 从 0 对应 8:00，span 为连续小时数 */
@@ -510,7 +407,7 @@ Page({
     const slots = [];
 
     const now = new Date();
-    const todayStr = this.getTodayDateStr();
+    const todayStr = getTodayDateStr();
     const metaMap = this.coachHoldMeta || {};
     const bookedSet = this.bookedSlotKeySet || new Set();
 

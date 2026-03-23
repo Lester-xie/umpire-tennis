@@ -26,10 +26,9 @@ exports.main = async (event, context) => {
   }
 
   try {
-    const res = await db.collection('db_booking').where({ phone }).get()
+    const res = await db.collection('db_booking').where({ phone, status: 'paid' }).get()
 
     const list = (res.data || [])
-      .filter((doc) => doc.status === 'paid')
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
       .slice(0, 50)
     return { data: list }
