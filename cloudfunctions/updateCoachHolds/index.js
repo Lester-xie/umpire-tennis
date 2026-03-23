@@ -64,6 +64,33 @@ function defaultCapacityLimit(lessonType, pairMode, groupMode) {
   return 1;
 }
 
+function normalizeOrderDate(raw) {
+  const s = String(raw || '').trim();
+  const parts = s.split('-');
+  if (parts.length !== 3) return s;
+  const y = parseInt(parts[0], 10);
+  const mo = parseInt(parts[1], 10);
+  const d = parseInt(parts[2], 10);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return s;
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+async function emitBookingRealtimeSignal({ venueId, orderDate }) {
+  const venueIdNorm = venueId != null ? String(venueId).trim() : '';
+  const orderDateNorm = normalizeOrderDate(orderDate);
+  if (!venueIdNorm || !orderDateNorm) return;
+  const now = Date.now();
+  await db.collection('db_booking_realtime_signal').add({
+    data: {
+      venueId: venueIdNorm,
+      orderDate: orderDateNorm,
+      eventType: 'coach_hold_changed',
+      createdAt: now,
+      updatedAt: now,
+    },
+  });
+}
+
 /**
  * 批量更新本人多条教练占用：课程类型 / 规模（与 coachHoldSlots 字段一致）
  * event: { holdIds: string[], lessonType, pairMode?, groupMode? }
@@ -126,6 +153,8 @@ exports.main = async (event) => {
   const now = Date.now();
 
   try {
+    let signalVenueId = '';
+    let signalOrderDate = '';
     for (let i = 0; i < normalizedIds.length; i += 1) {
       const holdId = normalizedIds[i];
       const docRes = await db.collection('db_coach_slot_hold').doc(holdId).get();
@@ -139,6 +168,8 @@ exports.main = async (event) => {
       if (doc.status !== 'active') {
         return { ok: false, errMsg: '部分占用已失效，请刷新' };
       }
+      if (!signalVenueId && doc.venueId != null) signalVenueId = String(doc.venueId).trim();
+      if (!signalOrderDate && doc.orderDate != null) signalOrderDate = String(doc.orderDate).trim();
 
       await db
         .collection('db_coach_slot_hold')
@@ -154,6 +185,14 @@ exports.main = async (event) => {
             updatedAt: now,
           },
         });
+    }
+    try {
+      await emitBookingRealtimeSignal({
+        venueId: signalVenueId,
+        orderDate: signalOrderDate,
+      });
+    } catch (e) {
+      console.error('emitBookingRealtimeSignal updateCoachHolds failed', e);
     }
     return { ok: true };
   } catch (err) {

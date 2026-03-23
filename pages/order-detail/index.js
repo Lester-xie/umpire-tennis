@@ -664,8 +664,38 @@ Page({
     return orderItems.reduce((total, item) => total + item.totalPrice, 0);
   },
 
+  // 拉起支付前做一次实时占用校验（普通场地单）
+  async validateCourtAvailabilityBeforePay() {
+    if (this.data.orderType !== 'court' || this.data.isCoachCourseOrder) return true;
+    const venueId = String(this.data.venueId || '').trim();
+    const orderDate = String(this.data.orderDate || '').trim();
+    const slots = Array.isArray(this.data.bookedSlots) ? this.data.bookedSlots : [];
+    if (!venueId || !orderDate || slots.length === 0) {
+      wx.showToast({ title: '订单数据异常，请返回重试', icon: 'none' });
+      return false;
+    }
+    try {
+      const res = await getBookedSlots({ venueId, orderDate });
+      const result = res && res.result ? res.result : {};
+      const keys = Array.isArray(result.keys) ? result.keys : [];
+      const occupied = new Set(keys);
+      const conflict = slots.some(
+        (s) => occupied.has(`${Number(s.courtId)}-${Number(s.slotIndex)}`)
+      );
+      if (conflict) {
+        wx.showToast({ title: '时段已被预订，请返回重选', icon: 'none' });
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.error('validateCourtAvailabilityBeforePay', e);
+      wx.showToast({ title: '校验失败，请重试', icon: 'none' });
+      return false;
+    }
+  },
+
   // 拉起微信支付；订场成功后跳转订场成功页并清空预订页已选时段
-  saveOrderToDB() {
+  async saveOrderToDB() {
     const { orderType, totalPrice } = this.data;
     const yuan = Number(totalPrice);
     if (!Number.isFinite(yuan) || yuan <= 0) {
@@ -688,6 +718,10 @@ Page({
         return;
       }
     }
+
+    const courtOk = await this.validateCourtAvailabilityBeforePay();
+    if (!courtOk) return;
+
     let totalFee = 1;
     if (isCoachWx) {
       const cashYuan =
@@ -993,7 +1027,7 @@ Page({
       return;
     }
 
-    this.saveOrderToDB();
+    await this.saveOrderToDB();
   },
 
   async submitCoachCourseWithHours() {

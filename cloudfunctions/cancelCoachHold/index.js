@@ -41,6 +41,22 @@ function sessionKeyFromHoldIds(ids) {
     .join('|');
 }
 
+async function emitBookingRealtimeSignal({ venueId, orderDate }) {
+  const venueIdNorm = venueId != null ? String(venueId).trim() : '';
+  const orderDateNorm = normalizeOrderDate(orderDate);
+  if (!venueIdNorm || !orderDateNorm) return;
+  const now = Date.now();
+  await db.collection('db_booking_realtime_signal').add({
+    data: {
+      venueId: venueIdNorm,
+      orderDate: orderDateNorm,
+      eventType: 'coach_hold_changed',
+      createdAt: now,
+      updatedAt: now,
+    },
+  });
+}
+
 /**
  * 取消占用：支持 active / released（已有学员支付后占用会变为 released）
  * event: { holdId?: string, holdIds?: string[] }
@@ -239,6 +255,15 @@ exports.main = async (event) => {
       } catch (err) {
         console.error('cancelCoachHold hold update', hid, err);
       }
+    }
+
+    try {
+      await emitBookingRealtimeSignal({
+        venueId: venueIdRaw,
+        orderDate: orderDateRaw,
+      });
+    } catch (e) {
+      console.error('emitBookingRealtimeSignal cancelCoachHold failed', e);
     }
 
     return { ok: true, cancelledBookings: toCancel.length };

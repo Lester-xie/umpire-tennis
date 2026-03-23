@@ -33,6 +33,22 @@ function orderDateInValues(orderDateRaw, normalized) {
   return [...set];
 }
 
+async function emitBookingRealtimeSignal({ venueId, orderDate }) {
+  const venueIdNorm = venueId != null ? String(venueId).trim() : '';
+  const orderDateNorm = normalizeOrderDate(orderDate);
+  if (!venueIdNorm || !orderDateNorm) return;
+  const now = Date.now();
+  await db.collection('db_booking_realtime_signal').add({
+    data: {
+      venueId: venueIdNorm,
+      orderDate: orderDateNorm,
+      eventType: 'coach_hold_changed',
+      createdAt: now,
+      updatedAt: now,
+    },
+  });
+}
+
 async function collectOccupiedKeys(venueIdRaw, orderDateRaw) {
   const orderDateNorm = normalizeOrderDate(orderDateRaw);
   const venueIds = venueIdInValues(venueIdRaw);
@@ -270,6 +286,12 @@ exports.main = async (event, context) => {
   } catch (err) {
     console.error('coachHoldSlots add failed', err);
     return { ok: false, errMsg: err.message || '写入失败，请重试' };
+  }
+
+  try {
+    await emitBookingRealtimeSignal({ venueId, orderDate });
+  } catch (e) {
+    console.error('emitBookingRealtimeSignal coachHoldSlots failed', e);
   }
 
   return { ok: true };

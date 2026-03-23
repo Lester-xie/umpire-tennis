@@ -57,6 +57,29 @@ function orderDateInValuesCb(orderDateRaw, normalized) {
   return [...set]
 }
 
+function slotKeysFromBookedSlotsCb(slots) {
+  return [...(slots || [])]
+    .map((s) => `${Number(s.courtId)}-${Number(s.slotIndex)}`)
+    .filter((k) => /^\d+-\d+$/.test(k))
+    .sort()
+}
+
+async function emitBookingRealtimeSignal({ venueId, orderDate }) {
+  const venueIdNorm = venueId != null ? String(venueId).trim() : ''
+  const orderDateNorm = normalizeOrderDateCb(orderDate)
+  if (!venueIdNorm || !orderDateNorm) return
+  const now = Date.now()
+  await db.collection('db_booking_realtime_signal').add({
+    data: {
+      venueId: venueIdNorm,
+      orderDate: orderDateNorm,
+      eventType: 'booking_paid',
+      createdAt: now,
+      updatedAt: now,
+    },
+  })
+}
+
 async function getCoachSessionLimitForHoldIds(holdIds) {
   if (!holdIds || !holdIds[0]) return 1
   try {
@@ -119,6 +142,53 @@ async function assertCoachSessionAllowsMarkPaid(booking) {
   if (paidCount >= limit) return { ok: false, reason: 'full' }
   const shouldReleaseHolds = paidCount + 1 >= limit
   return { ok: true, paidCountBefore: paidCount, limit, shouldReleaseHolds }
+}
+
+/**
+ * 普通场地单：支付成功回调时做最终占用冲突校验
+ * 若已有其他 paid 订单占用了本单任一时段，则本单不可再标记 paid
+ */
+async function assertCourtSlotsAllowMarkPaid(booking) {
+  const subtype = String(booking.bookingSubtype || '').trim()
+  if (subtype === 'coach_course') {
+    return { ok: true }
+  }
+  const selfId = String(booking._id || '').trim()
+  const orderDateNorm = normalizeOrderDateCb(booking.orderDate)
+  const venueIds = venueIdInValuesCb(booking.venueId)
+  const dateKeys = orderDateInValuesCb(booking.orderDate, orderDateNorm)
+  const targetSlotKeys = slotKeysFromBookedSlotsCb(booking.bookedSlots)
+  if (!orderDateNorm || venueIds.length === 0 || targetSlotKeys.length === 0) {
+    return { ok: false, reason: 'invalid_booking_payload' }
+  }
+
+  const targetSet = new Set(targetSlotKeys)
+  const hit = await db
+    .collection('db_booking')
+    .where({
+      venueId: _.in(venueIds),
+      orderDate: _.in(dateKeys),
+      status: 'paid',
+    })
+    .get()
+
+  let conflict = false
+  ;(hit.data || []).forEach((doc) => {
+    if (conflict) return
+    if (normalizeOrderDateCb(doc.orderDate) !== orderDateNorm) return
+    if (String(doc._id || '').trim() === selfId) return
+    const occupied = slotKeysFromBookedSlotsCb(doc.bookedSlots)
+    for (let i = 0; i < occupied.length; i += 1) {
+      if (targetSet.has(occupied[i])) {
+        conflict = true
+        break
+      }
+    }
+  })
+  if (conflict) {
+    return { ok: false, reason: 'slot_conflict' }
+  }
+  return { ok: true }
 }
 
 /**
@@ -233,6 +303,20 @@ async function markBookingPaid({ outTradeNo, transactionId, timeEnd }) {
     console.error('markBookingPaid: 教练课名额校验失败，回退 pending', outTradeNo, sessionGate.reason)
     await coll.doc(_id).update({
       data: { status: 'pending', updatedAt: now },
+    })
+    return
+  }
+
+  const courtGate = await assertCourtSlotsAllowMarkPaid(booking)
+  if (!courtGate.ok) {
+    console.error('markBookingPaid: 场地冲突，标记冲突单', outTradeNo, courtGate.reason)
+    await coll.doc(_id).update({
+      data: {
+        status: 'conflict',
+        conflictReason: courtGate.reason || 'slot_conflict',
+        conflictAt: now,
+        updatedAt: now,
+      },
     })
     return
   }
@@ -366,6 +450,18 @@ exports.main = async (event, context) => {
       const bookingHit = await bookingColl.where({ outTradeNo }).limit(1).get()
       if (bookingHit.data && bookingHit.data.length > 0) {
         await markBookingPaid({ outTradeNo, transactionId, timeEnd })
+        try {
+          const paidHit = await bookingColl.where({ outTradeNo }).limit(1).get()
+          const paidBooking = paidHit.data && paidHit.data[0] ? paidHit.data[0] : null
+          if (paidBooking && String(paidBooking.status || '') === 'paid') {
+            await emitBookingRealtimeSignal({
+              venueId: paidBooking.venueId,
+              orderDate: paidBooking.orderDate,
+            })
+          }
+        } catch (e) {
+          console.error('emitBookingRealtimeSignal after payCallback main failed', e)
+        }
       } else {
         await markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, timeEnd })
       }

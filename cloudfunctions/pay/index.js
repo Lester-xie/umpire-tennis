@@ -58,6 +58,45 @@ function orderDateInValuesPay(orderDateRaw, normalized) {
   return [...set]
 }
 
+function slotKeysFromBookedSlotsPay(slots) {
+  return [...(slots || [])]
+    .map((s) => `${Number(s.courtId)}-${Number(s.slotIndex)}`)
+    .filter((k) => /^\d+-\d+$/.test(k))
+}
+
+async function assertCourtSlotsCanCreatePending(dbConn, cmd, { venueId, orderDate, bookedSlots }) {
+  const orderDateNorm = normalizeOrderDatePay(orderDate)
+  const venueIds = venueIdInValuesPay(venueId)
+  const dateKeys = orderDateInValuesPay(orderDate, orderDateNorm)
+  const targetKeys = slotKeysFromBookedSlotsPay(bookedSlots)
+  if (!venueIds.length || !orderDateNorm || targetKeys.length === 0) {
+    return { ok: false, msg: '场馆/日期/时段无效' }
+  }
+  const targetSet = new Set(targetKeys)
+  const hit = await dbConn
+    .collection('db_booking')
+    .where({
+      venueId: cmd.in(venueIds),
+      orderDate: cmd.in(dateKeys),
+      status: 'paid',
+    })
+    .get()
+  let conflict = false
+  ;(hit.data || []).forEach((doc) => {
+    if (conflict) return
+    if (normalizeOrderDatePay(doc.orderDate) !== orderDateNorm) return
+    const occupied = slotKeysFromBookedSlotsPay(doc.bookedSlots)
+    for (let i = 0; i < occupied.length; i += 1) {
+      if (targetSet.has(occupied[i])) {
+        conflict = true
+        break
+      }
+    }
+  })
+  if (conflict) return { ok: false, msg: '所选时段已被预订，请返回重选' }
+  return { ok: true }
+}
+
 async function assertCoachCourseCanCreatePending(dbConn, cmd, { phone, venueId, orderDate, coachHoldIds }) {
   const sk = sessionKeyFromHoldIdsPay(coachHoldIds)
   const phoneNorm = String(phone || '').trim()
@@ -222,6 +261,20 @@ exports.main = async (event, context) => {
       : [];
     const bookingSubtypePre =
       event.booking.bookingSubtype != null ? String(event.booking.bookingSubtype).trim() : '';
+    if (bookingSubtypePre !== 'coach_course') {
+      const gate = await assertCourtSlotsCanCreatePending(db, _, {
+        venueId: event.booking.venueId,
+        orderDate: event.booking.orderDate,
+        bookedSlots: event.booking.bookedSlots,
+      })
+      if (!gate.ok) {
+        return {
+          returnCode: 'FAIL',
+          returnMsg: gate.msg || '所选时段已被预订',
+          payment: undefined,
+        };
+      }
+    }
     if (bookingSubtypePre === 'coach_course' && coachHoldIdsPre.length > 0) {
       const gate = await assertCoachCourseCanCreatePending(db, _, {
         phone: bookingPhone,

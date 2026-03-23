@@ -10,6 +10,17 @@ const {
   estimateBookingHeaderHeightPx,
 } = require('../../utils/bookingLayout');
 
+function normalizeDateForWatch(raw) {
+  const s = String(raw || '').trim();
+  const parts = s.split('-');
+  if (parts.length !== 3) return s;
+  const y = parseInt(parts[0], 10);
+  const mo = parseInt(parts[1], 10);
+  const d = parseInt(parts[2], 10);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return s;
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
 Page({
   data: {
     dateList: [], // 日期列表
@@ -34,6 +45,14 @@ Page({
   bookedSlotKeySet: null,
   /** 每次发起 getBookedSlots 自增，用于丢弃过期响应 */
   _bookedSlotsFetchToken: 0,
+  /** 订场实时信号 watch 句柄 */
+  bookingSignalWatcher: null,
+  /** 当前 watch 绑定 key：venueId__date */
+  _bookingSignalWatchKey: '',
+  /** 实时刷新防抖定时器 */
+  _realtimeRefreshTimer: null,
+  /** watch 重连定时器 */
+  _realtimeReconnectTimer: null,
 
   /** 标题：去选场页，选完后返回本页 */
   handleContentHeaderTitleTap() {
@@ -56,11 +75,29 @@ Page({
     if (newVenueId) {
       this.loadSlotPricesAndRender(newVenueId);
     }
+    this.restartRealtimeWatch();
+    this.refreshBookedSlotsNow();
     // 检查是否需要清空数据（下单成功后返回）
     const app = getApp();
     if (app && app.globalData && app.globalData.shouldClearBookingData) {
       this.clearBookingData();
       app.globalData.shouldClearBookingData = false;
+    }
+  },
+
+  onHide() {
+    this.stopRealtimeWatch();
+  },
+
+  onUnload() {
+    this.stopRealtimeWatch();
+    if (this._realtimeRefreshTimer) {
+      clearTimeout(this._realtimeRefreshTimer);
+      this._realtimeRefreshTimer = null;
+    }
+    if (this._realtimeReconnectTimer) {
+      clearTimeout(this._realtimeReconnectTimer);
+      this._realtimeReconnectTimer = null;
     }
   },
 
@@ -165,6 +202,7 @@ Page({
       this.generateTimeSchedule();
       this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
         if (applied) this.generateTimeSchedule();
+        this.restartRealtimeWatch();
       });
       return;
     }
@@ -182,6 +220,7 @@ Page({
       this.generateTimeSchedule();
       this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
         if (applied) this.generateTimeSchedule();
+        this.restartRealtimeWatch();
       });
       return;
     }
@@ -195,6 +234,104 @@ Page({
     this.generateTimeSchedule();
     this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
       if (applied) this.generateTimeSchedule();
+      this.restartRealtimeWatch();
+    });
+  },
+
+  restartRealtimeWatch() {
+    const venueId = this.data.selectedVenueId;
+    const selectedDate = this.data.selectedDate || getTodayDateStr();
+    if (!venueId || !selectedDate || !wx.cloud || !wx.cloud.database) {
+      this.stopRealtimeWatch();
+      return;
+    }
+    const watchKey = `${String(venueId)}__${selectedDate}`;
+    if (watchKey === this._bookingSignalWatchKey && this.bookingSignalWatcher) {
+      return;
+    }
+
+    this.stopRealtimeWatch();
+    this._bookingSignalWatchKey = watchKey;
+    const db = wx.cloud.database();
+    const venueIdNorm = String(venueId).trim();
+    const dateNorm = normalizeDateForWatch(selectedDate);
+
+    this.bookingSignalWatcher = db
+      .collection('db_booking_realtime_signal')
+      .where({
+        venueId: venueIdNorm,
+        orderDate: dateNorm,
+      })
+      .watch({
+        onChange: () => {
+          this.handleRealtimeSignalChange();
+        },
+        onError: (err) => {
+          console.error('booking realtime watch error', err);
+          this.stopRealtimeWatch();
+          if (this._realtimeReconnectTimer) {
+            clearTimeout(this._realtimeReconnectTimer);
+          }
+          this._realtimeReconnectTimer = setTimeout(() => {
+            this._realtimeReconnectTimer = null;
+            this.restartRealtimeWatch();
+          }, 1500);
+        },
+      });
+  },
+
+  stopRealtimeWatch() {
+    if (this.bookingSignalWatcher && this.bookingSignalWatcher.close) {
+      try {
+        this.bookingSignalWatcher.close();
+      } catch (e) {
+        console.warn('close booking realtime watch failed', e);
+      }
+    }
+    this.bookingSignalWatcher = null;
+    this._bookingSignalWatchKey = '';
+  },
+
+  handleRealtimeSignalChange() {
+    if (this._realtimeRefreshTimer) {
+      clearTimeout(this._realtimeRefreshTimer);
+      this._realtimeRefreshTimer = null;
+    }
+    this._realtimeRefreshTimer = setTimeout(() => {
+      this._realtimeRefreshTimer = null;
+      this.refreshBookedSlotsNow();
+    }, 200);
+  },
+
+  refreshBookedSlotsNow() {
+    const selectedDate = this.data.selectedDate || getTodayDateStr();
+    this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
+      if (!applied) return;
+      this.generateTimeSchedule(selectedDate);
+      this.reconcileSelectedSlotsAfterRealtime();
+    });
+  },
+
+  reconcileSelectedSlotsAfterRealtime() {
+    const selected = Array.isArray(this.data.selectedSlots) ? this.data.selectedSlots : [];
+    if (selected.length === 0) return;
+
+    const selectedSlots = [];
+    const selectedSlotsMap = {};
+    selected.forEach((s) => {
+      const court = this.data.courts.find((c) => c.id === s.courtId);
+      const slot = court && court.slots ? court.slots[s.slotIndex] : null;
+      if (slot && slot.available) {
+        selectedSlots.push({ courtId: s.courtId, slotIndex: s.slotIndex });
+        selectedSlotsMap[`${s.courtId}-${s.slotIndex}`] = true;
+      }
+    });
+    if (selectedSlots.length === selected.length) return;
+
+    this.setData({
+      selectedSlots,
+      selectedSlotsMap,
+      totalPrice: this.calculateTotalPrice(selectedSlots),
     });
   },
 
@@ -520,6 +657,7 @@ Page({
     });
     this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
       if (applied) this.generateTimeSchedule(selectedDate);
+      this.restartRealtimeWatch();
     });
   },
   

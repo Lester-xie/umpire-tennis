@@ -35,6 +35,7 @@ function orderDateInValues(orderDateRaw, normalized) {
   return [...set]
 }
 
+
 function defaultCapacityLimit(lessonType, pairMode, groupMode) {
   const lt = String(lessonType || '').trim()
   if (lt === 'group') return 5
