@@ -1,0 +1,21 @@
+.lottie-loading-overlay {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(242, 246, 243, 0.4);
+  z-index: 999;
+}
+
+.lottie-loading-overlay.show {
+  display: flex;
+}
+
+.lottie-loading-canvas {
+  width: 420rpx;
+  height: 420rpx;
+}

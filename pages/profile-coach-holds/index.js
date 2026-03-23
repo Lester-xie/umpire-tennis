@@ -13,7 +13,9 @@ Page({
     isCoach: false,
     isManager: false,
     coachHolds: [],
+    lottieLoadingVisible: false,
   },
+  _loadingTaskCount: 0,
 
   onShow() {
     this.refreshRoleAndHolds();
@@ -59,6 +61,7 @@ Page({
   },
 
   async refreshRoleAndHolds() {
+    this.beginLoading('加载中');
     const app = getApp();
     const isLoggedIn = app ? app.checkLogin() : false;
     const userPhone = wx.getStorageSync(STORAGE_KEYS.userPhone) || '';
@@ -80,6 +83,7 @@ Page({
       if (pages.length > 1) {
         setTimeout(() => wx.navigateBack(), 400);
       }
+      this.endLoading();
       return;
     }
     try {
@@ -93,6 +97,8 @@ Page({
     } catch (e) {
       console.error('loadCoachHolds failed', e);
       this.setData({ coachHolds: [] });
+    } finally {
+      this.endLoading();
     }
   },
 
@@ -107,11 +113,11 @@ Page({
       confirmColor: '#c62828',
       success: async (res) => {
         if (!res.confirm) return;
-        wx.showLoading({ title: '处理中...' });
+        this.beginLoading('处理中...');
         try {
           const cloudRes = await cancelCoachHold({ holdId });
           const r = (cloudRes && cloudRes.result) || {};
-          wx.hideLoading();
+          this.endLoading();
           if (!r.ok) {
             wx.showToast({
               title: r.errMsg || '取消失败',
@@ -122,11 +128,30 @@ Page({
           wx.showToast({ title: '已取消占用', icon: 'success' });
           this.refreshRoleAndHolds();
         } catch (err) {
-          wx.hideLoading();
+          this.endLoading();
           console.error('cancelCoachHold', err);
           wx.showToast({ title: '网络异常', icon: 'none' });
         }
       },
     });
+  },
+
+  onUnload() {
+    this._loadingTaskCount = 0;
+    this.setData({ lottieLoadingVisible: false });
+  },
+
+  beginLoading(title) {
+    this._loadingTaskCount = (this._loadingTaskCount || 0) + 1;
+    if (this._loadingTaskCount === 1) {
+      this.setData({ lottieLoadingVisible: true });
+    }
+  },
+
+  endLoading() {
+    this._loadingTaskCount = Math.max(0, (this._loadingTaskCount || 0) - 1);
+    if (this._loadingTaskCount === 0) {
+      this.setData({ lottieLoadingVisible: false });
+    }
   },
 });

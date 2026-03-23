@@ -28,7 +28,9 @@ Page({
     venueId: '',
     orderDate: '',
     courts: [],
+    lottieLoadingVisible: false,
   },
+  _loadingTaskCount: 0,
 
   onReady() {
     this.measureLayoutAndContentHeight();
@@ -122,6 +124,11 @@ Page({
     }
   },
 
+  onUnload() {
+    this._loadingTaskCount = 0;
+    this.setData({ lottieLoadingVisible: false });
+  },
+
   syncCampusName() {
     const app = getApp();
     const venue = app && app.globalData && app.globalData.selectedVenue;
@@ -151,6 +158,7 @@ Page({
     const { venueId, orderDate, bookedSlots } = this.data;
     const first = bookedSlots[0];
     const key = `${Number(first.courtId)}-${Number(first.slotIndex)}`;
+    this.beginLoading('加载中');
     try {
       const res = await getBookedSlots({ venueId, orderDate });
       const r = res && res.result ? res.result : {};
@@ -204,6 +212,22 @@ Page({
     } catch (e) {
       console.error('loadDetail', e);
       this.setData({ loading: false, errMsg: '加载失败，请稍后重试' });
+    } finally {
+      this.endLoading();
+    }
+  },
+
+  beginLoading(title) {
+    this._loadingTaskCount = (this._loadingTaskCount || 0) + 1;
+    if (this._loadingTaskCount === 1) {
+      this.setData({ lottieLoadingVisible: true });
+    }
+  },
+
+  endLoading() {
+    this._loadingTaskCount = Math.max(0, (this._loadingTaskCount || 0) - 1);
+    if (this._loadingTaskCount === 0) {
+      this.setData({ lottieLoadingVisible: false });
     }
   },
 

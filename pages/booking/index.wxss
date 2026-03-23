@@ -15,6 +15,25 @@
   flex-direction: column;
   position: relative;
 }
+.booking-loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(242, 246, 243, 0.56);
+  z-index: 20;
+  border-radius: 20rpx;
+}
+
+.booking-loading-overlay.show {
+  display: flex;
+}
+
+.booking-loading-canvas {
+  width: 420rpx;
+  height: 420rpx;
+}
 .content-header {
   display: flex;
   align-items: center;

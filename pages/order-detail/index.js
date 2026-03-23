@@ -66,7 +66,9 @@ Page({
     coachMixedPreviewCash: 0,
     /** 用户是否手动切换过教练单支付方式（余额刷新时尽量保留「仅微信」等选择） */
     coachPayUserChose: false,
+    lottieLoadingVisible: false,
   },
+  _loadingTaskCount: 0,
 
   onLoad(options) {
     this.syncCampusName();
@@ -202,6 +204,7 @@ Page({
     if (!this.data.isCoachCourseOrder || !this.data.venueId || !this.data.orderDate) return;
     const bs = this.data.bookedSlots;
     if (!bs || !bs[0]) return;
+    this.beginLoading('加载中');
     try {
       const res = await getBookedSlots({
         venueId: this.data.venueId,
@@ -231,6 +234,8 @@ Page({
       this.updateFooterButtonText();
     } catch (e) {
       console.error('loadCoachSessionRoster', e);
+    } finally {
+      this.endLoading();
     }
   },
 
@@ -355,6 +360,7 @@ Page({
       coachCourseBalanceReady: false,
       coachCourseBalanceHint: '加载中...',
     });
+    this.beginLoading('加载课时中');
     try {
       const cloudRes = await listMemberCourseHours(venueId);
       const rows =
@@ -410,6 +416,8 @@ Page({
         coachCourseBalanceHint: '课时加载失败，请稍后重试',
       });
       this.updateFooterButtonText();
+    } finally {
+      this.endLoading();
     }
   },
 
@@ -674,6 +682,7 @@ Page({
       wx.showToast({ title: '订单数据异常，请返回重试', icon: 'none' });
       return false;
     }
+    this.beginLoading('校验中');
     try {
       const res = await getBookedSlots({ venueId, orderDate });
       const result = res && res.result ? res.result : {};
@@ -691,6 +700,27 @@ Page({
       console.error('validateCourtAvailabilityBeforePay', e);
       wx.showToast({ title: '校验失败，请重试', icon: 'none' });
       return false;
+    } finally {
+      this.endLoading();
+    }
+  },
+
+  onUnload() {
+    this._loadingTaskCount = 0;
+    this.setData({ lottieLoadingVisible: false });
+  },
+
+  beginLoading(title) {
+    this._loadingTaskCount = (this._loadingTaskCount || 0) + 1;
+    if (this._loadingTaskCount === 1) {
+      this.setData({ lottieLoadingVisible: true });
+    }
+  },
+
+  endLoading() {
+    this._loadingTaskCount = Math.max(0, (this._loadingTaskCount || 0) - 1);
+    if (this._loadingTaskCount === 0) {
+      this.setData({ lottieLoadingVisible: false });
     }
   },
 
@@ -805,12 +835,12 @@ Page({
       };
     }
 
-    wx.showLoading({ title: '支付中...', mask: true });
+    this.beginLoading('支付中...');
     wx.cloud.callFunction({
       name: 'pay',
       data: payPayload,
       success: (res) => {
-        wx.hideLoading();
+        this.endLoading();
         const result = res.result || {};
         const payment = result.payment;
         if (result.returnCode !== 'SUCCESS' || !payment) {
@@ -870,7 +900,7 @@ Page({
         });
       },
       fail: (err) => {
-        wx.hideLoading();
+        this.endLoading();
         console.error('callFunction pay', err);
         wx.showToast({ title: '网络异常，请重试', icon: 'none' });
       },
@@ -893,18 +923,18 @@ Page({
     const app = getApp();
     if (!app) return;
 
-    wx.showLoading({ title: '处理中...' });
+    this.beginLoading('处理中...');
     try {
       const loginCode = await app.doLogin();
       if (!loginCode) {
-        wx.hideLoading();
+        this.endLoading();
         wx.showToast({ title: '登录失败，请重试', icon: 'none' });
         return;
       }
       wx.setStorageSync(STORAGE_KEYS.userPhoneCode, loginCode);
 
       if (!encryptedData || !iv) {
-        wx.hideLoading();
+        this.endLoading();
         wx.setStorageSync(STORAGE_KEYS.userPhoneCode, '');
         wx.setStorageSync(STORAGE_KEYS.userPhone, '');
         wx.showToast({ title: '缺少授权数据，请重试', icon: 'none' });
@@ -923,7 +953,7 @@ Page({
         decryptRes && decryptRes.result ? decryptRes.result.phoneNumber : decryptRes.phoneNumber;
 
       if (!phoneNumber) {
-        wx.hideLoading();
+        this.endLoading();
         wx.setStorageSync(STORAGE_KEYS.userPhoneCode, '');
         wx.setStorageSync(STORAGE_KEYS.userPhone, '');
         wx.showToast({ title: '手机号解密失败，请重试', icon: 'none' });
@@ -941,7 +971,7 @@ Page({
         wx.setStorageSync(STORAGE_KEYS.userPhone, phone);
         wx.setStorageSync(STORAGE_KEYS.userAvatar, user.avatar || '');
         wx.setStorageSync(STORAGE_KEYS.userNickname, user.name || '');
-        wx.hideLoading();
+        this.endLoading();
         this.setData({ showPhoneAuthModal: false });
         wx.showToast({ title: '登录成功', icon: 'success' });
         this.updateFooterButtonText();
@@ -959,14 +989,14 @@ Page({
       wx.setStorageSync(STORAGE_KEYS.userNickname, defaultNickname);
       wx.setStorageSync(STORAGE_KEYS.userAvatar, DEFAULT_USER_AVATAR);
 
-      wx.hideLoading();
+      this.endLoading();
       this.setData({ showPhoneAuthModal: false });
       wx.showToast({ title: '注册成功', icon: 'success' });
       this.updateFooterButtonText();
       this.loadCoachCourseHoursBalance();
       this.loadCoachSessionRoster();
     } catch (err2) {
-      wx.hideLoading();
+      this.endLoading();
       wx.showToast({ title: '处理失败，请重试', icon: 'none' });
     }
   },
@@ -978,7 +1008,7 @@ Page({
       // 1）本地已有手机号：查云库是否已注册 → 已注册则直接 wx.login 完成登录
       const storedPhone = wx.getStorageSync(STORAGE_KEYS.userPhone) || '';
       if (storedPhone) {
-        wx.showLoading({ title: '验证中...' });
+        this.beginLoading('验证中...');
         try {
           const res = await getUserByPhone(storedPhone);
           const user = res && res.data && res.data.length > 0 ? res.data[0] : null;
@@ -987,7 +1017,7 @@ Page({
             wx.setStorageSync(STORAGE_KEYS.userPhone, storedPhone);
             wx.setStorageSync(STORAGE_KEYS.userAvatar, user.avatar || '');
             wx.setStorageSync(STORAGE_KEYS.userNickname, user.name || '');
-            wx.hideLoading();
+            this.endLoading();
             wx.showToast({ title: '登录成功', icon: 'success' });
             this.updateFooterButtonText();
             this.loadCoachCourseHoursBalance();
@@ -997,7 +1027,7 @@ Page({
         } catch (e) {
           console.error('getUserByPhone failed', e);
         }
-        wx.hideLoading();
+        this.endLoading();
       }
 
       // 2）无手机号或库中无用户：弹出手机号授权
@@ -1064,14 +1094,14 @@ Page({
       coachCapacityLabel: this.data.coachCapacityLabel,
       memberDisplayName: String(wx.getStorageSync(STORAGE_KEYS.userNickname) || '').trim().slice(0, 40),
     };
-    wx.showLoading({ title: '提交中...', mask: true });
+    this.beginLoading('提交中...');
     try {
       const cloudRes = await completeCoachBookingWithHours({
         phone,
         holdIds: this.data.coachHoldIds || [],
         snapshot,
       });
-      wx.hideLoading();
+      this.endLoading();
       const r = cloudRes && cloudRes.result ? cloudRes.result : {};
       if (!r.ok) {
         wx.showToast({ title: r.errMsg || '提交失败', icon: 'none' });
@@ -1092,7 +1122,7 @@ Page({
       }
       wx.redirectTo({ url: '/pages/booking-success/index' });
     } catch (e) {
-      wx.hideLoading();
+      this.endLoading();
       console.error('completeCoachBookingWithHours', e);
       wx.showToast({ title: '网络异常，请重试', icon: 'none' });
     }

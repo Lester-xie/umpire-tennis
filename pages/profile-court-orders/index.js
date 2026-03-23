@@ -8,7 +8,9 @@ Page({
     placeholderHeight: 0,
     isLoggedIn: false,
     courtOrders: [],
+    lottieLoadingVisible: false,
   },
+  _loadingTaskCount: 0,
 
   onShow() {
     const app = getApp();
@@ -58,6 +60,7 @@ Page({
 
   async loadCourtOrders() {
     let courtOrders = [];
+    this.beginLoading('加载订单中');
     try {
       const cloudRes = await getMyBookings();
       const raw =
@@ -67,7 +70,28 @@ Page({
       courtOrders = raw.map((order) => buildCourtOrderDisplay(order));
     } catch (e) {
       console.error('拉取订场历史失败', e);
+    } finally {
+      this.endLoading();
     }
     this.setData({ courtOrders });
+  },
+
+  onUnload() {
+    this._loadingTaskCount = 0;
+    this.setData({ lottieLoadingVisible: false });
+  },
+
+  beginLoading(title) {
+    this._loadingTaskCount = (this._loadingTaskCount || 0) + 1;
+    if (this._loadingTaskCount === 1) {
+      this.setData({ lottieLoadingVisible: true });
+    }
+  },
+
+  endLoading() {
+    this._loadingTaskCount = Math.max(0, (this._loadingTaskCount || 0) - 1);
+    if (this._loadingTaskCount === 0) {
+      this.setData({ lottieLoadingVisible: false });
+    }
   },
 });

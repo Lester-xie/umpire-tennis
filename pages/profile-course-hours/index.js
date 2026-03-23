@@ -36,7 +36,9 @@ Page({
     placeholderHeight: 0,
     isLoggedIn: false,
     sections: [],
+    lottieLoadingVisible: false,
   },
+  _loadingTaskCount: 0,
 
   onShow() {
     this.refresh();
@@ -91,6 +93,7 @@ Page({
       return;
     }
 
+    this.beginLoading('加载课时中');
     try {
       const [venuesRes, hoursRes] = await Promise.all([getVenues(), listAllMemberCourseHours()]);
       const venues = (venuesRes && venuesRes.data) || [];
@@ -109,6 +112,27 @@ Page({
       console.error('加载课时失败', e);
       wx.showToast({ title: '加载失败', icon: 'none' });
       this.setData({ isLoggedIn: true, sections: [] });
+    } finally {
+      this.endLoading();
+    }
+  },
+
+  onUnload() {
+    this._loadingTaskCount = 0;
+    this.setData({ lottieLoadingVisible: false });
+  },
+
+  beginLoading(title) {
+    this._loadingTaskCount = (this._loadingTaskCount || 0) + 1;
+    if (this._loadingTaskCount === 1) {
+      this.setData({ lottieLoadingVisible: true });
+    }
+  },
+
+  endLoading() {
+    this._loadingTaskCount = Math.max(0, (this._loadingTaskCount || 0) - 1);
+    if (this._loadingTaskCount === 0) {
+      this.setData({ lottieLoadingVisible: false });
     }
   },
 });

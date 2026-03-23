@@ -60,6 +60,7 @@ Page({
     /** 来自 db_category.scaleList，随课程类型切换 */
     purposePairScales: [],
     purposeGroupScales: [],
+    lottieLoadingVisible: false,
   },
 
   // 动画定时器
@@ -69,6 +70,8 @@ Page({
   bookedSlotKeySet: null,
   /** 每次发起 getBookedSlots 自增，用于丢弃过期响应 */
   _bookedSlotsFetchToken: 0,
+  /** loading 并发计数 */
+  _loadingTaskCount: 0,
 
   /**
    * @param {boolean} [allowOpenPlayOpt] 传入时可避免 setData 尚未合并时读错 purposeOnlyOpenPlay
@@ -96,6 +99,7 @@ Page({
   },
 
   async refreshManagerAndCoachCatalog() {
+    this.beginLoading('加载中');
     let isManager = false;
     let isCoach = false;
     const phone = String(wx.getStorageSync('user_phone') || '').trim();
@@ -121,6 +125,7 @@ Page({
       const patch = this.applyPurposeScalesForLessonType('experience', '1v1', 'group35');
       this.setData({ lessonType: 'experience', ...patch });
     }
+    this.endLoading();
   },
 
   applyPurposeScalesForLessonType(lessonType, pairModeIn, groupModeIn) {
@@ -231,6 +236,11 @@ Page({
     this.calculateContentHeight();
   },
 
+  onUnload() {
+    this._loadingTaskCount = 0;
+    this.setData({ lottieLoadingVisible: false });
+  },
+
   calculateContentHeight() {
     const windowInfo = wx.getWindowInfo();
     const app = getApp();
@@ -259,6 +269,7 @@ Page({
   },
 
   loadSlotPricesAndRender(venueIdOverride) {
+    this.beginLoading('加载中');
     const venueId =
       venueIdOverride !== undefined ? venueIdOverride : this.data.selectedVenueId;
 
@@ -273,6 +284,8 @@ Page({
       this.generateTimeSchedule();
       this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
         if (applied) this.generateTimeSchedule();
+      }).finally(() => {
+        this.endLoading();
       });
     };
 
@@ -296,6 +309,20 @@ Page({
     wx.showToast({ title: '场馆未配置场地价格', icon: 'none' });
     this.setData({ priceLoading: false });
     resetAndFetch();
+  },
+
+  beginLoading(title) {
+    this._loadingTaskCount = (this._loadingTaskCount || 0) + 1;
+    if (this._loadingTaskCount === 1) {
+      this.setData({ lottieLoadingVisible: true });
+    }
+  },
+
+  endLoading() {
+    this._loadingTaskCount = Math.max(0, (this._loadingTaskCount || 0) - 1);
+    if (this._loadingTaskCount === 0) {
+      this.setData({ lottieLoadingVisible: false });
+    }
   },
 
   fetchBookedSlotsForDate(orderDate) {
@@ -500,11 +527,11 @@ Page({
       confirmColor: '#c62828',
       success: async (res) => {
         if (!res.confirm) return;
-        wx.showLoading({ title: '处理中...' });
+        this.beginLoading('处理中...');
         try {
           const cloudRes = await cancelCoachHold({ holdIds: ids });
           const r = (cloudRes && cloudRes.result) || {};
-          wx.hideLoading();
+          this.endLoading();
           if (!r.ok) {
             wx.showToast({ title: r.errMsg || '取消失败', icon: 'none' });
             return;
@@ -512,7 +539,7 @@ Page({
           wx.showToast({ title: '已取消', icon: 'success' });
           this.loadSlotPricesAndRender();
         } catch (err) {
-          wx.hideLoading();
+          this.endLoading();
           console.error('confirmCancelCoachHolds', err);
           wx.showToast({ title: '网络异常', icon: 'none' });
         }
@@ -543,7 +570,7 @@ Page({
       pairMode,
       groupMode
     );
-    wx.showLoading({ title: '保存中...' });
+    this.beginLoading('保存中...');
     try {
       const capacityLimit = this.resolveSelectedCapacityLimit(lessonType, pairMode, groupMode);
       const cloudRes = await updateCoachHolds(
@@ -557,7 +584,7 @@ Page({
         })
       );
       const r = (cloudRes && cloudRes.result) || {};
-      wx.hideLoading();
+      this.endLoading();
       if (!r.ok) {
         wx.showToast({ title: r.errMsg || '保存失败', icon: 'none' });
         return;
@@ -570,13 +597,14 @@ Page({
       });
       this.loadSlotPricesAndRender();
     } catch (e) {
-      wx.hideLoading();
+      this.endLoading();
       console.error('submitCoachHoldEdit', e);
       wx.showToast({ title: '网络异常', icon: 'none' });
     }
   },
 
   updateSlotsAvailability(selectedDate) {
+    this.beginLoading('加载中');
     this.bookedSlotKeySet = new Set();
     this.coachHoldMeta = {};
     this.myCoachHoldIdSet = new Set();
@@ -589,6 +617,8 @@ Page({
     });
     this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
       if (applied) this.generateTimeSchedule(selectedDate);
+    }).finally(() => {
+      this.endLoading();
     });
   },
 
@@ -766,7 +796,7 @@ Page({
       groupMode,
     } = this.data;
 
-    wx.showLoading({ title: '提交中...' });
+    this.beginLoading('提交中...');
     const app = getApp();
     const venue = app && app.globalData && app.globalData.selectedVenue;
     const venueName = venue && venue.name ? String(venue.name).trim() : '';
@@ -792,7 +822,7 @@ Page({
         })
       );
       const r = (cloudRes && cloudRes.result) || {};
-      wx.hideLoading();
+      this.endLoading();
       if (!r.ok) {
         wx.showToast({
           title: r.errMsg || '占用失败',
@@ -822,7 +852,7 @@ Page({
         this.generateTimeSchedule(selectedDate);
       });
     } catch (e) {
-      wx.hideLoading();
+      this.endLoading();
       console.error('submitCoachHold', e);
       wx.showToast({ title: '网络异常', icon: 'none' });
     }

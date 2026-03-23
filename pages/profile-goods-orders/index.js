@@ -10,7 +10,9 @@ Page({
     placeholderHeight: 0,
     isLoggedIn: false,
     goodsOrders: [],
+    lottieLoadingVisible: false,
   },
+  _loadingTaskCount: 0,
 
   onShow() {
     this.loadGoodsOrders();
@@ -66,6 +68,7 @@ Page({
     }
 
     let goodsOrders = [];
+    this.beginLoading('加载订单中');
     try {
       const cloudRes = await listCoursePurchases();
       const raw =
@@ -95,8 +98,29 @@ Page({
       });
     } catch (e) {
       console.error('拉取课程订单失败', e);
+    } finally {
+      this.endLoading();
     }
 
     this.setData({ isLoggedIn: true, goodsOrders });
+  },
+
+  onUnload() {
+    this._loadingTaskCount = 0;
+    this.setData({ lottieLoadingVisible: false });
+  },
+
+  beginLoading(title) {
+    this._loadingTaskCount = (this._loadingTaskCount || 0) + 1;
+    if (this._loadingTaskCount === 1) {
+      this.setData({ lottieLoadingVisible: true });
+    }
+  },
+
+  endLoading() {
+    this._loadingTaskCount = Math.max(0, (this._loadingTaskCount || 0) - 1);
+    if (this._loadingTaskCount === 0) {
+      this.setData({ lottieLoadingVisible: false });
+    }
   },
 });

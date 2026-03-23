@@ -1,4 +1,5 @@
 <view class="container">
+  <lottie-loading visible="{{lottieLoadingVisible}}" />
   <header hideDesc="{{true}}" showBackButton="{{true}}" title="预约场地" />
   <view class="content" style="height: {{contentHeight}}px; padding-bottom: {{selectedSlots.length > 0 ? '140rpx' : '40rpx'}};">
     <view

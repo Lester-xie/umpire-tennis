@@ -2,6 +2,8 @@
 const STORAGE_USER_PHONE = 'user_phone';
 /** 未注册用户首次欢迎页看完后不再展示 */
 const STORAGE_WELCOME_SEEN = 'welcome_seen';
+/** 已选择球场缓存（与 location 页一致） */
+const STORAGE_SELECTED_VENUE = 'selected_venue';
 
 /** 滑到末端比例超过此值则视为完成 */
 const UNLOCK_THRESHOLD = 0.88;
@@ -21,11 +23,18 @@ Page({
   onLoad() {
     const phone = wx.getStorageSync(STORAGE_USER_PHONE);
     const seen = wx.getStorageSync(STORAGE_WELCOME_SEEN);
-    if (phone || seen) {
-      wx.reLaunch({ url: '/pages/location/index' });
+    // 首次用户：先展示 welcome，不直接跳转场馆选择
+    if (!phone && !seen) {
+      this.setData({ visible: true });
       return;
     }
-    this.setData({ visible: true });
+
+    const selectedVenue = wx.getStorageSync(STORAGE_SELECTED_VENUE);
+    if (selectedVenue && selectedVenue.id) {
+      wx.switchTab({ url: '/pages/home/index' });
+      return;
+    }
+    wx.reLaunch({ url: '/pages/location/index' });
   },
 
   onReady() {
@@ -91,7 +100,12 @@ Page({
       });
       setTimeout(() => {
         wx.setStorageSync(STORAGE_WELCOME_SEEN, true);
-        wx.reLaunch({ url: '/pages/location/index' });
+        const selectedVenue = wx.getStorageSync(STORAGE_SELECTED_VENUE);
+        if (selectedVenue && selectedVenue.id) {
+          wx.switchTab({ url: '/pages/home/index' });
+        } else {
+          wx.reLaunch({ url: '/pages/location/index' });
+        }
       }, 220);
       return;
     }

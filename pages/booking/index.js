@@ -9,6 +9,8 @@ const {
   computeBookingMainContentHeightPx,
   estimateBookingHeaderHeightPx,
 } = require('../../utils/bookingLayout');
+const lottie = require('lottie-miniprogram');
+const loadingAnimationData = require('../../assets/images/loading.js');
 
 function normalizeDateForWatch(raw) {
   const s = String(raw || '').trim();
@@ -20,7 +22,6 @@ function normalizeDateForWatch(raw) {
   if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return s;
   return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
-
 Page({
   data: {
     dateList: [], // 日期列表
@@ -53,6 +54,14 @@ Page({
   _realtimeRefreshTimer: null,
   /** watch 重连定时器 */
   _realtimeReconnectTimer: null,
+  /** loading lottie 动画实例 */
+  loadingAnimation: null,
+  /** loading 并发计数，避免多个请求互相提前关闭 */
+  _loadingTaskCount: 0,
+  /** 首次进入页面：是否已执行过首轮数据加载 */
+  _initialLoadFinished: false,
+  /** 是否正在跳转到选场页，避免重复触发 */
+  _navigatingToLocation: false,
 
   /** 标题：去选场页，选完后返回本页 */
   handleContentHeaderTitleTap() {
@@ -63,20 +72,27 @@ Page({
 
   onLoad() {
     this.coachHoldMeta = {};
-    const newVenueId = this.syncSelectedVenueName();
+    this.syncSelectedVenueName();
+    this.ensureVenueSelected();
     // 生成最近两个月的日期列表
     this.generateDateList();
-    // 加载价格规则后再生成时间段和场地数据（保证展示/计算一致）
-    this.loadSlotPricesAndRender(newVenueId);
+    // 先渲染页面骨架，避免首次进入时白屏等待
+    this.generateTimeSchedule();
   },
 
   onShow() {
+    if (!this.ensureVenueSelected()) {
+      return;
+    }
+    if (!this._initialLoadFinished) {
+      return;
+    }
     const newVenueId = this.syncSelectedVenueName();
     if (newVenueId) {
       this.loadSlotPricesAndRender(newVenueId);
     }
     this.restartRealtimeWatch();
-    this.refreshBookedSlotsNow();
+    this.refreshBookedSlotsNow({ showLoading: true });
     // 检查是否需要清空数据（下单成功后返回）
     const app = getApp();
     if (app && app.globalData && app.globalData.shouldClearBookingData) {
@@ -91,6 +107,7 @@ Page({
 
   onUnload() {
     this.stopRealtimeWatch();
+    this.destroyLoadingAnimation();
     if (this._realtimeRefreshTimer) {
       clearTimeout(this._realtimeRefreshTimer);
       this._realtimeRefreshTimer = null;
@@ -114,6 +131,27 @@ Page({
       return venueId;
     }
     return null;
+  },
+
+  /**
+   * 未选择场地时，优先引导至选场页（扫码进预订页时也生效）。
+   * 返回 true 表示已有场地，false 表示已触发跳转。
+   */
+  ensureVenueSelected() {
+    const app = getApp();
+    const venue = app && app.globalData ? app.globalData.selectedVenue : null;
+    const venueId = venue && venue.id ? String(venue.id).trim() : '';
+    if (venueId) return true;
+
+    if (this._navigatingToLocation) return false;
+    this._navigatingToLocation = true;
+    wx.navigateTo({
+      url: '/pages/location/index?from=booking',
+      complete: () => {
+        this._navigatingToLocation = false;
+      },
+    });
+    return false;
   },
 
   // 仅重置已选时间段（不重新生成场地/时段数据）
@@ -153,6 +191,10 @@ Page({
   onReady() {
     // 页面渲染完成后计算 content 高度
     this.calculateContentHeight();
+    this.initLoadingAnimation();
+    this._initialLoadFinished = true;
+    // 首次进入：页面先渲染，再进行异步加载并显示 loading
+    this.loadSlotPricesAndRender();
   },
   
   calculateContentHeight() {
@@ -188,6 +230,7 @@ Page({
   },
 
   loadSlotPricesAndRender(venueIdOverride) {
+    this.beginLoading();
     const venueId =
       venueIdOverride !== undefined ? venueIdOverride : this.data.selectedVenueId;
 
@@ -203,6 +246,9 @@ Page({
       this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
         if (applied) this.generateTimeSchedule();
         this.restartRealtimeWatch();
+        this.endLoading();
+      }).catch(() => {
+        this.endLoading();
       });
       return;
     }
@@ -214,13 +260,15 @@ Page({
     // 优先使用 venue 文档里的 courtList[].priceList（与时段索引一一对应）
     if (courtList.length > 0) {
       this.slotPriceMap = buildSlotPriceMapFromCourtList(courtList);
-      this.setData({ priceLoading: false });
       this.bookedSlotKeySet = new Set();
       this.coachHoldMeta = {};
       this.generateTimeSchedule();
       this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
         if (applied) this.generateTimeSchedule();
         this.restartRealtimeWatch();
+        this.endLoading();
+      }).catch(() => {
+        this.endLoading();
       });
       return;
     }
@@ -228,14 +276,92 @@ Page({
     // 无 courtList / priceList 时无法在客户端展示单价
     this.slotPriceMap = {};
     wx.showToast({ title: '场馆未配置场地价格', icon: 'none' });
-    this.setData({ priceLoading: false });
     this.bookedSlotKeySet = new Set();
     this.coachHoldMeta = {};
     this.generateTimeSchedule();
     this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
       if (applied) this.generateTimeSchedule();
       this.restartRealtimeWatch();
+      this.endLoading();
+    }).catch(() => {
+      this.endLoading();
     });
+  },
+
+  beginLoading() {
+    this._loadingTaskCount = (this._loadingTaskCount || 0) + 1;
+    if (this._loadingTaskCount === 1) {
+      this.setPriceLoading(true);
+    }
+  },
+
+  endLoading() {
+    this._loadingTaskCount = Math.max(0, (this._loadingTaskCount || 0) - 1);
+    if (this._loadingTaskCount === 0) {
+      this.setPriceLoading(false);
+    }
+  },
+
+  setPriceLoading(flag) {
+    const next = !!flag;
+    if (this.data.priceLoading === next) return;
+    this.setData({ priceLoading: next }, () => {
+      this.updateLoadingAnimation(next);
+    });
+  },
+
+  initLoadingAnimation() {
+    const query = wx.createSelectorQuery().in(this);
+    query
+      .select('#booking-loading-canvas')
+      .node()
+      .exec((res) => {
+        const canvasNode = res && res[0] ? res[0].node : null;
+        if (!canvasNode) return;
+
+        const dpr = (wx.getWindowInfo && wx.getWindowInfo().pixelRatio)
+          || wx.getSystemInfoSync().pixelRatio
+          || 1;
+        const sizePx = 210;
+        canvasNode.width = sizePx * dpr;
+        canvasNode.height = sizePx * dpr;
+
+        const ctx = canvasNode.getContext('2d');
+        if (!ctx) return;
+        ctx.scale(dpr, dpr);
+
+        this.loadingAnimation = lottie.loadAnimation({
+          renderer: 'canvas',
+          loop: true,
+          autoplay: false,
+          animationData: loadingAnimationData,
+          rendererSettings: {
+            context: ctx,
+            clearCanvas: true,
+          },
+        });
+
+        this.updateLoadingAnimation(this.data.priceLoading);
+      });
+  },
+
+  updateLoadingAnimation(isLoading) {
+    if (!this.loadingAnimation) return;
+    if (isLoading) {
+      this.loadingAnimation.play();
+    } else {
+      this.loadingAnimation.stop();
+    }
+  },
+
+  destroyLoadingAnimation() {
+    if (!this.loadingAnimation) return;
+    try {
+      this.loadingAnimation.destroy();
+    } catch (e) {
+      console.warn('destroy loading animation failed', e);
+    }
+    this.loadingAnimation = null;
   },
 
   restartRealtimeWatch() {
@@ -303,12 +429,16 @@ Page({
     }, 200);
   },
 
-  refreshBookedSlotsNow() {
+  refreshBookedSlotsNow(options) {
+    const showLoading = !!(options && options.showLoading);
+    if (showLoading) this.beginLoading();
     const selectedDate = this.data.selectedDate || getTodayDateStr();
     this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
       if (!applied) return;
       this.generateTimeSchedule(selectedDate);
       this.reconcileSelectedSlotsAfterRealtime();
+    }).finally(() => {
+      if (showLoading) this.endLoading();
     });
   },
 
@@ -646,6 +776,7 @@ Page({
 
   // 切换日期：先按「无占用」立即刷新格子，再异步合并 getBookedSlots 结果
   updateSlotsAvailability(selectedDate) {
+    this.beginLoading();
     this.bookedSlotKeySet = new Set();
     this.coachHoldMeta = {};
     this.generateTimeSchedule(selectedDate);
@@ -658,6 +789,9 @@ Page({
     this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
       if (applied) this.generateTimeSchedule(selectedDate);
       this.restartRealtimeWatch();
+      this.endLoading();
+    }).catch(() => {
+      this.endLoading();
     });
   },
   

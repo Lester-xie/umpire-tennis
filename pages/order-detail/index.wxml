@@ -1,4 +1,5 @@
 <view class="container">
+  <lottie-loading visible="{{lottieLoadingVisible}}" />
   <header hideDesc="{{true}}" showBackButton="{{true}}" />
   <scroll-view class="content-scroll" scroll-y="true" enhanced="{{true}}" show-scrollbar="{{false}}" style="height: {{contentScrollHeight}}px;">
   <view class="content">

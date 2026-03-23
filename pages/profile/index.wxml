@@ -1,4 +1,5 @@
 <view class="profile-container">
+  <lottie-loading visible="{{lottieLoadingVisible}}" />
   <view class="header-wrapper">
     <header
       hideDesc="{{true}}"
@@ -59,7 +60,8 @@
       </view>
 
       <view class="card menu-card">
-        <block wx:if="{{isCoach || isManager}}">
+        <!-- 仅教练可见；管理员不展示「我的场地占用」 -->
+        <block wx:if="{{isCoach}}">
           <view class="menu-row" bindtap="goCoachHolds">
             <text class="menu-title">我的场地占用</text>
             <image class="menu-arrow" src="/assets/images/arrow.svg" mode="aspectFit"></image>

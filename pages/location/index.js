@@ -20,7 +20,9 @@ Page({
     mapLongitude: MAP_CENTER_LON,
     mapScale: MAP_SCALE,
     mapMarkers: [],
+    lottieLoadingVisible: false,
   },
+  _loadingTaskCount: 0,
 
   onLoad(options) {
     /** 从预订页进入：选场后 navigateBack，不跳首页 */
@@ -34,6 +36,7 @@ Page({
     // 仅在小程序冷启动且首屏是 location 时：已选过球场则直接进首页
     const isFirstPage = pages.length === 1;
 
+    this.beginLoading('加载场馆中');
     this.loadVenues()
       .then((venues) => {
         this.setData({ venues });
@@ -58,7 +61,15 @@ Page({
         this.setData({ venues: [], selectedVenueId });
         this.setMapMarkers(selectedVenueId);
         this.getUserLocation();
+      })
+      .finally(() => {
+        this.endLoading();
       });
+  },
+
+  onUnload() {
+    this._loadingTaskCount = 0;
+    this.setData({ lottieLoadingVisible: false });
   },
 
   onShow() {
@@ -188,5 +199,19 @@ Page({
         courtList: Array.isArray(v.courtList) ? v.courtList : [],
       };
     });
+  },
+
+  beginLoading(title) {
+    this._loadingTaskCount = (this._loadingTaskCount || 0) + 1;
+    if (this._loadingTaskCount === 1) {
+      this.setData({ lottieLoadingVisible: true });
+    }
+  },
+
+  endLoading() {
+    this._loadingTaskCount = Math.max(0, (this._loadingTaskCount || 0) - 1);
+    if (this._loadingTaskCount === 0) {
+      this.setData({ lottieLoadingVisible: false });
+    }
   },
 });

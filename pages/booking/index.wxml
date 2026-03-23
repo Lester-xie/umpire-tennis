@@ -30,6 +30,9 @@
       </view>
     </scroll-view>
     <view class="content-time">
+      <view class="booking-loading-overlay {{priceLoading ? 'show' : ''}}">
+        <canvas id="booking-loading-canvas" type="2d" class="booking-loading-canvas"></canvas>
+      </view>
       <!-- 可滚动的区域 -->
       <scroll-view class="content-time-scroll" scroll-x="true" scroll-y="true" enable-flex="true" show-scrollbar="{{false}}">
         <view class="time-table">

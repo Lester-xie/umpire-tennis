@@ -44,6 +44,9 @@
       "desc": "用于展示附近场馆与距离信息"
     }
   },
+  "usingComponents": {
+    "lottie-loading": "/components/lottie-loading/index"
+  },
   "style": "v2",
   "sitemapLocation": "sitemap.json"
 }

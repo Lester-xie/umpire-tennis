@@ -41,20 +41,27 @@ Page({
     userPhone: '',
     contentScrollHeight: 400,
     nicknameFocus: false,
+    lottieLoadingVisible: false,
   },
+  _loadingTaskCount: 0,
 
   async onLoad() {
+    this.beginLoading('加载中');
     const userAvatarFileID = wx.getStorageSync(STORAGE_KEYS.userAvatar) || '';
     const userNickname = wx.getStorageSync(STORAGE_KEYS.userNickname) || '';
     const userPhone = wx.getStorageSync(STORAGE_KEYS.userPhone) || '';
 
-    const userAvatarUrl = await resolveAvatarForDisplay(userAvatarFileID);
-    this.setData({
-      userAvatar: userAvatarUrl || '',
-      userAvatarFileID,
-      userNickname,
-      userPhone,
-    });
+    try {
+      const userAvatarUrl = await resolveAvatarForDisplay(userAvatarFileID);
+      this.setData({
+        userAvatar: userAvatarUrl || '',
+        userAvatarFileID,
+        userNickname,
+        userPhone,
+      });
+    } finally {
+      this.endLoading();
+    }
   },
 
   onReady() {
@@ -87,7 +94,7 @@ Page({
       wx.setStorageSync(STORAGE_KEYS.userAvatar, userAvatarFileID);
     }
 
-    wx.showLoading({ title: '正在保存资料...' });
+    this.beginLoading('正在保存资料...');
 
     // 再更新云数据库 user.avatar（以及昵称，若有）
     const updateData = {};
@@ -96,7 +103,7 @@ Page({
 
     // userPhone 为空时无法按手机号更新云端字段
     if (!userPhone || Object.keys(updateData).length === 0) {
-      wx.hideLoading();
+      this.endLoading();
       wx.showToast({ title: '资料已保存', icon: 'success' });
       setTimeout(() => {
         wx.navigateBack();
@@ -106,14 +113,14 @@ Page({
 
     updateUserByPhone({ phone: userPhone, update: updateData })
       .then(() => {
-        wx.hideLoading();
+        this.endLoading();
         wx.showToast({ title: '资料已保存', icon: 'success' });
         setTimeout(() => {
           wx.navigateBack();
         }, 800);
       })
       .catch((err) => {
-        wx.hideLoading();
+        this.endLoading();
         console.error('updateUserByPhone failed', err);
         wx.showToast({ title: '保存失败，请重试', icon: 'none' });
       });
@@ -148,7 +155,7 @@ Page({
         // 上传到云存储：cloudPath = user-avatar/avatar_xxx.png
         const cloudPath = `user-avatar/avatar_${Date.now()}.png`;
 
-        wx.showLoading({ title: '上传头像...' });
+        this.beginLoading('上传头像...');
         wx.cloud.uploadFile({
           cloudPath,
           filePath: fileName,
@@ -160,11 +167,11 @@ Page({
 
             const tempUrl = await getTempFileURLFromFileID(fileID);
             this.setData({ userAvatar: tempUrl || '' });
-            wx.hideLoading();
+            this.endLoading();
             wx.showToast({ title: '头像已更新', icon: 'success' });
           })
           .catch((err) => {
-            wx.hideLoading();
+            this.endLoading();
             console.error('upload avatar failed', err);
             wx.showToast({ title: '上传失败，请重试', icon: 'none' });
           });
@@ -174,5 +181,24 @@ Page({
         wx.showToast({ title: '保存头像失败', icon: 'none' });
       },
     });
+  },
+
+  onUnload() {
+    this._loadingTaskCount = 0;
+    this.setData({ lottieLoadingVisible: false });
+  },
+
+  beginLoading(title) {
+    this._loadingTaskCount = (this._loadingTaskCount || 0) + 1;
+    if (this._loadingTaskCount === 1) {
+      this.setData({ lottieLoadingVisible: true });
+    }
+  },
+
+  endLoading() {
+    this._loadingTaskCount = Math.max(0, (this._loadingTaskCount || 0) - 1);
+    if (this._loadingTaskCount === 0) {
+      this.setData({ lottieLoadingVisible: false });
+    }
   },
 });

@@ -1,0 +1,8 @@
+<view class="lottie-loading-overlay {{visible ? 'show' : ''}}">
+  <canvas
+    id="lottie-loading-canvas"
+    type="2d"
+    class="lottie-loading-canvas"
+    style="width: {{sizeRpx}}rpx; height: {{sizeRpx}}rpx;"
+  ></canvas>
+</view>

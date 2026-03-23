@@ -61,7 +61,9 @@ Page({
     isCoach: false, // db_user.isCoach
     isManager: false, // db_user.isManager（畅打占用等）
     userIdentity: '', // 教练 | VIP | ''
+    lottieLoadingVisible: false,
   },
+  _loadingTaskCount: 0,
 
   onLoad() {
     const app = getApp();
@@ -74,35 +76,51 @@ Page({
   },
 
   async onShow() {
-    const app = getApp();
-    const isLoggedIn = app ? app.checkLogin() : false;
-    const userAvatarFileID = wx.getStorageSync(STORAGE_KEYS.userAvatar) || '';
-    const userAvatar = await resolveAvatarForUI(userAvatarFileID);
-    const userNickname = wx.getStorageSync(STORAGE_KEYS.userNickname) || '';
-    const userPhone = wx.getStorageSync(STORAGE_KEYS.userPhone) || '';
-    const userDisplayName = isLoggedIn ? (userNickname || '昂湃用户') : '点击登录';
-    let isVip = false;
-    let isCoach = false;
-    let isManager = false;
-    if (isLoggedIn && userPhone) {
-      const flags = await this.fetchUserRoleFlags(userPhone);
-      isVip = flags.isVip;
-      isCoach = flags.isCoach;
-      isManager = flags.isManager;
+    /** 仅首次进入「我的」页展示全屏 loading，后续切换 tab 进入不再展示 */
+    const firstVisit = !wx.getStorageSync(STORAGE_KEYS.profileVisited);
+    if (firstVisit) {
+      this.beginLoading('加载中');
     }
-    const userIdentity = buildUserIdentity(isCoach, isVip);
-    this.setData({
-      isLoggedIn,
-      userAvatar,
-      userAvatarFileID,
-      userNickname,
-      userDisplayName,
-      userPhone,
-      isVip,
-      isCoach,
-      isManager,
-      userIdentity,
-    });
+    try {
+      const app = getApp();
+      const isLoggedIn = app ? app.checkLogin() : false;
+      const userAvatarFileID = wx.getStorageSync(STORAGE_KEYS.userAvatar) || '';
+      const userAvatar = await resolveAvatarForUI(userAvatarFileID);
+      const userNickname = wx.getStorageSync(STORAGE_KEYS.userNickname) || '';
+      const userPhone = wx.getStorageSync(STORAGE_KEYS.userPhone) || '';
+      const userDisplayName = isLoggedIn ? (userNickname || '昂湃用户') : '点击登录';
+      let isVip = false;
+      let isCoach = false;
+      let isManager = false;
+      if (isLoggedIn && userPhone) {
+        const flags = await this.fetchUserRoleFlags(userPhone);
+        isVip = flags.isVip;
+        isCoach = flags.isCoach;
+        isManager = flags.isManager;
+      }
+      const userIdentity = buildUserIdentity(isCoach, isVip);
+      this.setData({
+        isLoggedIn,
+        userAvatar,
+        userAvatarFileID,
+        userNickname,
+        userDisplayName,
+        userPhone,
+        isVip,
+        isCoach,
+        isManager,
+        userIdentity,
+      });
+    } finally {
+      if (firstVisit) {
+        try {
+          wx.setStorageSync(STORAGE_KEYS.profileVisited, true);
+        } catch (e) {
+          console.warn('set profileVisited failed', e);
+        }
+        this.endLoading();
+      }
+    }
   },
 
   /** 从 db_user 读取 isVip、isCoach、isManager（一次查询） */
@@ -166,7 +184,7 @@ Page({
   },
 
   goCoachHolds() {
-    if (!this.data.isCoach && !this.data.isManager) return;
+    if (!this.data.isCoach) return;
     wx.navigateTo({ url: '/pages/profile-coach-holds/index' });
   },
 
@@ -192,11 +210,11 @@ Page({
     const app = getApp();
     if (!app) return;
 
-    wx.showLoading({ title: '检查注册信息...' });
+    this.beginLoading('检查注册信息...');
     try {
       const loginCode = await app.doLogin();
       if (!loginCode) {
-        wx.hideLoading();
+        this.endLoading();
         wx.showToast({ title: '登录失败，请重试', icon: 'none' });
         return;
       }
@@ -205,7 +223,7 @@ Page({
 
       if (!encryptedData || !iv) {
         // 解密所需参数缺失：让用户走完善资料里的手动输入路径
-        wx.hideLoading();
+        this.endLoading();
         wx.setStorageSync(STORAGE_KEYS.userPhoneCode, '');
         wx.setStorageSync(STORAGE_KEYS.userPhone, '');
         // wx.navigateTo({ url: '/pages/complete-profile/index' });
@@ -226,7 +244,7 @@ Page({
       console.log('phoneNumber', decryptRes);
 
       if (!phoneNumber) {
-        wx.hideLoading();
+        this.endLoading();
         wx.setStorageSync(STORAGE_KEYS.userPhoneCode, '');
         wx.setStorageSync(STORAGE_KEYS.userPhone, '');
         wx.showToast({ title: '手机号解密失败，请重试', icon: 'none' });
@@ -267,7 +285,7 @@ Page({
           userIdentity: buildUserIdentity(isCoach, isVip),
         });
 
-        wx.hideLoading();
+        this.endLoading();
         // 保持在当前 profile 页
         return;
       }
@@ -283,7 +301,7 @@ Page({
       wx.setStorageSync(STORAGE_KEYS.userNickname, defaultNickname);
       wx.setStorageSync(STORAGE_KEYS.userAvatar, DEFAULT_USER_AVATAR);
 
-      wx.hideLoading();
+      this.endLoading();
       this.setData({
         isLoggedIn: true,
         userAvatar: DEFAULT_USER_AVATAR,
@@ -297,8 +315,27 @@ Page({
 
       // wx.navigateTo({ url: '/pages/complete-profile/index' });
     } catch (err2) {
-      wx.hideLoading();
+      this.endLoading();
       wx.showToast({ title: '注册失败，请重试', icon: 'none' });
+    }
+  },
+
+  onUnload() {
+    this._loadingTaskCount = 0;
+    this.setData({ lottieLoadingVisible: false });
+  },
+
+  beginLoading(title) {
+    this._loadingTaskCount = (this._loadingTaskCount || 0) + 1;
+    if (this._loadingTaskCount === 1) {
+      this.setData({ lottieLoadingVisible: true });
+    }
+  },
+
+  endLoading() {
+    this._loadingTaskCount = Math.max(0, (this._loadingTaskCount || 0) - 1);
+    if (this._loadingTaskCount === 0) {
+      this.setData({ lottieLoadingVisible: false });
     }
   },
 

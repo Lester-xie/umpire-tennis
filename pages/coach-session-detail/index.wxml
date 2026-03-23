@@ -1,4 +1,5 @@
 <view class="container">
+  <lottie-loading visible="{{lottieLoadingVisible}}" />
   <view class="header-wrapper">
     <header hideDesc="{{true}}" showBackButton="{{true}}" />
   </view>
