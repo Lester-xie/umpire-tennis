@@ -11,11 +11,14 @@
   flex-shrink: 0;
 }
 
+.content-wrapper {
+  width: calc(100% - 8rpx);
+}
+
 .content {
   background-color: #f2f6f3;
   border-radius: 28rpx;
   padding: 32rpx;
-  margin-bottom: 160rpx;
   display: flex;
   flex-direction: column;
 }

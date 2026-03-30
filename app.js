@@ -1,5 +1,7 @@
 /** 与 profile/order-detail 等页一致：本地已存手机号表示用户曾完成注册/授权 */
 const STORAGE_USER_PHONE = 'user_phone';
+/** 与 pages/location、pages/welcome 一致：已选球场持久化 key */
+const STORAGE_SELECTED_VENUE = 'selected_venue';
 
 App({
   globalData: {
@@ -13,6 +15,21 @@ App({
     this.initSystemInfo();
     this.initCloud();
     this.restoreLoginSession();
+    this.restoreSelectedVenue();
+  },
+  /**
+   * 冷启动时 globalData 会清空，但本地可能仍有上次选的球场。
+   * 不从存储恢复会导致订场页 ensureVenueSelected 误判为未选场并反复跳转选场页。
+   */
+  restoreSelectedVenue() {
+    try {
+      const v = wx.getStorageSync(STORAGE_SELECTED_VENUE);
+      if (v && v.id) {
+        this.globalData.selectedVenue = v;
+      }
+    } catch (e) {
+      console.warn('restoreSelectedVenue failed', e);
+    }
   },
   /**
    * 冷启动时若本地已有手机号，静默 wx.login，恢复 globalData.isLoggedIn，

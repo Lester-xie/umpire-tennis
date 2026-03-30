@@ -14,13 +14,4 @@
     </view>
     <view class="title">{{ title }}</view>
   </view>
-  <view class="desc-container" wx:if="{{!hideDesc}}" style="width: {{descWidth}}px; height: {{descHeight}}px;">
-    <image class="desc" src="/assets/images/header-bg.jpg" mode="aspectFit" style="width: {{descWidth}}px; height: {{descHeight}}px;"></image>
-    <image 
-      class="svg-icon tennis" 
-      src="/assets/images/tennis.svg" 
-      mode="aspectFit"
-      style="transform: translate({{tennisX}}px, {{tennisY}}px) rotate({{tennisRotate}}deg);"
-    ></image>
-  </view>
 </view>

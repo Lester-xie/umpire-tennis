@@ -1,7 +1,7 @@
 <view class="profile-container">
   <lottie-loading visible="{{lottieLoadingVisible}}" />
   <view class="header-wrapper">
-    <header hideDesc="{{true}}" showBackButton="{{true}}" title="我的课时" />
+    <header showBackButton="{{true}}" title="我的课时" />
   </view>
   <scroll-view
     class="content-scroll"

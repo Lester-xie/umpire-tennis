@@ -27,10 +27,8 @@
 
 .hero-card {
   background: rgba(240, 246, 244, 0.8);
-  border-radius: 24rpx;
+  border-radius: 28rpx;
   padding: 36rpx 32rpx;
-  margin-bottom: 28rpx;
-  border: 2rpx solid #ffffff;
 }
 
 .hero-title {
@@ -61,11 +59,8 @@
 }
 
 .section {
-  background: #fff;
-  border-radius: 24rpx;
+  border-radius: 28rpx;
   padding: 28rpx 32rpx;
-  margin-bottom: 24rpx;
-  border: 2rpx solid #e8efe9;
 }
 
 .section-title {
@@ -117,6 +112,7 @@
 }
 
 .tip-card {
+  margin-top: 20rpx;
   font-size: 24rpx;
   color: #666;
   line-height: 1.5;
@@ -161,4 +157,8 @@
   color: #fff;
   font-size: 32rpx;
   font-weight: 600;
+}
+
+.divider {
+  margin-top: 20rpx;
 }

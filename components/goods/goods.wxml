@@ -1,29 +1,19 @@
 <view class="goods-container">
   <block wx:if="{{goods.length}}">
-    <view
-      class="goods-item"
+    <card
       wx:for="{{goods}}"
       wx:key="id"
       data-index="{{index}}"
       bindtap="handleGoodClick"
     >
-      <image class="goods-image" src="{{item.image}}" mode="aspectFill"></image>
-      <view class="goods-info">
-        <view class="goods-title">{{item.title}}</view>
-        <view class="goods-type-row" wx:if="{{item.typeLabel || item.categoryLabel}}">
-          <image class="goods-type-icon" src="/assets/images/type.png" mode="aspectFit"></image>
-          <text wx:if="{{item.typeLabel}}" class="goods-type-text">{{item.typeLabel}}</text>
-          <view wx:if="{{item.categoryLabel}}" class="goods-category">{{item.categoryLabel}}</view>
-        </view>
-        <view class="goods-unit-row" wx:if="{{item.subtitle}}">
-          <image class="goods-unit-icon" src="/assets/images/time.png" mode="aspectFit"></image>
-          <text class="goods-subtitle">{{item.subtitle}}</text>
-        </view>
-        <view class="goods-price">
-          ¥ {{item.price}}
+      <view class="goods-item">
+        <image class="goods-image" src="{{item.image}}" mode="aspectFill"></image>
+        <view class="goods-info">
+          <view class="goods-title">{{item.title}}</view>
+          <image class="arrow-icon" src="/assets/images/arrow.svg" mode="widthFix" />
         </view>
       </view>
-    </view>
+    </card>
   </block>
   <view wx:elif="{{courseLoaded}}" class="goods-empty">{{goodsEmptyHint || '暂无课程'}}</view>
 </view>

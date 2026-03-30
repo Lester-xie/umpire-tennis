@@ -18,6 +18,51 @@ const {
   getBookedSlots,
 } = require('../../api/tennisDb');
 const { buildLessonKey, formatLessonKeyDisplay } = require('../../utils/lessonKey');
+const { lessonKeyFromTypeMapFormat, splitCourseDescriptionLines } = require('../../utils/courseCatalog');
+
+function enrichGoodItemDisplay(g) {
+  if (!g) return null;
+  const sub = g.subtitle != null ? String(g.subtitle).trim() : '';
+  const { note, tail } = splitCourseDescriptionLines(sub);
+  return {
+    ...g,
+    noteLine: note,
+    tailLine: tail,
+  };
+}
+
+function sortTypeMapFormatKeys(keys) {
+  return [...keys].sort((a, b) => String(a).localeCompare(String(b), 'zh-CN'));
+}
+
+function sortTypeMapSessionKeys(inner) {
+  if (!inner || typeof inner !== 'object') return [];
+  return Object.keys(inner).sort((a, b) => {
+    const na = Number(a);
+    const nb = Number(b);
+    if (Number.isFinite(na) && Number.isFinite(nb) && String(na) === String(a).trim() && String(nb) === String(b).trim()) {
+      return na - nb;
+    }
+    return String(a).localeCompare(String(b), 'zh-CN');
+  });
+}
+
+function parseTypeMapPrice(raw) {
+  const n = Number(String(raw != null ? raw : '').replace(/,/g, ''));
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+function grantHoursFromSessionKey(sessionKey) {
+  const k = String(sessionKey || '').trim();
+  const n = Number(k);
+  if (Number.isFinite(n) && n > 0) return Math.min(999, Math.floor(n));
+  const m = k.match(/(\d+)/);
+  if (m) {
+    const v = Math.floor(Number(m[1]));
+    if (v > 0) return Math.min(999, v);
+  }
+  return 0;
+}
 
 Page({
   data: {
@@ -67,6 +112,12 @@ Page({
     /** 用户是否手动切换过教练单支付方式（余额刷新时尽量保留「仅微信」等选择） */
     coachPayUserChose: false,
     lottieLoadingVisible: false,
+    /** 课时包：db_course.typeMap 多规格 */
+    goodsHasTypeMap: false,
+    goodsFormatKeys: [],
+    goodsSessionKeys: [],
+    selectedGoodsFormat: '',
+    selectedGoodsSession: '',
   },
   _loadingTaskCount: 0,
 
@@ -76,10 +127,21 @@ Page({
       // 商品订单：从首页课程列表跳转
       try {
         const goodItem = JSON.parse(decodeURIComponent(options.goodData || '{}'));
+        const tm = goodItem && goodItem.typeMap;
+        if (
+          goodItem &&
+          tm &&
+          typeof tm === 'object' &&
+          !Array.isArray(tm) &&
+          Object.keys(tm).length > 0
+        ) {
+          this.initGoodsTypeMapOrder(goodItem);
+          return;
+        }
         if (goodItem && goodItem.price != null) {
           this.setData({
             orderType: 'goods',
-            goodItem,
+            goodItem: enrichGoodItemDisplay(goodItem),
             totalPrice: goodItem.price,
           });
           return;
@@ -182,6 +244,92 @@ Page({
       venueId: venueId,
     });
     this.syncCampusName();
+  },
+
+  initGoodsTypeMapOrder(goodItem) {
+    const formatKeys = sortTypeMapFormatKeys(Object.keys(goodItem.typeMap));
+    const f0 = formatKeys[0];
+    const inner = goodItem.typeMap[f0];
+    const sessionKeys = sortTypeMapSessionKeys(inner);
+    if (!f0 || !sessionKeys.length) {
+      wx.showToast({ title: '课程价格配置不完整', icon: 'none' });
+      this.setData({
+        orderType: 'goods',
+        goodItem: enrichGoodItemDisplay({ ...goodItem, grantHours: 0, lessonKey: '' }),
+        totalPrice: Number(goodItem.price) || 0,
+      });
+      return;
+    }
+    const s0 = sessionKeys[0];
+    const price = parseTypeMapPrice(inner[s0]);
+    const grantHours = grantHoursFromSessionKey(s0);
+    const lessonKey = lessonKeyFromTypeMapFormat(goodItem.lessonType, f0);
+    const nextGood = enrichGoodItemDisplay({
+      ...goodItem,
+      price,
+      grantHours,
+      lessonKey,
+    });
+    this.setData({
+      orderType: 'goods',
+      goodItem: nextGood,
+      totalPrice: price,
+      goodsHasTypeMap: true,
+      goodsFormatKeys: formatKeys,
+      goodsSessionKeys: sessionKeys,
+      selectedGoodsFormat: f0,
+      selectedGoodsSession: s0,
+    });
+  },
+
+  selectGoodsFormat(e) {
+    const key = e.currentTarget.dataset.key;
+    if (!key || key === this.data.selectedGoodsFormat) return;
+    const g = this.data.goodItem;
+    const tm = g && g.typeMap;
+    if (!tm || !tm[key]) return;
+    const sessionKeys = sortTypeMapSessionKeys(tm[key]);
+    if (!sessionKeys.length) return;
+    const s0 = sessionKeys[0];
+    const price = parseTypeMapPrice(tm[key][s0]);
+    const grantHours = grantHoursFromSessionKey(s0);
+    const lessonKey = lessonKeyFromTypeMapFormat(g.lessonType, key);
+    this.setData({
+      selectedGoodsFormat: key,
+      goodsSessionKeys: sessionKeys,
+      selectedGoodsSession: s0,
+      totalPrice: price,
+      goodItem: {
+        ...g,
+        price,
+        grantHours,
+        lessonKey,
+      },
+    });
+  },
+
+  selectGoodsSession(e) {
+    const session = e.currentTarget.dataset.session;
+    if (session == null || String(session) === String(this.data.selectedGoodsSession)) return;
+    const g = this.data.goodItem;
+    const fmt = this.data.selectedGoodsFormat;
+    const tm = g && g.typeMap;
+    if (!tm || !tm[fmt]) return;
+    const raw = tm[fmt][session];
+    if (raw == null) return;
+    const price = parseTypeMapPrice(raw);
+    const grantHours = grantHoursFromSessionKey(session);
+    const lessonKey = lessonKeyFromTypeMapFormat(g.lessonType, fmt);
+    this.setData({
+      selectedGoodsSession: session,
+      totalPrice: price,
+      goodItem: {
+        ...g,
+        price,
+        grantHours,
+        lessonKey,
+      },
+    });
   },
 
   syncCampusName() {
@@ -780,7 +928,9 @@ Page({
       const goodsVenueId = String(g.venueId || '').trim();
       if (!lessonKey || grantHours <= 0) {
         wx.showToast({
-          title: '无法识别课时或课程类型，请检查 db_course / db_course_scale 与 unit，或填写 grantHours、lessonKey',
+          title: this.data.goodsHasTypeMap
+            ? '请选择上课形式与节数套餐'
+            : '无法识别课时或课程类型，请检查 db_course 的 typeMap / unit，或填写 grantHours、lessonKey',
           icon: 'none',
         });
         return;
@@ -792,6 +942,17 @@ Page({
         });
         return;
       }
+      // booking-success 页「商品」只展示标题/规格，不展示 description（subtitle）
+      let goodDesc = g.title ? String(g.title).trim() : '';
+      if (!goodDesc) goodDesc = g.desc || '';
+      if (
+        this.data.goodsHasTypeMap &&
+        this.data.selectedGoodsFormat &&
+        this.data.selectedGoodsSession !== '' &&
+        this.data.selectedGoodsSession != null
+      ) {
+        goodDesc = `${goodDesc} ${this.data.selectedGoodsFormat}×${this.data.selectedGoodsSession}节`.trim();
+      }
       payPayload.goodsPurchase = {
         type: 'course_hours',
         phone,
@@ -799,7 +960,7 @@ Page({
         grantHours,
         lessonKey,
         venueId: goodsVenueId,
-        goodDesc: g.desc || '',
+        goodDesc,
       };
     }
     if (orderType === 'court') {

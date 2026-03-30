@@ -36,10 +36,8 @@ function getCategories() {
 }
 
 /**
- * 课程列表：courseCache 与 db_course_scale、db_category 同批拉取并缓存；切换分类仅在内存筛选。
- * db_course 建议只保留外键：category → db_category._id，type → db_course_scale._id（无需再维护 categoryLabel / typeLabel）。
- * 展示名与课类推断：分类用 db_category.name（可选 coachLessonType），规模用 db_course_scale.name（可选 pairMode / groupMode）。
- * 详见 utils/courseCatalog.js；grantHours、显式 lessonKey、lessonType 等仍可写在课程文档上。
+ * 课程列表：courseCache 拉取 db_course 并缓存；切换分类仅在内存筛选（新 schema 无 category 时等效于全部分类）。
+ * 新 db_course：name、description、image、venueId、typeMap；旧版仍可含 category、type 外键。
  * @param {string} filterCategoryId
  * @param {{ forceRefresh?: boolean }} [options]
  * @returns {Promise<{ data: object[], scaleById: Record<string,object>, categoryById: Record<string,object> }>}

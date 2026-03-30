@@ -1,6 +1,6 @@
 <view class="complete-profile-page">
   <lottie-loading visible="{{lottieLoadingVisible}}" />
-  <header hideDesc="{{true}}" showBackButton="{{true}}" />
+  <header showBackButton="{{true}}" />
   <view class="content">
     <view class="form-row form-row-nickname {{nicknameFocus ? 'form-row-focus' : ''}}">
       <text class="form-label">昵称</text>

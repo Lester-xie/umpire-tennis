@@ -1,6 +1,7 @@
 {
   "navigationBarTitleText": "完成",
   "usingComponents": {
-    "header": "/components/header/header"
+    "header": "/components/header/header",
+    "card": "/components/card/card"
   }
 }

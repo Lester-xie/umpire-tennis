@@ -1,102 +1,54 @@
 .goods-container {
   margin-top: 40rpx;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 24rpx;
 }
 
 .goods-item {
+  box-sizing: border-box;
+  min-width: 0;
   display: flex;
+  flex-direction: column;
   align-items: stretch;
   background-color: rgba(240, 246, 244, 0.8);
-  border-radius: 36rpx;
-  padding: 32rpx;
+  border-radius: 28rpx;
+  padding: 16rpx;
   border: 2rpx solid #ffffff;
   overflow: hidden;
 }
 
 .goods-image {
-  width: 240rpx;
-  height: 240rpx;
-  border-radius: 36rpx;
+  width: 100%;
+  height: 200rpx;
+  border-radius: 20rpx;
   flex-shrink: 0;
-  align-self: flex-start;
 }
 
 .goods-info {
-  flex: 1;
+  margin: 16rpx -16rpx 0;
+  padding: 16rpx 16rpx 0;
   min-width: 0;
-  margin-left: 32rpx;
   display: flex;
-  flex-direction: column;
-  justify-content: space-around;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 2rpx solid #134E35;
+}
+
+.arrow-icon {
+  width: 28rpx;
+  height: 28rpx;
+  transform: rotate(180deg);
 }
 
 .goods-title {
-  font-size: 34rpx;
+  font-size: 28rpx;
   color: #000000;
-  line-height: 1.4;
-}
-
-.goods-type-row {
-  margin-top: 12rpx;
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-
-.goods-type-icon {
-  width: 32rpx;
-  height: 32rpx;
-  flex-shrink: 0;
-}
-
-.goods-type-text {
-  font-size: 28rpx;
-  color: #414141;
   line-height: 1.35;
-}
-
-.goods-category {
-  margin-left: auto;
-  flex-shrink: 0;
-  padding: 4rpx 16rpx;
-  font-size: 24rpx;
-  line-height: 1.35;
-  color: #2d6a4f;
-  background: rgba(45, 106, 79, 0.12);
-  border-radius: 999rpx;
-}
-
-.goods-unit-row {
-  margin-top: 12rpx;
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-}
-
-.goods-unit-icon {
-  width: 32rpx;
-  height: 32rpx;
-  flex-shrink: 0;
-}
-
-.goods-subtitle {
-  font-size: 28rpx;
-  color: #535353;
-  line-height: 1.35;
-}
-
-.goods-price {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  border-top: 2rpx solid #E0E0E0;
-  padding-top: 12rpx;
-  margin-top: 12rpx;
-  font-size: 36rpx;
-  font-weight: 500;
-  color: #414141;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .goods-empty {

@@ -2,6 +2,7 @@
   "navigationBarTitleText": "选择球场",
   "navigationStyle": "custom",
   "usingComponents": {
-    "header": "/components/header/header"
+    "header": "/components/header/header",
+    "card": "/components/card/card"
   }
 }

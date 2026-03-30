@@ -2,8 +2,6 @@
   <view class="welcome-page">
     <image class="welcome-bg" src="/assets/images/welcome-bg.jpg" mode="aspectFill" />
     <view class="welcome-bottom">
-      <text class="welcome-line welcome-line--brand">昂湃</text>
-      <text class="welcome-line welcome-line--en">Tennis</text>
       <view class="slide-wrap">
         <view class="slide-track">
           <image

@@ -135,10 +135,12 @@ Component({
   },
 
   attached: function () {
-    // 计算 desc 的宽高
+    // 与 pages/home .content-wrapper 的 padding: 0 32rpx 一致（750rpx = 屏宽）
     const windowInfo = wx.getWindowInfo();
     const screenWidth = windowInfo.windowWidth || windowInfo.screenWidth;
-    const descWidth = screenWidth - 32;
+    const rpxToPx = screenWidth / 750;
+    const horizontalPadding = 32 * rpxToPx * 2;
+    const descWidth = screenWidth - horizontalPadding;
     const aspectRatio = 1.9230769230769231;
     const descHeight = descWidth / aspectRatio;
     

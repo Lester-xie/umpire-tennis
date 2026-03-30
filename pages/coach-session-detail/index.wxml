@@ -1,7 +1,7 @@
 <view class="container">
   <lottie-loading visible="{{lottieLoadingVisible}}" />
   <view class="header-wrapper">
-    <header hideDesc="{{true}}" showBackButton="{{true}}" />
+    <header showBackButton="{{true}}" />
   </view>
   <scroll-view
     class="content-scroll"
@@ -11,31 +11,36 @@
     style="margin-top: {{headerHeight}}px; height: {{contentHeight}}px;"
   >
     <view class="content" wx:if="{{!loading && !errMsg}}">
-      <view class="hero-card">
-        <view class="hero-title">{{capacityLabel}}</view>
-        <view class="hero-sub" wx:if="{{coachName}}">教练 {{coachName}}</view>
-        <view class="hero-meta">
-          <text class="hero-meta-item">{{campusName}}</text>
-          <text class="hero-meta-item">{{formattedDate}}</text>
-          <text class="hero-meta-item">{{courtName}} · {{timeRange}}</text>
-        </view>
-      </view>
-
-      <view class="section">
-        <view class="section-title">报名情况</view>
-        <view class="cap-line">已报 <text class="cap-num">{{joinedCount}}</text> / {{capacityLimit}} 人</view>
-        <view class="participant-list" wx:if="{{participants.length > 0}}">
-          <view class="participant-item" wx:for="{{participants}}" wx:key="index">
-            <image
-              class="participant-avatar"
-              src="{{item.avatarUrl ? item.avatarUrl : defaultAvatar}}"
-              mode="aspectFill"
-            />
-            <text class="participant-name">{{item.displayName}}</text>
+      <card>
+        <view class="hero-card">
+          <view class="hero-title">{{capacityLabel}}</view>
+          <view class="hero-sub" wx:if="{{coachName}}">教练 {{coachName}}</view>
+          <view class="hero-meta">
+            <text class="hero-meta-item">{{campusName}}</text>
+            <text class="hero-meta-item">{{formattedDate}}</text>
+            <text class="hero-meta-item">{{courtName}} · {{timeRange}}</text>
           </view>
         </view>
-        <view class="empty-roster" wx:else>暂无</view>
-      </view>
+      </card>
+
+      <view class="divider"></view>
+      <card>
+        <view class="section">
+          <view class="section-title">报名情况</view>
+          <view class="cap-line">已报 <text class="cap-num">{{joinedCount}}</text> / {{capacityLimit}} 人</view>
+          <view class="participant-list" wx:if="{{participants.length > 0}}">
+            <view class="participant-item" wx:for="{{participants}}" wx:key="index">
+              <image
+                class="participant-avatar"
+                src="{{item.avatarUrl ? item.avatarUrl : defaultAvatar}}"
+                mode="aspectFill"
+              />
+              <text class="participant-name">{{item.displayName}}</text>
+            </view>
+          </view>
+          <view class="empty-roster" wx:else>暂无</view>
+        </view>
+      </card>
 
       <view class="tip-card" wx:if="{{slotPast}}">
         该时段已开始或结束。

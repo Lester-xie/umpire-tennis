@@ -1,0 +1,6 @@
+<view class="card">
+  <view class="card-wrapper">
+    <slot></slot>
+  </view>
+  <view class="card-bg"></view>
+</view>

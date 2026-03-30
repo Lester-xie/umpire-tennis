@@ -1,0 +1,22 @@
+/* pages/components/card/card.wxss */
+.card {
+  position: relative;
+  width: 100%;
+}
+.card-wrapper {
+  border-radius: 28rpx;
+  border: 2rpx solid #134E35;
+  background: #fff;
+}
+.card-bg {
+  position: absolute;
+  border: 2rpx solid #134E35;
+  border-radius: 28rpx;
+  background: #fff;
+  z-index: 0;
+  top: 8rpx;
+  left: 8rpx;
+  right: -8rpx;
+  bottom: -8rpx;
+  z-index: -1;
+}

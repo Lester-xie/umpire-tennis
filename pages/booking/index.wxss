@@ -4,9 +4,12 @@
   flex-direction: column;
   height: 100vh;
 }
+.divider {
+  margin-top: 20rpx;
+}
+
 .content {
   box-sizing: border-box;
-  margin-top: 20rpx;
   background-color: #F2F6F3;
   border-radius: 28rpx;
   padding: 20rpx;
@@ -332,6 +335,9 @@
   justify-content: center;
   min-height: 0;
   text-align: center;
+  position: relative;
+  padding: 6rpx 10rpx 30rpx;
+  box-sizing: border-box;
 }
 
 .slot-coach-purpose {
@@ -342,10 +348,14 @@
 }
 
 .slot-coach-cap {
+  position: absolute;
+  right: 4rpx;
+  bottom: 2rpx;
   font-size: 22rpx;
   color: #1b5e20;
-  margin-top: 6rpx;
+  line-height: 1.2;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .time-slot-cell.slot-past.slot-coach-hold {
@@ -414,4 +424,11 @@
   position: relative;
   z-index: 1;
   letter-spacing: 1rpx;
+}
+
+.slot-coach-name {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: #1b5e20;
+  line-height: 1.3;
 }

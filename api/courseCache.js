@@ -1,5 +1,4 @@
 const { ALL_CATEGORY_ID } = require('../utils/constants');
-const { indexDocsById } = require('../utils/courseCatalog');
 
 function getDb() {
   return wx.cloud.database();
@@ -7,21 +6,21 @@ function getDb() {
 
 /** 全表缓存；切换分类仅在内存中筛选，避免重复请求云库 */
 let cachedRows = null;
+/** 兼容旧版 db_course 外键 type → db_course_scale；新 schema 无 type 时为空表 */
 let cachedScaleById = null;
+/** 兼容旧版 category → db_category；新 schema 无 category 时为空表 */
 let cachedCategoryById = null;
 let inflightFetch = null;
 
 function fetchFullAndWriteCache() {
   if (inflightFetch) return inflightFetch;
-  inflightFetch = Promise.all([
-    getDb().collection('db_course').get(),
-    getDb().collection('db_course_scale').get(),
-    getDb().collection('db_category').get(),
-  ])
-    .then(([courseRes, scaleRes, catRes]) => {
+  inflightFetch = getDb()
+    .collection('db_course')
+    .get()
+    .then((courseRes) => {
       cachedRows = courseRes.data || [];
-      cachedScaleById = indexDocsById(scaleRes.data || []);
-      cachedCategoryById = indexDocsById(catRes.data || []);
+      cachedScaleById = {};
+      cachedCategoryById = {};
       return {
         data: cachedRows,
         scaleById: cachedScaleById,
@@ -42,7 +41,7 @@ function filterByCategory(rows, filterCategoryId) {
 }
 
 /**
- * 课程 + 规模表 + 分类表一次拉齐，避免在 db_course 上冗余 categoryLabel / typeLabel。
+ * 仅拉取 db_course；scaleById / categoryById 为空对象（兼容旧调用方）。
  * @returns {Promise<{ data: object[], scaleById: Record<string,object>, categoryById: Record<string,object> }>}
  */
 function getCourses(filterCategoryId, options = {}) {

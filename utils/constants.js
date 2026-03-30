@@ -28,6 +28,8 @@ function collectHomeExcludedCategoryRefs(categoryById) {
 }
 
 function isCourseInHomeExcludedCategory(course, excludedCategoryRefs) {
+  const name = course && course.name != null ? String(course.name).trim() : '';
+  if (name && HOME_EXCLUDED_CATEGORY_NAMES.includes(name)) return true;
   const ref = course && course.category;
   if (ref == null || ref === '') return false;
   if (excludedCategoryRefs.has(String(ref))) return true;

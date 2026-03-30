@@ -1,7 +1,7 @@
 <view class="location-page">
   <lottie-loading visible="{{lottieLoadingVisible}}" />
   <view class="header-wrapper">
-    <header hideDesc="{{true}}" title="{{headerTitle}}" />
+    <header title="{{headerTitle}}" />
   </view>
   <!-- 腾讯地图：展示球场与当前位置 -->
   <view class="map-wrap" style="margin-top: {{headerHeight + 10}}px;">
@@ -16,19 +16,22 @@
     />
   </view>
   <view class="venue-list">
-    <view
+    <card
       class="list-item goods-item {{selectedVenueId === item.id ? 'active' : ''}}"
       wx:for="{{venues}}"
       wx:key="id"
       data-id="{{item.id}}"
       bindtap="onSelectVenue"
     >
-      <image class="goods-thumb venue-thumb" src="{{item.image}}" mode="aspectFill" />
-      <view class="item-main">
-        <view class="item-desc">{{item.name}}</view>
-        <view class="item-time">{{item.address}}</view>
-        <view class="item-time venue-distance" wx:if="{{item.distanceText}}">距您 {{item.distanceText}}</view>
+      <view class="item-inner">
+        <view class="item-current-badge" wx:if="{{selectedVenueId === item.id}}">已选</view>
+        <image class="goods-thumb venue-thumb" src="{{item.image}}" mode="aspectFill" />
+        <view class="item-main">
+          <view class="item-desc">{{item.name}}</view>
+          <view class="item-time">{{item.address}}</view>
+          <view class="item-time venue-distance" wx:if="{{item.distanceText}}">距您 {{item.distanceText}}</view>
+        </view>
       </view>
-    </view>
+    </card>
   </view>
 </view>

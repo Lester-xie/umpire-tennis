@@ -1,14 +1,51 @@
 /**
- * 课程列表展示与 lessonKey：只依赖 db_course 上的外键 category、type，
- * 名称与类型推断来自关联的 db_category / db_course_scale（无需在课程上冗余 categoryLabel、typeLabel）。
- * 规模文档可选：pairMode、groupMode（优先于 name 文本推断）。
- * 分类文档可选：coachLessonType（experience|regular|group）——若配置则优先于 name 推断课类。
+ * 课程列表展示与 lessonKey：
+ * - 新 db_course：name、description、image、venueId、typeMap（如 1V1/1V2 → 节数→单价）
+ * - 旧版：外键 category、type，关联 db_category / db_course_scale
  */
 
 const { buildLessonKey } = require('./lessonKey');
 const { normalizeVenueId } = require('./venueId');
 
 const DEFAULT_GOODS_IMAGE = '/assets/images/goods/good1.jpg';
+
+/** 从 typeMap 嵌套对象中取最小标价（元），用于列表展示 */
+function minPriceFromTypeMap(typeMap) {
+  let min = Infinity;
+  function walk(obj) {
+    if (!obj || typeof obj !== 'object') return;
+    Object.values(obj).forEach((v) => {
+      if (v != null && typeof v === 'object') walk(v);
+      else {
+        const n = Number(String(v).replace(/,/g, ''));
+        if (Number.isFinite(n) && n >= 0) min = Math.min(min, n);
+      }
+    });
+  }
+  walk(typeMap);
+  return min === Infinity ? undefined : min;
+}
+
+function typeMapKeysLabel(typeMap) {
+  if (!typeMap || typeof typeMap !== 'object') return '';
+  return Object.keys(typeMap)
+    .sort()
+    .join(' · ');
+}
+
+/** 订单页：说明与「正式课」等后缀分行展示 */
+function splitCourseDescriptionLines(subtitle) {
+  const s = String(subtitle || '').trim();
+  if (!s) return { note: '', tail: '' };
+  const idx = s.indexOf('正式课');
+  if (idx >= 0) {
+    return {
+      note: s.slice(0, idx).trim(),
+      tail: s.slice(idx).trim(),
+    };
+  }
+  return { note: s, tail: '' };
+}
 
 /**
  * @param {object[]} docs 含 _id 的云文档数组
@@ -127,7 +164,12 @@ function inferLessonType(course, categoryDoc) {
   const fromCat = inferLessonTypeFromCategoryName(courseCategoryDisplayName(categoryDoc));
   if (fromCat) return fromCat;
 
-  const title = String(course.title || '');
+  const fromName = inferLessonTypeFromCategoryName(
+    course.name != null ? String(course.name).trim() : '',
+  );
+  if (fromName) return fromName;
+
+  const title = String(course.title || course.name || '');
   if (title.indexOf('体验') !== -1) return 'experience';
   if (title.indexOf('团课') !== -1 || title.indexOf('团体') !== -1) return 'group';
   return '';
@@ -170,11 +212,35 @@ function inferGroupModeFromScale(scaleDoc, course, displayName) {
   return 'group35';
 }
 
+/**
+ * 用户选定 typeMap 中的上课形式（如 1V1）后生成 lessonKey（节数只影响 grantHours，不改变 key）
+ * @param {string} lessonType experience | regular | group | open_play | ''
+ * @param {string} formatKey typeMap 外层键，如 1V1、1V2
+ */
+function lessonKeyFromTypeMapFormat(lessonType, formatKey) {
+  const ltRaw = String(lessonType || '').trim();
+  const lt =
+    ltRaw && ['experience', 'regular', 'group', 'open_play'].includes(ltRaw) ? ltRaw : 'regular';
+  if (lt === 'group') {
+    const gm = inferGroupModeFromScale(null, {}, String(formatKey || ''));
+    return buildLessonKey('group', '1v1', gm);
+  }
+  if (lt === 'open_play') {
+    return buildLessonKey('open_play', '1v1', 'group36');
+  }
+  const pm = inferPairModeFromScale(null, {}, String(formatKey || ''));
+  return buildLessonKey(lt, pm, 'group35');
+}
+
 function resolveLessonKeyFromCourse(course, scaleDoc, categoryDoc) {
   const direct = course.lessonKey != null ? String(course.lessonKey).trim() : '';
   if (direct) return direct;
 
-  const scaleName = courseScaleDisplayName(scaleDoc);
+  let scaleName = courseScaleDisplayName(scaleDoc);
+  if (!scaleName && course.typeMap && typeof course.typeMap === 'object') {
+    const keys = Object.keys(course.typeMap).sort();
+    scaleName = keys[0] || '';
+  }
 
   const ltExplicit = course.lessonType != null ? String(course.lessonType).trim() : '';
   if (['experience', 'regular', 'group'].includes(ltExplicit)) {
@@ -202,7 +268,50 @@ function resolveLessonKeyFromCourse(course, scaleDoc, categoryDoc) {
  * @param {object|null} categoryDoc
  */
 function formatCourseRow(c, scaleDoc, categoryDoc) {
-  const titleRaw = c.title != null ? String(c.title).trim() : '';
+  const hasTypeMap =
+    c &&
+    c.typeMap != null &&
+    typeof c.typeMap === 'object' &&
+    Object.keys(c.typeMap).length > 0;
+
+  if (hasTypeMap) {
+    const titleRaw = c.name != null ? String(c.name).trim() : '';
+    const title = titleRaw || '课程';
+    const typeLabel = typeMapKeysLabel(c.typeMap);
+    const categoryLabel = '';
+    const subtitle =
+      c.description != null && String(c.description).trim() !== ''
+        ? String(c.description).trim()
+        : '';
+    const desc = [title, subtitle].filter(Boolean).join(' · ');
+    const grantHours = parseGrantHours(c);
+    const lessonKey = resolveLessonKeyFromCourse(c, scaleDoc, categoryDoc);
+    const venueId = normalizeVenueId(c.venueId != null ? c.venueId : c.venue);
+    const price = minPriceFromTypeMap(c.typeMap) ?? c.price ?? 0;
+    const lessonType = inferLessonType(c, categoryDoc);
+    return {
+      id: c._id,
+      image: c.displayImage || courseImageSource(c) || DEFAULT_GOODS_IMAGE,
+      title,
+      typeLabel,
+      categoryLabel,
+      subtitle,
+      desc,
+      price,
+      grantHours,
+      lessonKey,
+      venueId,
+      typeMap: c.typeMap,
+      lessonType,
+    };
+  }
+
+  const titleRaw =
+    c.title != null
+      ? String(c.title).trim()
+      : c.name != null
+        ? String(c.name).trim()
+        : '';
   const title = titleRaw || '课程';
   const typeLabel = courseScaleDisplayName(scaleDoc);
   const categoryLabel = courseCategoryDisplayName(categoryDoc);
@@ -211,7 +320,7 @@ function formatCourseRow(c, scaleDoc, categoryDoc) {
   const desc = [title, typeLabel, subtitle].filter(Boolean).join(' · ');
   const grantHours = parseGrantHours(c);
   const lessonKey = resolveLessonKeyFromCourse(c, scaleDoc, categoryDoc);
-  const venueId = normalizeVenueId(c.venue);
+  const venueId = normalizeVenueId(c.venueId != null ? c.venueId : c.venue);
   return {
     id: c._id,
     image: c.displayImage || courseImageSource(c) || DEFAULT_GOODS_IMAGE,
@@ -238,4 +347,8 @@ module.exports = {
   parseGrantHours,
   resolveLessonKeyFromCourse,
   formatCourseRow,
+  minPriceFromTypeMap,
+  typeMapKeysLabel,
+  lessonKeyFromTypeMapFormat,
+  splitCourseDescriptionLines,
 };

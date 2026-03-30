@@ -2,7 +2,6 @@
   <lottie-loading visible="{{lottieLoadingVisible}}" />
   <view class="header-wrapper">
     <header
-      hideDesc="{{true}}"
       showSwitchAccountButton="{{isLoggedIn && userPhone}}"
       bind:switchaccount="onSwitchAccount"
     />

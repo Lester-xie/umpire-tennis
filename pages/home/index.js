@@ -1,17 +1,8 @@
-const { ALL_CATEGORY_ID } = require('../../utils/constants');
-
 Page({
   data: {
     headerHeight: 0, // header 高度
     contentHeight: 400,
     placeholderHeight: 0,
-    /** 与 category 选中项同步，传给 goods 筛选 db_course */
-    filterCategoryId: ALL_CATEGORY_ID,
-  },
-  onCategoryTap(e) {
-    const id = e.detail && e.detail.id;
-    if (!id) return;
-    this.setData({ filterCategoryId: id });
   },
   onLoad() {},
   onReady() {

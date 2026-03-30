@@ -67,7 +67,7 @@ function resolveCourseImages(list) {
 
 Component({
   properties: {
-    /** 与 category 选中项 _id 一致；为 ALL_CATEGORY_ID 时不按 category 筛选 */
+    /** 父页传入的分类 _id；为 ALL_CATEGORY_ID 时不按 category 筛选 */
     categoryId: {
       type: String,
       value: ALL_CATEGORY_ID,
@@ -130,7 +130,9 @@ Component({
             filtered = [];
             hint = '请先在顶部选择场馆，再查看该馆课程与价格';
           } else {
-            filtered = baseRows.filter((c) => venueIdLooseEqual(c.venue, selectedVenueId));
+            filtered = baseRows.filter((c) =>
+              venueIdLooseEqual(c.venueId != null ? c.venueId : c.venue, selectedVenueId),
+            );
             if (!filtered.length) {
               hint = '当前场馆暂无上架课程';
             }
@@ -167,11 +169,15 @@ Component({
           id: good.id,
           image: good.image,
           desc: good.desc,
+          title: good.title,
+          subtitle: good.subtitle,
           price: good.price,
           grantHours: good.grantHours,
           lessonKey: good.lessonKey,
           venueId: good.venueId,
           venueName,
+          typeMap: good.typeMap,
+          lessonType: good.lessonType,
         }),
       );
       wx.navigateTo({

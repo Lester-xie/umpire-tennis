@@ -28,7 +28,7 @@
   justify-content: flex-end;
   padding: 120rpx 0 calc(48rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
-  background: linear-gradient(to bottom, rgba(19, 78, 53, 0.01) 0%, #117946 42%, #117946 100%);
+  background: linear-gradient(to bottom, rgba(19, 78, 53, 0.01) 0%, #117946 62%, #117946 100%);
 }
 
 .welcome-line {
