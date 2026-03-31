@@ -135,6 +135,7 @@
   font-size: 26rpx;
   color: #666;
   font-weight: 500;
+  line-height: 1.4;
 }
 .goods-typemap-chips {
   display: flex;
@@ -144,6 +145,7 @@
 .goods-typemap-chip {
   padding: 14rpx 28rpx;
   font-size: 28rpx;
+  line-height: 1.35;
   color: #134e35;
   background: #f0f5f2;
   border-radius: 999rpx;

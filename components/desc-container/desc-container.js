@@ -9,6 +9,28 @@ Component({
   },
 
   methods: {
+    measureDescLayout() {
+      wx.createSelectorQuery()
+        .in(this)
+        .select('.desc-container')
+        .boundingClientRect()
+        .exec((res) => {
+          const rect = res && res[0];
+          if (!rect || !rect.width || !rect.height) {
+            setTimeout(() => this.measureDescLayout(), 50);
+            return;
+          }
+          this.setData(
+            {
+              descWidth: rect.width,
+              descHeight: rect.height,
+            },
+            () => {
+              this.initTennisAnimation();
+            }
+          );
+        });
+    },
     // 初始化网球动画
     initTennisAnimation() {
       const descWidth = this.data.descWidth;
@@ -134,25 +156,9 @@ Component({
     },
   },
 
-  attached: function () {
-    // 与 pages/home .content-wrapper 的 padding: 0 32rpx 一致（750rpx = 屏宽）
-    const windowInfo = wx.getWindowInfo();
-    const screenWidth = windowInfo.windowWidth || windowInfo.screenWidth;
-    const rpxToPx = screenWidth / 750;
-    const horizontalPadding = 32 * rpxToPx * 2;
-    const descWidth = screenWidth - horizontalPadding;
-    const aspectRatio = 1.9230769230769231;
-    const descHeight = descWidth / aspectRatio;
-    
-    this.setData({
-      descWidth,
-      descHeight,
-    });
-  },
-  
   ready: function () {
-    // 在 ready 生命周期中启动动画，确保 DOM 已渲染
-    this.initTennisAnimation();
+    // 布局用 CSS（width:100% + aspect-ratio），尺寸用测量值驱动网球动画
+    this.measureDescLayout();
   },
   
   detached() {

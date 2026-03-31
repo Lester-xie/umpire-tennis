@@ -58,10 +58,6 @@
   min-width: 0;
 }
 
-.goods-item.active .item-main {
-  padding-right: 132rpx;
-}
-
 .goods-item .item-desc {
   font-size: 30rpx;
   font-weight: 600;
@@ -73,6 +69,10 @@
   font-size: 24rpx;
   color: #666;
   margin-top: 8rpx;
+  line-height: 1.45;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .goods-item .item-time.venue-distance {

@@ -1,11 +1,12 @@
 <view class="home-container">
+  <lottie-loading visible="{{courseLoadingVisible}}" />
   <view class="header-wrapper">
     <header showLocationButton="{{true}}" />
   </view>
   <scroll-view class="content-scroll" scroll-y="true" style="margin-top: {{headerHeight}}px; height: {{contentHeight}}px;">
     <view class="content-wrapper">
       <desc-container />
-      <goods />
+      <goods bind:courseloading="onCourseLoading" />
       <view style="height: {{placeholderHeight}}px;"></view>
     </view>
   </scroll-view>

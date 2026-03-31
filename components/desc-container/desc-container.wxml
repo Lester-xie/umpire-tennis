@@ -1,21 +1,24 @@
 <view class="desc-root">
   <view class="desc-measure">
-    <view
-      class="desc-container"
-      style="width: {{descWidth}}px; height: {{descHeight}}px;"
-    >
-      <image
-        class="desc"
-        src="/assets/images/header-bg2.jpg"
-        mode="aspectFit"
-        style="width: {{descWidth}}px; height: {{descHeight}}px;"
-      ></image>
-      <image
-        class="svg-icon tennis"
-        src="/assets/images/tennis.svg"
-        mode="aspectFit"
-        style="transform: translate({{tennisX}}px, {{tennisY}}px) rotate({{tennisRotate}}deg);"
-      ></image>
-    </view>
+    <card>
+      <view class="desc-container">
+        <image
+          class="desc"
+          src="/assets/images/header-bg2.jpg"
+          mode="aspectFit"
+        ></image>
+        <image
+          class="svg-icon tennis"
+          src="/assets/images/tennis.svg"
+          mode="aspectFit"
+          style="transform: translate({{tennisX}}px, {{tennisY}}px) rotate({{tennisRotate}}deg);"
+        ></image>
+        <image
+          class="logo"
+          src="/assets/images/logo2.png"
+          mode="aspectFit"
+        ></image>
+      </view>
+    </card>
   </view>
 </view>

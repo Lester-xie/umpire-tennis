@@ -7,6 +7,9 @@
   border-radius: 28rpx;
   border: 2rpx solid #134E35;
   background: #fff;
+  overflow: hidden;
+  padding: 0;
+  line-height: 0;
 }
 .card-bg {
   position: absolute;

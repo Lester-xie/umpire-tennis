@@ -3,6 +3,7 @@
   "usingComponents": {
     "header": "/components/header/header",
     "desc-container": "/components/desc-container/desc-container",
-    "goods": "/components/goods/goods"
+    "goods": "/components/goods/goods",
+    "lottie-loading": "/components/lottie-loading/index"
   }
 }

@@ -117,6 +117,7 @@ Component({
         });
         return;
       }
+      this.triggerEvent('courseloading', { loading: true });
       getCourses(categoryId)
         .then(({ data, scaleById, categoryById }) =>
           resolveCourseImages(data || []).then((rows) => ({ rows, scaleById, categoryById })),
@@ -154,6 +155,9 @@ Component({
         .catch((err) => {
           console.warn('getCourses failed', err);
           this.setData({ goods: [], courseLoaded: true, goodsEmptyHint: '' });
+        })
+        .then(() => {
+          this.triggerEvent('courseloading', { loading: false });
         });
     },
 

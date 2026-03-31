@@ -3,8 +3,14 @@ Page({
     headerHeight: 0, // header 高度
     contentHeight: 400,
     placeholderHeight: 0,
+    courseLoadingVisible: false,
   },
   onLoad() {},
+
+  onCourseLoading(e) {
+    const loading = e.detail && e.detail.loading;
+    this.setData({ courseLoadingVisible: !!loading });
+  },
   onReady() {
     // 页面渲染完成后计算 header 高度（只计算 title 部分）
     this.calculateHeaderHeight();
