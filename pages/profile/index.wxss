@@ -216,15 +216,9 @@
 }
 
 .profile-menu-icon {
-  width: 48rpx;
-  height: 48rpx;
+  width: 44rpx;
+  height: 44rpx;
   margin-right: 24rpx;
-  border-radius: 14rpx;
-  background: rgba(19, 78, 53, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
 }
 
 .profile-menu-icon-text {
@@ -238,7 +232,7 @@
   flex: 1;
   font-size: 30rpx;
   font-weight: 500;
-  color: #1a1a1a;
+  color: #134e35;
 }
 
 .profile-menu-sep {

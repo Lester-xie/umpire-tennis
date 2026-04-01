@@ -31,7 +31,7 @@
           <image
             wx:else
             class="profile-avatar profile-avatar--placeholder"
-            src="/assets/images/profile-icon.svg"
+            src="/assets/images/profile/profile-icon.svg"
             mode="aspectFit"
           />
           <button
@@ -69,43 +69,43 @@
       <view class="profile-menu-card">
         <block wx:if="{{isCoach || isManager}}">
           <view  class="profile-menu-item" bindtap="handleCoachBookCourt" hover-class="profile-menu-item--hover">
-            <view class="profile-menu-icon"><text class="profile-menu-icon-text">订</text></view>
+            <image src="/assets/images/profile/profile-booking.svg" class="profile-menu-icon" mode="aspectFit" />
             <text class="profile-menu-label">预约场地</text>
             <view class="profile-menu-sep" />
-            <image src="/assets/images/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
+            <image src="/assets/images/profile/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
+          </view>
+          <view class="profile-menu-divider" />
+        </block>
+        <block wx:if="{{isCoach}}">
+          <view class="profile-menu-item" bindtap="goCoachHolds" hover-class="profile-menu-item--hover">
+            <image src="/assets/images/profile/profile-lock.svg" class="profile-menu-icon" mode="aspectFit" />
+            <text class="profile-menu-label">我的场地占用</text>
+            <view class="profile-menu-sep" />
+            <image src="/assets/images/profile/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
           </view>
           <view class="profile-menu-divider" />
         </block>
         <view class="profile-menu-item" bindtap="goCourtOrders" hover-class="profile-menu-item--hover">
-          <view class="profile-menu-icon"><text class="profile-menu-icon-text">订</text></view>
+          <image src="/assets/images/profile/profile-history.svg" class="profile-menu-icon" mode="aspectFit" />
           <text class="profile-menu-label">订场历史</text>
           <view class="profile-menu-sep" />
-          <image src="/assets/images/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
+          <image src="/assets/images/profile/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
         </view>
         <view class="profile-menu-divider" />
         <view class="profile-menu-item" bindtap="goGoodsOrders" hover-class="profile-menu-item--hover">
-          <view class="profile-menu-icon"><text class="profile-menu-icon-text">课</text></view>
+          <image src="/assets/images/profile/profile-list.svg" class="profile-menu-icon" mode="aspectFit" />
           <text class="profile-menu-label">课程订单</text>
           <view class="profile-menu-sep" />
-          <image src="/assets/images/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
+          <image src="/assets/images/profile/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
         </view>
         <view class="profile-menu-divider" />
         <view class="profile-menu-item" bindtap="goCourseHours" hover-class="profile-menu-item--hover">
-          <view class="profile-menu-icon"><text class="profile-menu-icon-text">时</text></view>
+          <image src="/assets/images/profile/profile-mine.svg" class="profile-menu-icon" mode="aspectFit" />
           <text class="profile-menu-label">我的课时</text>
           <view class="profile-menu-sep" />
-          <image src="/assets/images/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
+          <image src="/assets/images/profile/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
         </view>
         <view class="profile-menu-divider" />
-        <block wx:if="{{isCoach}}">
-          <view class="profile-menu-item" bindtap="goCoachHolds" hover-class="profile-menu-item--hover">
-            <view class="profile-menu-icon"><text class="profile-menu-icon-text">场</text></view>
-            <text class="profile-menu-label">我的场地占用</text>
-            <view class="profile-menu-sep" />
-            <image src="/assets/images/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
-          </view>
-          <view class="profile-menu-divider" />
-        </block>
       </view>
 
       <view class="profile-footer-space" style="height: {{placeholderHeight}}px;"></view>
