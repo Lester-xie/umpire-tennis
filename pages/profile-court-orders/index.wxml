@@ -15,10 +15,21 @@
         <view class="section-list" wx:if="{{courtOrders.length > 0}}">
           <view class="list-item court-item" wx:for="{{courtOrders}}" wx:key="_id">
             <view class="item-main">
-              <view class="item-date">{{item.formattedDate}}</view>
+              <view class="item-date-row">
+                <text class="item-date">{{item.formattedDate}}</text>
+                <text class="item-status" wx:if="{{item.statusLabel}}">{{item.statusLabel}}</text>
+              </view>
               <view class="item-summary">{{item.displaySummary}}</view>
             </view>
-            <view class="item-price">¥ {{item.totalPrice}}</view>
+            <view class="item-right">
+              <view class="item-price">¥ {{item.totalPrice}}</view>
+              <view
+                wx:if="{{item.showCancelBooking}}"
+                class="court-order-cancel"
+                data-bookingid="{{item._id}}"
+                catchtap="handleCancelBooking"
+              >取消订单</view>
+            </view>
           </view>
         </view>
         <view class="empty-tip" wx:else>

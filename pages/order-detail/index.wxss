@@ -20,6 +20,7 @@
   padding: 32rpx;
   display: flex;
   flex-direction: column;
+  line-height: normal;
 }
 
 /* 商品订单 */
@@ -389,10 +390,6 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-.fee-item.total {
-  padding-top: 24rpx;
-  border-top: 2rpx solid #F0F0F0;
 }
 .fee-label {
   font-size: 28rpx;

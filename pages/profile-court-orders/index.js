@@ -1,4 +1,4 @@
-const { getMyBookings } = require('../../api/tennisDb');
+const { getMyBookings, cancelMemberBooking } = require('../../api/tennisDb');
 const { buildCourtOrderDisplay } = require('../../utils/profileHistoryHelpers');
 
 Page({
@@ -62,7 +62,7 @@ Page({
     let courtOrders = [];
     this.beginLoading('加载订单中');
     try {
-      const cloudRes = await getMyBookings();
+      const cloudRes = await getMyBookings({ includePending: true });
       const raw =
         cloudRes && cloudRes.result && Array.isArray(cloudRes.result.data)
           ? cloudRes.result.data
@@ -74,6 +74,37 @@ Page({
       this.endLoading();
     }
     this.setData({ courtOrders });
+  },
+
+  handleCancelBooking(e) {
+    const bookingId = e.currentTarget.dataset.bookingid;
+    if (!bookingId) return;
+    wx.showModal({
+      title: '取消订单',
+      content:
+        '确定取消该订单？已支付的金额将原路退回微信，已使用的课时将退回账户。距场次开始不足 6 小时时无法在线取消。',
+      confirmText: '确定取消',
+      confirmColor: '#c62828',
+      success: async (res) => {
+        if (!res.confirm) return;
+        this.beginLoading('处理中');
+        try {
+          const cloudRes = await cancelMemberBooking({ bookingId });
+          const r = (cloudRes && cloudRes.result) || {};
+          this.endLoading();
+          if (!r.ok) {
+            wx.showToast({ title: r.errMsg || '取消失败', icon: 'none' });
+            return;
+          }
+          wx.showToast({ title: '已取消', icon: 'success' });
+          this.loadCourtOrders();
+        } catch (err) {
+          this.endLoading();
+          console.error('cancelMemberBooking', err);
+          wx.showToast({ title: '网络异常', icon: 'none' });
+        }
+      },
+    });
   },
 
   onUnload() {

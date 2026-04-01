@@ -13,7 +13,7 @@
     <view class="content-wrapper">
       <view class="card section-card" wx:if="{{isCoach || isManager}}">
         <view class="section-list" wx:if="{{coachHolds.length > 0}}">
-          <view class="list-item coach-hold-item" wx:for="{{coachHolds}}" wx:key="_id">
+          <view class="list-item coach-hold-item" wx:for="{{coachHolds}}" wx:key="listKey">
             <view class="item-main">
               <view class="coach-hold-line coach-hold-line--strong">{{item.displayDate}} {{item.timeRange}}</view>
               <view class="coach-hold-line">{{item.venueLine}} · {{item.courtLabel}}</view>
@@ -21,7 +21,7 @@
             </view>
             <view
               class="coach-hold-cancel"
-              data-holdid="{{item._id}}"
+              data-holdids="{{item.cancelHoldIdsStr}}"
               catchtap="handleCancelCoachHold"
             >取消</view>
           </view>

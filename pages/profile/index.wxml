@@ -1,90 +1,114 @@
-<view class="profile-container">
+<view class="profile-page">
   <lottie-loading visible="{{lottieLoadingVisible}}" />
+
   <view class="header-wrapper">
     <header
+      title="账户"
       showSwitchAccountButton="{{isLoggedIn && userPhone}}"
       bind:switchaccount="onSwitchAccount"
     />
   </view>
+
   <scroll-view
-    class="content-scroll"
+    class="profile-scroll"
     scroll-y="true"
     enhanced="{{true}}"
     show-scrollbar="{{false}}"
     style="margin-top: {{headerHeight}}px; height: {{contentHeight}}px;"
   >
-    <view class="content-wrapper">
-      <!-- 用户信息卡片 -->
-      <view class="card user-card" bindtap="handleUserCardTap">
-        <view class="user-avatar-wrapper">
+    <view class="profile-body">
+      <!-- 头像区：居中 + 装饰 -->
+      <view class="profile-hero">
+        <view class="profile-hero-deco profile-hero-deco--l">✦</view>
+        <view class="profile-hero-deco profile-hero-deco--r">✧</view>
+        <view class="profile-avatar-wrap" bindtap="handleUserCardTap">
           <image
             wx:if="{{isLoggedIn}}"
-            class="user-avatar"
+            class="profile-avatar"
             src="{{ userAvatar || '/assets/images/default-avatar.jpg'}}"
             mode="aspectFill"
-          ></image>
+          />
           <image
             wx:else
-            class="user-avatar"
-            src="/assets/images/tab-bar-user-active.svg"
+            class="profile-avatar profile-avatar--placeholder"
+            src="/assets/images/profile-icon.svg"
             mode="aspectFit"
-          ></image>
+          />
+          <button
+            wx:if="{{!isLoggedIn}}"
+            class="profile-avatar-auth-btn"
+            open-type="getPhoneNumber"
+            bindgetphonenumber="onPhoneRegister"
+          />
         </view>
-        <view class="user-info">
-          <view class="user-name">{{userDisplayName}}</view>
-          <view class="user-desc-row">
-            <view class="user-desc">{{isLoggedIn ? (userPhone || '欢迎使用昂湃网球') : '登录后查看订场与团购记录'}}</view>
-          </view>
-        </view>
-        <view wx:if="{{userIdentity}}" class="user-identity-wrapper">
-          <view class="user-identity">{{userIdentity}}</view>
-        </view>
-        <view class="user-arrow" wx:if="{{!isLoggedIn}}">
-          <image class="arrow-icon" src="/assets/images/arrow.svg" mode="aspectFit"></image>
-        </view>
-
-        <!-- 未登录时：用透明按钮覆盖整个用户卡片，点击直接触发 getPhoneNumber -->
-        <button
-          wx:if="{{!isLoggedIn}}"
-          class="user-card-auth-btn"
-          open-type="getPhoneNumber"
-          bindgetphonenumber="onPhoneRegister"
-        ></button>
-      </view>
-      <view class="booking-court-wrapper" wx:if="{{isCoach || isManager}}">
-        <view class="coach-book-card card">
-          <view class="coach-book-desc">选择时段并填写用途后，该场地时段将对会员显示为已占用，无法预订。</view>
-          <view class="coach-book-btn" bindtap="handleCoachBookCourt">预约场地</view>
-        </view>
+        <view class="profile-name">{{userDisplayName}}</view>
+        <view wx:if="{{userIdentity}}" class="profile-badge">{{userIdentity}}</view>
       </view>
 
-      <view class="card menu-card">
-        <!-- 仅教练可见；管理员不展示「我的场地占用」 -->
-        <block wx:if="{{isCoach}}">
-          <view class="menu-row" bindtap="goCoachHolds">
-            <text class="menu-title">我的场地占用</text>
-            <image class="menu-arrow" src="/assets/images/arrow.svg" mode="aspectFit"></image>
+      <!-- 奖励/课时卡片 -->
+      <view class="profile-reward-section">
+        <card>
+          <view class="profile-reward-card">
+            <view class="profile-reward-icon-wrap">
+              <text class="profile-reward-icon-star">★</text>
+            </view>
+            <view class="profile-reward-text">
+              <text class="profile-reward-label">剩余课时</text>
+              <view class="profile-reward-value-row">
+                <text class="profile-reward-star">★</text>
+                <text class="profile-reward-num">{{isLoggedIn ? totalCourseHoursText : '—'}}</text>
+                <text class="profile-reward-unit" wx:if="{{isLoggedIn}}">小时</text>
+              </view>
+            </view>
+            <view class="profile-reward-btn" bindtap="handleRedeemTap">查看</view>
           </view>
-          <view class="menu-divider"></view>
+        </card>
+      </view>
+
+      <!-- 菜单列表 -->
+      <view class="profile-menu-card">
+        <block wx:if="{{isCoach || isManager}}">
+          <view  class="profile-menu-item" bindtap="handleCoachBookCourt" hover-class="profile-menu-item--hover">
+            <view class="profile-menu-icon"><text class="profile-menu-icon-text">订</text></view>
+            <text class="profile-menu-label">预约场地</text>
+            <view class="profile-menu-sep" />
+            <image src="/assets/images/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
+          </view>
+          <view class="profile-menu-divider" />
         </block>
-        <view class="menu-row" bindtap="goCourtOrders">
-          <text class="menu-title">订场历史</text>
-          <image class="menu-arrow" src="/assets/images/arrow.svg" mode="aspectFit"></image>
+        <view class="profile-menu-item" bindtap="goCourtOrders" hover-class="profile-menu-item--hover">
+          <view class="profile-menu-icon"><text class="profile-menu-icon-text">订</text></view>
+          <text class="profile-menu-label">订场历史</text>
+          <view class="profile-menu-sep" />
+          <image src="/assets/images/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
         </view>
-        <view class="menu-divider"></view>
-        <view class="menu-row" bindtap="goGoodsOrders">
-          <text class="menu-title">课程订单</text>
-          <image class="menu-arrow" src="/assets/images/arrow.svg" mode="aspectFit"></image>
+        <view class="profile-menu-divider" />
+        <view class="profile-menu-item" bindtap="goGoodsOrders" hover-class="profile-menu-item--hover">
+          <view class="profile-menu-icon"><text class="profile-menu-icon-text">课</text></view>
+          <text class="profile-menu-label">课程订单</text>
+          <view class="profile-menu-sep" />
+          <image src="/assets/images/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
         </view>
-        <view class="menu-divider"></view>
-        <view class="menu-row" bindtap="goCourseHours">
-          <text class="menu-title">我的课时</text>
-          <image class="menu-arrow" src="/assets/images/arrow.svg" mode="aspectFit"></image>
+        <view class="profile-menu-divider" />
+        <view class="profile-menu-item" bindtap="goCourseHours" hover-class="profile-menu-item--hover">
+          <view class="profile-menu-icon"><text class="profile-menu-icon-text">时</text></view>
+          <text class="profile-menu-label">我的课时</text>
+          <view class="profile-menu-sep" />
+          <image src="/assets/images/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
         </view>
+        <view class="profile-menu-divider" />
+        <block wx:if="{{isCoach}}">
+          <view class="profile-menu-item" bindtap="goCoachHolds" hover-class="profile-menu-item--hover">
+            <view class="profile-menu-icon"><text class="profile-menu-icon-text">场</text></view>
+            <text class="profile-menu-label">我的场地占用</text>
+            <view class="profile-menu-sep" />
+            <image src="/assets/images/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
+          </view>
+          <view class="profile-menu-divider" />
+        </block>
       </view>
 
-      <view class="placeholder" style="height: {{placeholderHeight}}px;"></view>
+      <view class="profile-footer-space" style="height: {{placeholderHeight}}px;"></view>
     </view>
   </scroll-view>
-
 </view>

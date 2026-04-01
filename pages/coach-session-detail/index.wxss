@@ -61,6 +61,7 @@
 .section {
   border-radius: 28rpx;
   padding: 28rpx 32rpx;
+  line-height: normal;
 }
 
 .section-title {

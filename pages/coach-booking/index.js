@@ -28,6 +28,78 @@ const {
   buildUpdateCoachHoldsPayload,
 } = require('../../utils/coachHoldPayload');
 
+/** 每格 1 小时；团课至少 2 小时 */
+const GROUP_LESSON_MIN_SLOTS = 2;
+
+/**
+ * 团课：时段须在同一场地，且 slotIndex 连续，总时长 ≥2 小时。
+ * @param {{ courtId: number, slotIndex: number }[]} slots
+ * @returns {{ ok: boolean, errMsg?: string }}
+ */
+function validateGroupLessonSlots(slots) {
+  const list = Array.isArray(slots) ? slots : [];
+  if (list.length < GROUP_LESSON_MIN_SLOTS) {
+    return { ok: false, errMsg: '团课至少选择连续 2 小时' };
+  }
+  const byCourt = new Map();
+  list.forEach((s) => {
+    const cid = Number(s.courtId);
+    const idx = Number(s.slotIndex);
+    if (!Number.isFinite(cid) || !Number.isFinite(idx)) return;
+    if (!byCourt.has(cid)) byCourt.set(cid, new Set());
+    byCourt.get(cid).add(idx);
+  });
+  if (byCourt.size !== 1) {
+    return { ok: false, errMsg: '团课需在同一场地选择时段' };
+  }
+  const indices = [...byCourt.values()][0];
+  const sorted = [...indices].sort((a, b) => a - b);
+  if (sorted.length < GROUP_LESSON_MIN_SLOTS) {
+    return { ok: false, errMsg: '团课至少选择连续 2 小时' };
+  }
+  for (let i = 1; i < sorted.length; i += 1) {
+    if (sorted[i] !== sorted[i - 1] + 1) {
+      return { ok: false, errMsg: '团课需选择连续的时间段' };
+    }
+  }
+  return { ok: true };
+}
+
+/**
+ * 根据 coachHoldMeta 解析 editingHoldIds 对应的场地格子（用于编辑用途时校验团课）
+ * @returns {{ courtId: number, slotIndex: number }[]}
+ */
+function collectSlotPairsForCoachHoldIds(coachHoldMeta, editingHoldIds) {
+  const want = new Set(
+    (Array.isArray(editingHoldIds) ? editingHoldIds : [])
+      .map((id) => String(id || '').trim())
+      .filter(Boolean)
+  );
+  if (want.size === 0) return [];
+  const pairSet = new Set();
+  const pairs = [];
+  Object.keys(coachHoldMeta || {}).forEach((k) => {
+    const m = coachHoldMeta[k];
+    if (!m) return;
+    const hid = m.holdId != null ? String(m.holdId).trim() : '';
+    const sessionIds = Array.isArray(m.sessionHoldIds) ? m.sessionHoldIds : [];
+    const match =
+      (hid && want.has(hid)) ||
+      sessionIds.some((x) => want.has(String(x || '').trim()));
+    if (!match) return;
+    const parts = k.split('-');
+    const courtId = Number(parts[0]);
+    const slotIndex = Number(parts[1]);
+    if (!Number.isFinite(courtId) || !Number.isFinite(slotIndex)) return;
+    const key = `${courtId}-${slotIndex}`;
+    if (pairSet.has(key)) return;
+    pairSet.add(key);
+    pairs.push({ courtId, slotIndex });
+  });
+  pairs.sort((a, b) => a.courtId - b.courtId || a.slotIndex - b.slotIndex);
+  return pairs;
+}
+
 Page({
   data: {
     dateList: [], // 日期列表
@@ -548,7 +620,29 @@ Page({
   },
 
   confirmPurposeSheet() {
-    if (this.data.purposeSheetMode === 'edit') {
+    const { lessonType, purposeSheetMode, purposeOnlyOpenPlay } = this.data;
+    if (lessonType === 'group' && !purposeOnlyOpenPlay) {
+      let check;
+      if (purposeSheetMode === 'edit') {
+        const pairs = collectSlotPairsForCoachHoldIds(
+          this.coachHoldMeta,
+          this.data.editingHoldIds
+        );
+        const hasIds = (this.data.editingHoldIds || []).length > 0;
+        if (hasIds && pairs.length === 0) {
+          check = { ok: false, errMsg: '无法识别占用时段，请刷新后重试' };
+        } else {
+          check = validateGroupLessonSlots(pairs);
+        }
+      } else {
+        check = validateGroupLessonSlots(this.data.selectedSlots);
+      }
+      if (!check.ok) {
+        wx.showToast({ title: check.errMsg || '团课时段不符合要求', icon: 'none' });
+        return;
+      }
+    }
+    if (purposeSheetMode === 'edit') {
       this.submitCoachHoldEdit();
     } else {
       this.submitCoachHold();

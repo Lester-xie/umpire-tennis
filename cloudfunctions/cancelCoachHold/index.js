@@ -1,9 +1,71 @@
+const crypto = require('crypto');
 const cloud = require('wx-server-sdk');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
 const _ = db.command;
+
+function generateRandomString(length = 32) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = crypto.randomBytes(length);
+  let out = '';
+  for (let i = 0; i < length; i += 1) {
+    out += chars[bytes[i] % chars.length];
+  }
+  return out;
+}
+
+/**
+ * 教练取消场次：已微信支付部分原路退回（与会员取消一致）
+ */
+async function refundWeChatPortionForBooking(bookingDoc, bookingId, now) {
+  const totalFee = Math.floor(Number(bookingDoc.totalFee) || 0);
+  if (totalFee <= 0) return { ok: true, skipped: true };
+  if (String(bookingDoc.refundStatus || '') === 'success') return { ok: true, skipped: true };
+  const outTradeNo = String(bookingDoc.outTradeNo || '').trim();
+  if (!outTradeNo) {
+    return { ok: false, errMsg: '订单缺少商户单号，无法原路退款' };
+  }
+  const subMchId = process.env.subMchId;
+  if (!subMchId) {
+    return { ok: false, errMsg: '服务端未配置 subMchId，无法退款' };
+  }
+  const outRefundNo = `rc${Date.now()}${crypto.randomBytes(4).toString('hex')}`.slice(0, 32);
+  try {
+    const res = await cloud.cloudPay.refund({
+      outTradeNo,
+      outRefundNo,
+      totalFee,
+      refundFee: totalFee,
+      subMchId,
+      nonceStr: generateRandomString(32),
+      refundDesc: '教练取消场次退款',
+    });
+    const refundOk = res.returnCode === 'SUCCESS' || res.resultCode === 'SUCCESS';
+    if (!refundOk) {
+      return {
+        ok: false,
+        errMsg: res.returnMsg || res.errMsg || res.errmsg || res.return_msg || '微信退款失败',
+      };
+    }
+    await db
+      .collection('db_booking')
+      .doc(bookingId)
+      .update({
+        data: {
+          refundStatus: 'success',
+          outRefundNo,
+          refundedAt: now,
+          updatedAt: now,
+        },
+      });
+    return { ok: true };
+  } catch (err) {
+    console.error('refundWeChatPortionForBooking', err);
+    return { ok: false, errMsg: err.message || '退款异常' };
+  }
+}
 
 function normalizeOrderDate(raw) {
   const s = String(raw || '').trim();
@@ -206,7 +268,14 @@ exports.main = async (event) => {
       const bid = b._id;
       const st = String(b.status || '');
       if (st === 'paid') {
-        const deduct = Math.floor(Number(b.coachCourseHoursDeduct) || 0);
+        const rf = await refundWeChatPortionForBooking(b, bid, now);
+        if (!rf.ok && !rf.skipped) {
+          return { ok: false, errMsg: rf.errMsg || '退款失败，已中止取消' };
+        }
+        let deduct = Math.floor(Number(b.coachCourseHoursDeduct) || 0);
+        if (deduct <= 0 && String(b.paymentMethod || '').trim() === 'course_hours') {
+          deduct = Array.isArray(b.bookedSlots) ? b.bookedSlots.length : 0;
+        }
         if (deduct > 0) {
           const phone = String(b.phone || '').trim();
           const lessonKey = String(b.lessonKey || '').trim();

@@ -10,6 +10,7 @@ const {
   getUserByPhone,
   createUser,
   decryptPhoneNumber,
+  listAllMemberCourseHours,
   DEFAULT_USER_AVATAR,
 } = require('../../api/tennisDb');
 
@@ -62,6 +63,9 @@ Page({
     isManager: false, // db_user.isManager（畅打占用等）
     userIdentity: '', // 教练 | VIP | ''
     lottieLoadingVisible: false,
+    /** 全部场馆剩余课时合计（展示在账户卡片） */
+    totalCourseHours: 0,
+    totalCourseHoursText: '—',
   },
   _loadingTaskCount: 0,
 
@@ -99,6 +103,14 @@ Page({
         isManager = flags.isManager;
       }
       const userIdentity = buildUserIdentity(isCoach, isVip);
+      let totalCourseHours = 0;
+      if (isLoggedIn && userPhone) {
+        totalCourseHours = await this.fetchTotalCourseHoursSum();
+      }
+      const totalCourseHoursText =
+        isLoggedIn && userPhone
+          ? this.formatHoursNumber(totalCourseHours)
+          : '—';
       this.setData({
         isLoggedIn,
         userAvatar,
@@ -110,6 +122,8 @@ Page({
         isCoach,
         isManager,
         userIdentity,
+        totalCourseHours,
+        totalCourseHoursText,
       });
     } finally {
       if (firstVisit) {
@@ -120,6 +134,29 @@ Page({
         }
         this.endLoading();
       }
+    }
+  },
+
+  formatHoursNumber(n) {
+    const x = Number(n) || 0;
+    if (Number.isInteger(x) || Math.abs(x - Math.round(x)) < 1e-6) {
+      return String(Math.round(x));
+    }
+    return x.toFixed(1);
+  },
+
+  async fetchTotalCourseHoursSum() {
+    try {
+      const res = await listAllMemberCourseHours();
+      const rows = (res && res.result && Array.isArray(res.result.data)) ? res.result.data : [];
+      let sum = 0;
+      rows.forEach((r) => {
+        sum += Number(r.hours) || 0;
+      });
+      return sum;
+    } catch (e) {
+      console.warn('fetchTotalCourseHoursSum', e);
+      return 0;
     }
   },
 
@@ -148,7 +185,7 @@ Page({
 
   calculateHeaderHeight() {
     const query = wx.createSelectorQuery();
-    query.select('.header').boundingClientRect();
+    query.select('.header-wrapper').boundingClientRect();
     query.exec((res) => {
       const headerRect = res[0];
       if (headerRect && headerRect.height > 0) {
@@ -165,7 +202,7 @@ Page({
     const windowInfo = wx.getWindowInfo();
     const windowHeight = windowInfo.windowHeight;
     const query = wx.createSelectorQuery();
-    query.select('.header').boundingClientRect();
+    query.select('.header-wrapper').boundingClientRect();
     query.select('.tab-bar').boundingClientRect();
     query.exec((res) => {
       const headerRect = res[0];
@@ -272,6 +309,7 @@ Page({
         const isVip = !!user.isVip;
         const isCoach = !!user.isCoach;
         const isManager = !!user.isManager;
+        const totalCourseHours = await this.fetchTotalCourseHoursSum();
         this.setData({
           isLoggedIn: true,
           userAvatar: resolvedAvatar,
@@ -283,6 +321,8 @@ Page({
           isCoach,
           isManager,
           userIdentity: buildUserIdentity(isCoach, isVip),
+          totalCourseHours,
+          totalCourseHoursText: this.formatHoursNumber(totalCourseHours),
         });
 
         this.endLoading();
@@ -311,6 +351,8 @@ Page({
         isCoach: false,
         isManager: false,
         userIdentity: '',
+        totalCourseHours: 0,
+        totalCourseHoursText: '0',
       });
 
       // wx.navigateTo({ url: '/pages/complete-profile/index' });
@@ -339,11 +381,19 @@ Page({
     }
   },
 
-  // 点击用户卡片：已登录则进入完善资料
+  // 点击头像区域：已登录则进入完善资料
   handleUserCardTap() {
     if (this.data.isLoggedIn) {
       wx.navigateTo({ url: '/pages/complete-profile/index' });
     }
+  },
+
+  handleRedeemTap() {
+    if (!this.data.isLoggedIn) {
+      wx.showToast({ title: '请先登录', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({ url: '/pages/profile-course-hours/index' });
   },
 
   /** 教练或管理员：进入教练约场页（需已选场馆） */
@@ -400,6 +450,8 @@ Page({
           isCoach: false,
           isManager: false,
           userIdentity: '',
+          totalCourseHours: 0,
+          totalCourseHoursText: '—',
         });
       },
     });

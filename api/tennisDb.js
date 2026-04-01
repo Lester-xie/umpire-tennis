@@ -113,13 +113,30 @@ function updateUserByPhone({ phone, update } = {}) {
 }
 
 /**
- * 当前登录用户已支付订场记录：以本地手机号查询 db_booking（云函数校验 db_user 与当前微信绑定）。
+ * 当前登录用户订场记录：以本地手机号查询 db_booking（云函数校验 db_user 与当前微信绑定）。
+ * @param {{ includePending?: boolean }} [options] includePending 为 true 时含待支付/确认中
  */
-function getMyBookings() {
+function getMyBookings(options) {
   const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  const includePending = !!(options && options.includePending);
   return wx.cloud.callFunction({
     name: 'listBookings',
-    data: { phone },
+    data: { phone, ...(includePending ? { includePending: true } : {}) },
+  });
+}
+
+/**
+ * 会员取消订场/教练课：首场开始前满 6 小时可取消；已付原路退微信、退课时（云函数内校验）
+ * @param {{ bookingId: string }} payload
+ */
+function cancelMemberBooking(payload) {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'cancelMemberBooking',
+    data: {
+      ...(payload || {}),
+      phone,
+    },
   });
 }
 
@@ -227,6 +244,7 @@ module.exports = {
   decryptPhoneNumber,
   updateUserByPhone,
   getMyBookings,
+  cancelMemberBooking,
   listCoursePurchases,
   listMemberCourseHours,
   listAllMemberCourseHours,

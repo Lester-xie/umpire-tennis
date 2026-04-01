@@ -1,4 +1,4 @@
-.profile-container {
+.profile-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -16,267 +16,253 @@
   box-sizing: border-box;
 }
 
-.content-scroll {
+/* 滚动区 */
+.profile-scroll {
   flex: 1;
   width: 100%;
 }
 
-.content-wrapper {
-  padding: 32rpx;
+.profile-body {
+  padding: 8rpx 32rpx 32rpx;
 }
 
-/* 卡片通用样式 */
-.card {
-  background-color: #fff;
-  border-radius: 28rpx;
-  padding: 32rpx;
-  margin-bottom: 32rpx;
-  box-shadow: 0 4rpx 24rpx rgba(0, 0, 0, 0.06);
-}
-
-/* 用户信息卡片 */
-.user-card {
-  display: flex;
-  align-items: center;
-  padding: 40rpx;
-  min-height: 160rpx;
+/* 头像英雄区 */
+.profile-hero {
   position: relative;
-}
-
-.user-avatar-wrapper {
-  width: 112rpx;
-  height: 112rpx;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #F2F6F3 0%, #E8EFEB 100%);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  overflow: hidden;
+  padding: 24rpx 0 40rpx;
 }
 
-.user-avatar {
-  width: 112rpx;
-  height: 112rpx;
-  border-radius: 50%;
-  box-sizing: border-box;
-  border: 4rpx solid #E8EFEB;
+.profile-hero-deco {
+  position: absolute;
+  top: 32rpx;
+  font-size: 36rpx;
+  color: #134e35;
+  opacity: 0.35;
+  pointer-events: none;
 }
 
-.user-info {
-  flex: 1;
-  margin-left: 32rpx;
-  min-width: 0;
+.profile-hero-deco--l {
+  left: 48rpx;
 }
 
-.user-name {
-  font-size: 34rpx;
-  font-weight: 600;
-  color: #134E35;
-  line-height: 1.3;
+.profile-hero-deco--r {
+  top: 80rpx;
+  right: 48rpx;
 }
 
-.user-desc-row {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  margin-top: 8rpx;
-  min-width: 0;
-}
-
-.user-desc {
-  flex: 1;
-  min-width: 0;
-  font-size: 26rpx;
-  color: #888;
-  line-height: 1.4;
-}
-
-.user-identity-wrapper {
-  flex-shrink: 0;
-  margin-left: 16rpx;
-  padding: 4rpx;
-  font-size: 32rpx;
-  color: #134E35;
-  background: #a1d3a2;
-  border: 2rpx solid #134E35;
-  border-radius: 12rpx;
-}
-
-.user-identity {
-  border: 1rpx solid #134E35;
-  padding: 4rpx 16rpx;
-  border-radius: 8rpx;
-}
-
-.user-vip-icon {
+.profile-icon {
+  width: 100rpx;
   height: 100rpx;
-  width: auto;
-  max-width: 176rpx;
-  flex-shrink: 0;
-  display: block;
-}
-
-.user-arrow {
-  padding: 16rpx;
-  flex-shrink: 0;
-}
-
-/* 未登录时，透明覆盖按钮：点击 user-card 直接触发 getPhoneNumber */
-.user-card-auth-btn {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background: transparent;
-  border: none;
-  border-radius: 28rpx;
-  padding: 0;
-  margin: 0;
+}
+
+.profile-avatar-wrap {
+  position: relative;
+  width: 176rpx;
+  height: 176rpx;
+  border-radius: 50%;
+  background: #fff;
+  border: 2rpx solid #134e35;
+  box-shadow: 0 8rpx 32rpx rgba(19, 78, 53, 0.12);
+  overflow: hidden;
+}
+
+.profile-avatar {
+  width: 176rpx;
+  height: 176rpx;
+  border-radius: 50%;
+}
+
+.profile-avatar--placeholder {
+  padding: 36rpx;
+  box-sizing: border-box;
+}
+
+.profile-avatar-auth-btn {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 176rpx !important;
+  height: 100%;
   opacity: 0;
   z-index: 2;
 }
 
-.booking-court-wrapper {
-  margin-bottom: 32rpx;
+.profile-name {
+  margin-top: 28rpx;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #134e35;
+  letter-spacing: 0.02em;
 }
 
-.coach-book-card {
-  padding: 36rpx 32rpx;
+.profile-badge {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: #134e35;
+  padding: 6rpx 20rpx;
+  background: rgba(19, 78, 53, 0.1);
+  border-radius: 999rpx;
 }
 
-.coach-book-desc {
-  font-size: 26rpx;
-  color: #666;
-  line-height: 1.5;
+/* 课时卡片：外层间距；内层由 card 组件提供描边与双层底 */
+/* card-bg 向右下错位 8rpx，需留出空隙，否则在 scroll-view 内易被裁剪 */
+.profile-reward-section {
   margin-bottom: 28rpx;
-}
-
-.coach-book-btn {
-  text-align: center;
-  padding: 22rpx 32rpx;
-  font-size: 28rpx;
-  font-weight: 600;
-  color: #fff;
-  background: linear-gradient(135deg, #134e35 0%, #1a6b4a 100%);
-  border-radius: 40rpx;
-  box-shadow: 0 8rpx 24rpx rgba(19, 78, 53, 0.28);
-}
-
-.arrow-icon {
-  width: 32rpx;
-  height: 32rpx;
-  transform: rotate(180deg);
-}
-
-.menu-card {
-  margin-bottom: 32rpx;
-  padding: 0;
-  overflow: hidden;
-}
-
-.menu-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 36rpx 32rpx;
-  min-height: 96rpx;
+  width: 100%;
+  padding-right: 8rpx;
+  padding-bottom: 8rpx;
   box-sizing: border-box;
 }
 
-.menu-row:active {
-  background: rgba(19, 78, 53, 0.06);
+.profile-reward-card {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 28rpx 28rpx 32rpx;
+  box-sizing: border-box;
+  line-height: normal;
 }
 
-.menu-title {
-  font-size: 30rpx;
-  font-weight: 500;
-  color: #134e35;
-}
-
-.menu-arrow {
-  width: 28rpx;
-  height: 28rpx;
-  flex-shrink: 0;
-  transform: rotate(180deg);
-  opacity: 0.45;
-}
-
-.menu-divider {
-  height: 2rpx;
-  margin: 0 32rpx;
-  background: #f0f0f0;
-}
-
-.placeholder {
-  width: 100%;
-}
-
-/* 登录提示弹窗 */
-.login-modal-mask {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+.profile-reward-icon-wrap {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 20rpx;
+  background: linear-gradient(145deg, #e8f5e9 0%, #c8e6c9 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  margin-right: 24rpx;
+  flex-shrink: 0;
 }
 
-.login-modal {
-  width: 560rpx;
-  background-color: #fff;
-  border-radius: 28rpx;
-  padding: 48rpx;
+.profile-reward-icon-star {
+  font-size: 44rpx;
+  color: #ffc107;
+  line-height: 1;
 }
 
-.login-modal-title {
-  font-size: 36rpx;
-  font-weight: 600;
-  color: #333;
-  text-align: center;
-  margin-bottom: 24rpx;
-}
-
-.login-modal-desc {
-  font-size: 30rpx;
-  color: #666;
-  text-align: center;
-  margin-bottom: 48rpx;
-  line-height: 1.5;
-}
-
-.login-modal-btns {
-  display: flex;
-  gap: 24rpx;
-}
-
-.login-modal-btn {
+.profile-reward-text {
   flex: 1;
-  padding: 24rpx;
-  text-align: center;
-  font-size: 30rpx;
-  border-radius: 20rpx;
-  border: none;
-  margin: 0;
+  min-width: 0;
 }
 
-.login-modal-btn::after {
-  border: none;
-}
-
-.login-modal-btn.cancel {
-  background-color: #F0F0F0;
+.profile-reward-label {
+  display: block;
+  font-size: 26rpx;
   color: #666;
+  margin-bottom: 8rpx;
 }
 
-.login-modal-btn.confirm {
-  background: linear-gradient(135deg, #134E35 0%, #1a6b4a 100%);
-  color: #fff;
+.profile-reward-value-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8rpx;
+}
+
+.profile-reward-star {
+  font-size: 28rpx;
+  color: #ffc107;
+}
+
+.profile-reward-num {
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #1a1a1a;
+  line-height: 1.1;
+}
+
+.profile-reward-unit {
+  font-size: 26rpx;
+  color: #888;
   font-weight: 500;
 }
 
+.profile-reward-btn {
+  flex-shrink: 0;
+  padding: 18rpx 36rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(180deg, #ff9f43 0%, #e67e22 100%);
+  border-radius: 999rpx;
+  box-shadow: 0 6rpx 20rpx rgba(230, 126, 34, 0.35);
+}
+
+.profile-reward-btn:active {
+  opacity: 0.92;
+}
+
+/* 菜单 */
+.profile-menu-card {
+  overflow: hidden;
+}
+
+.profile-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 32rpx 28rpx;
+  height: 100rpx;
+  box-sizing: border-box;
+}
+
+.profile-menu-item--hover {
+  background: rgba(19, 78, 53, 0.05);
+}
+
+.profile-menu-icon {
+  width: 48rpx;
+  height: 48rpx;
+  margin-right: 24rpx;
+  border-radius: 14rpx;
+  background: rgba(19, 78, 53, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.profile-menu-icon-text {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #134e35;
+  line-height: 1;
+}
+
+.profile-menu-label {
+  flex: 1;
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #1a1a1a;
+}
+
+.profile-menu-sep {
+  width: 2rpx;
+  height: 80rpx;
+  background: #134e35;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+  position: relative;
+  top: 12rpx;
+}
+
+.profile-menu-divider {
+  height: 2rpx;
+  margin-left: 28rpx;
+  background: #134e35;
+}
+
+.profile-footer-space {
+  width: 100%;
+}
+
+.profile-menu-arrow {
+  width: 28rpx;
+  height: 28rpx;
+  transform: rotate(180deg);
+}

@@ -1,0 +1,14 @@
+{
+  "name": "cancelMemberBooking",
+  "version": "1.0.0",
+  "description": "会员取消订场/教练课（6小时前、退款、退课时）",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

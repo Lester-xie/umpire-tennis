@@ -1,5 +1,5 @@
 const { listCoachHolds, cancelCoachHold, getUserByPhone } = require('../../api/tennisDb');
-const { buildCoachHoldRow } = require('../../utils/profileHistoryHelpers');
+const { mergeCoachHoldDisplayRows } = require('../../utils/profileHistoryHelpers');
 
 const STORAGE_KEYS = {
   userPhone: 'user_phone',
@@ -92,7 +92,7 @@ Page({
         cloudRes && cloudRes.result && Array.isArray(cloudRes.result.data)
           ? cloudRes.result.data
           : [];
-      const coachHolds = raw.map((row) => buildCoachHoldRow(row)).filter(Boolean);
+      const coachHolds = mergeCoachHoldDisplayRows(raw);
       this.setData({ coachHolds });
     } catch (e) {
       console.error('loadCoachHolds failed', e);
@@ -104,18 +104,28 @@ Page({
 
   handleCancelCoachHold(e) {
     if (!this.data.isCoach && !this.data.isManager) return;
-    const holdId = e.currentTarget.dataset.holdid;
-    if (!holdId) return;
+    const idsStr = e.currentTarget.dataset.holdids != null ? String(e.currentTarget.dataset.holdids) : '';
+    const holdIds = idsStr
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (holdIds.length === 0) return;
+    const multi = holdIds.length > 1;
     wx.showModal({
       title: '取消占用',
-      content: '取消后该时段将重新对会员开放预订。',
+      content: multi
+        ? '将取消该次占用的全部时段，取消后将重新对会员开放预订。若已有学员报名，相关订单将一并处理。'
+        : '取消后该时段将重新对会员开放预订。',
       confirmText: '取消占用',
       confirmColor: '#c62828',
       success: async (res) => {
         if (!res.confirm) return;
         this.beginLoading('处理中...');
         try {
-          const cloudRes = await cancelCoachHold({ holdId });
+          const cloudRes =
+            holdIds.length === 1
+              ? await cancelCoachHold({ holdId: holdIds[0] })
+              : await cancelCoachHold({ holdIds });
           const r = (cloudRes && cloudRes.result) || {};
           this.endLoading();
           if (!r.ok) {

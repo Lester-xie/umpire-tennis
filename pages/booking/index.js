@@ -54,6 +54,10 @@ Page({
   _realtimeRefreshTimer: null,
   /** watch 重连定时器 */
   _realtimeReconnectTimer: null,
+  /** onError 里 setTimeout(0) 延迟清理的 id，须在 onHide/onUnload 清除 */
+  _watchErrorDeferTimer: null,
+  /** 仅随 onHide/onUnload 递增，用于丢弃离开页面后的 watch 异步回调 */
+  _watchSessionGen: 0,
   /** loading lottie 动画实例 */
   loadingAnimation: null,
   /** loading 并发计数，避免多个请求互相提前关闭 */
@@ -102,10 +106,24 @@ Page({
   },
 
   onHide() {
+    this._watchSessionGen = (this._watchSessionGen || 0) + 1;
+    if (this._watchErrorDeferTimer) {
+      clearTimeout(this._watchErrorDeferTimer);
+      this._watchErrorDeferTimer = null;
+    }
+    if (this._realtimeReconnectTimer) {
+      clearTimeout(this._realtimeReconnectTimer);
+      this._realtimeReconnectTimer = null;
+    }
     this.stopRealtimeWatch();
   },
 
   onUnload() {
+    this._watchSessionGen = (this._watchSessionGen || 0) + 1;
+    if (this._watchErrorDeferTimer) {
+      clearTimeout(this._watchErrorDeferTimer);
+      this._watchErrorDeferTimer = null;
+    }
     this.stopRealtimeWatch();
     this.destroyLoadingAnimation();
     if (this._realtimeRefreshTimer) {
@@ -378,11 +396,12 @@ Page({
 
     this.stopRealtimeWatch();
     this._bookingSignalWatchKey = watchKey;
+    const sessionAtWatch = this._watchSessionGen;
     const db = wx.cloud.database();
     const venueIdNorm = String(venueId).trim();
     const dateNorm = normalizeDateForWatch(selectedDate);
 
-    this.bookingSignalWatcher = db
+    const watcher = db
       .collection('db_booking_realtime_signal')
       .where({
         venueId: venueIdNorm,
@@ -394,28 +413,44 @@ Page({
         },
         onError: (err) => {
           console.error('booking realtime watch error', err);
-          this.stopRealtimeWatch();
           if (this._realtimeReconnectTimer) {
             clearTimeout(this._realtimeReconnectTimer);
-          }
-          this._realtimeReconnectTimer = setTimeout(() => {
             this._realtimeReconnectTimer = null;
-            this.restartRealtimeWatch();
-          }, 1500);
+          }
+          // 勿在 onError 同步栈内立刻 close：易与 SDK 内部 initWatchFail 状态机冲突，报
+          // "current state (CLOSED) does not accept initWatchFail"
+          if (this._watchErrorDeferTimer) {
+            clearTimeout(this._watchErrorDeferTimer);
+          }
+          this._watchErrorDeferTimer = setTimeout(() => {
+            this._watchErrorDeferTimer = null;
+            if (sessionAtWatch !== this._watchSessionGen) return;
+            if (this.bookingSignalWatcher != null && this.bookingSignalWatcher !== watcher) {
+              return;
+            }
+            this.stopRealtimeWatch();
+            this._realtimeReconnectTimer = setTimeout(() => {
+              this._realtimeReconnectTimer = null;
+              if (sessionAtWatch !== this._watchSessionGen) return;
+              this.restartRealtimeWatch();
+            }, 1500);
+          }, 0);
         },
       });
+    this.bookingSignalWatcher = watcher;
   },
 
   stopRealtimeWatch() {
-    if (this.bookingSignalWatcher && this.bookingSignalWatcher.close) {
-      try {
-        this.bookingSignalWatcher.close();
-      } catch (e) {
-        console.warn('close booking realtime watch failed', e);
-      }
-    }
+    const w = this.bookingSignalWatcher;
     this.bookingSignalWatcher = null;
     this._bookingSignalWatchKey = '';
+    if (w && typeof w.close === 'function') {
+      try {
+        w.close();
+      } catch (e) {
+        // 已关闭或 SDK 内部已 teardown 时再 close 会抛错，忽略即可
+      }
+    }
   },
 
   handleRealtimeSignalChange() {

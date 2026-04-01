@@ -2,10 +2,16 @@
 .card {
   position: relative;
   width: 100%;
+  /* 形成堆叠上下文，避免子级 z-index:-1 沉到页面背景下方导致「底片」看不见 */
+  z-index: 0;
+  isolation: isolate;
+  overflow: visible;
 }
 .card-wrapper {
+  position: relative;
+  z-index: 1;
   border-radius: 28rpx;
-  border: 2rpx solid #134E35;
+  border: 2rpx solid #134e35;
   background: #fff;
   overflow: hidden;
   padding: 0;
@@ -13,13 +19,12 @@
 }
 .card-bg {
   position: absolute;
-  border: 2rpx solid #134E35;
+  z-index: 0;
+  border: 2rpx solid #134e35;
   border-radius: 28rpx;
   background: #fff;
-  z-index: 0;
   top: 8rpx;
   left: 8rpx;
   right: -8rpx;
   bottom: -8rpx;
-  z-index: -1;
 }
