@@ -80,7 +80,7 @@
       <view class="profile-menu-card">
         <block wx:if="{{isManager}}">
           <view class="profile-menu-item profile-menu-admin" bindtap="goAdminConsole" hover-class="profile-menu-item--hover">
-            <image src="/assets/images/profile/profile-list.svg" class="profile-menu-icon" mode="aspectFit" />
+            <image src="/assets/images/profile/profile-admin.svg" class="profile-menu-icon" mode="aspectFit" />
             <text class="profile-menu-label">管理后台</text>
             <view class="profile-menu-sep" />
             <image src="/assets/images/profile/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
@@ -91,15 +91,6 @@
           <view  class="profile-menu-item profile-menu-admin" bindtap="handleCoachBookCourt" hover-class="profile-menu-item--hover">
             <image src="/assets/images/profile/profile-booking.svg" class="profile-menu-icon" mode="aspectFit" />
             <text class="profile-menu-label">预约场地</text>
-            <view class="profile-menu-sep" />
-            <image src="/assets/images/profile/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
-          </view>
-          <view class="profile-menu-divider" />
-        </block>
-        <block wx:if="{{isCoach}}">
-          <view class="profile-menu-item profile-menu-admin" bindtap="goCoachHolds" hover-class="profile-menu-item--hover">
-            <image src="/assets/images/profile/profile-lock.svg" class="profile-menu-icon" mode="aspectFit" />
-            <text class="profile-menu-label">我的场地占用</text>
             <view class="profile-menu-sep" />
             <image src="/assets/images/profile/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
           </view>

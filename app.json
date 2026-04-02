@@ -8,7 +8,6 @@
     "pages/coach-session-detail/index",
     "pages/booking-success/index",
     "pages/profile/index",
-    "pages/profile-coach-holds/index",
     "pages/profile-court-orders/index",
     "pages/profile-goods-orders/index",
     "pages/profile-course-hours/index",

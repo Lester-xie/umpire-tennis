@@ -1,4 +1,4 @@
-/** 与云函数一致，用于和「我的场地占用」、接口返回的 orderDate 对齐 */
+/** 与云函数一致，用于和接口返回的 orderDate 对齐 */
 function normalizeOrderDateStr(d) {
   const s = String(d || '').trim();
   const parts = s.split('-');

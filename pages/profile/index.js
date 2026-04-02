@@ -236,11 +236,6 @@ Page({
     });
   },
 
-  goCoachHolds() {
-    if (!this.data.isCoach) return;
-    wx.navigateTo({ url: '/pages/profile-coach-holds/index' });
-  },
-
   goCourtOrders() {
     wx.navigateTo({ url: '/pages/profile-court-orders/index' });
   },
