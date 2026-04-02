@@ -99,13 +99,6 @@
           <image src="/assets/images/profile/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
         </view>
         <view class="profile-menu-divider" />
-        <view class="profile-menu-item" bindtap="goCourseHours" hover-class="profile-menu-item--hover">
-          <image src="/assets/images/profile/profile-mine.svg" class="profile-menu-icon" mode="aspectFit" />
-          <text class="profile-menu-label">我的课时</text>
-          <view class="profile-menu-sep" />
-          <image src="/assets/images/profile/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
-        </view>
-        <view class="profile-menu-divider" />
       </view>
 
       <view class="profile-footer-space" style="height: {{placeholderHeight}}px;"></view>

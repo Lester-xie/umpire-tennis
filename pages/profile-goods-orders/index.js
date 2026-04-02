@@ -1,7 +1,53 @@
-const { listCoursePurchases } = require('../../api/tennisDb');
+const { listCoursePurchases, getCourses } = require('../../api/tennisDb');
 const { formatGoodsOrderTime } = require('../../utils/profileHistoryHelpers');
+const { ALL_CATEGORY_ID } = require('../../utils/constants');
+const {
+  courseImageSource,
+  DEFAULT_GOODS_IMAGE,
+  indexDocsById,
+} = require('../../utils/courseCatalog');
 
-const DEFAULT_COURSE_THUMB = '/assets/images/goods/good1.jpg';
+/** 与首页课程卡片一致：displayImage → picture/image → 默认图 */
+function thumbUrlFromCourseDoc(course) {
+  if (!course) return DEFAULT_GOODS_IMAGE;
+  const d =
+    course.displayImage != null && String(course.displayImage).trim() !== ''
+      ? String(course.displayImage).trim()
+      : '';
+  if (d) return d;
+  return courseImageSource(course) || DEFAULT_GOODS_IMAGE;
+}
+
+function pickCourse(map, courseId) {
+  const a = String(courseId || '').trim();
+  if (!a || !map) return null;
+  if (map[a]) return map[a];
+  const n = Number(a);
+  if (Number.isFinite(n) && map[String(n)]) return map[String(n)];
+  return null;
+}
+
+/** cloud:// 批量换临时 https，与 components/goods 行为一致 */
+function resolveCloudImageUrls(urls) {
+  const list = urls || [];
+  const cloudIds = [...new Set(list.filter((u) => u && String(u).startsWith('cloud://')))];
+  if (!cloudIds.length) {
+    return Promise.resolve(list.slice());
+  }
+  return new Promise((resolve) => {
+    wx.cloud.getTempFileURL({
+      fileList: cloudIds.map((fileID) => ({ fileID, maxAge: 60 * 60 * 24 * 7 })),
+      success: (res) => {
+        const urlMap = Object.create(null);
+        (res.fileList || []).forEach((f) => {
+          if (f.fileID && f.tempFileURL) urlMap[f.fileID] = f.tempFileURL;
+        });
+        resolve(list.map((u) => (u && urlMap[u] ? urlMap[u] : u)));
+      },
+      fail: () => resolve(list.slice()),
+    });
+  });
+}
 
 Page({
   data: {
@@ -75,7 +121,20 @@ Page({
         cloudRes && cloudRes.result && Array.isArray(cloudRes.result.data)
           ? cloudRes.result.data
           : [];
-      goodsOrders = raw.map((row) => {
+      let courseRows = [];
+      try {
+        const coursePack = await getCourses(ALL_CATEGORY_ID);
+        courseRows = coursePack.data || [];
+      } catch (e2) {
+        console.warn('拉取 db_course 失败，订单缩略图使用默认图', e2);
+      }
+      const courseById = indexDocsById(courseRows);
+      const thumbRaws = raw.map((row) => {
+        const course = pickCourse(courseById, row.courseId);
+        return thumbUrlFromCourseDoc(course);
+      });
+      const thumbUrls = await resolveCloudImageUrls(thumbRaws);
+      goodsOrders = raw.map((row, i) => {
         const ts = row.paidAt != null ? row.paidAt : row.createdAt;
         const fen = Number(row.totalFee) || 0;
         const yuan = fen > 0 ? Math.round(fen) / 100 : 0;
@@ -91,7 +150,7 @@ Page({
           totalPrice: yuan,
           formattedTime: formatGoodsOrderTime(ts),
           goodItem: {
-            image: DEFAULT_COURSE_THUMB,
+            image: thumbUrls[i] || DEFAULT_GOODS_IMAGE,
             desc,
           },
         };

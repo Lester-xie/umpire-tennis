@@ -206,7 +206,7 @@
 .profile-menu-item {
   display: flex;
   align-items: center;
-  padding: 32rpx 28rpx;
+  padding: 32rpx 10rpx;
   height: 100rpx;
   box-sizing: border-box;
 }
@@ -247,7 +247,6 @@
 
 .profile-menu-divider {
   height: 2rpx;
-  margin-left: 28rpx;
   background: #134e35;
 }
 
