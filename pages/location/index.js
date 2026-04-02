@@ -8,6 +8,7 @@ const MAP_CENTER_LON = 106.7153;
 const MAP_SCALE = 16;
 
 const { getVenues } = require('../../api/tennisDb');
+const { venueIdLooseEqual } = require('../../utils/venueId');
 
 Page({
   data: {
@@ -79,6 +80,30 @@ Page({
       this.setData({ selectedVenueId });
       this.setMapMarkers(selectedVenueId);
     }
+    const curId = selectedVenueId || this.data.selectedVenueId;
+    this.loadVenues()
+      .then((venues) => {
+        this.setData({ venues });
+        const app = getApp();
+        if (curId) {
+          const matched = venues.find((v) => venueIdLooseEqual(v.id, curId));
+          if (matched) {
+            app.globalData.selectedVenue = matched;
+            try {
+              wx.setStorageSync(STORAGE_KEYS.selectedVenue, matched);
+            } catch (e) {
+              console.warn('location onShow persist venue', e);
+            }
+          }
+        }
+        this.setMapMarkers(curId);
+        if (this.data.userLocation) {
+          this.updateDistances();
+        }
+      })
+      .catch((err) => {
+        console.warn('location onShow loadVenues', err);
+      });
   },
 
   onReady() {

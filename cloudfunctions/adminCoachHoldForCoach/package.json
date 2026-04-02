@@ -1,0 +1,9 @@
+{
+  "name": "adminCoachHoldForCoach",
+  "version": "1.0.0",
+  "description": "管理员代指定教练/管理员占用场地",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

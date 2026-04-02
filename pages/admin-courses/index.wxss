@@ -1,0 +1,54 @@
+.admin-sub-page {
+  min-height: 100vh;
+  background: #f7f9ff;
+}
+
+.header-wrapper {
+  position: relative;
+  z-index: 2;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+  box-sizing: border-box;
+}
+
+.admin-scroll {
+  box-sizing: border-box;
+  padding: 24rpx 32rpx 48rpx;
+}
+
+.loading-text,
+.empty {
+  font-size: 28rpx;
+  color: #888;
+  padding: 24rpx;
+}
+
+.course-row {
+  display: flex;
+  flex-direction: column;
+  padding: 28rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  margin-bottom: 16rpx;
+  border: 1rpx solid #e8ecf4;
+}
+
+.course-row--hover {
+  opacity: 0.9;
+}
+
+.course-name {
+  font-size: 30rpx;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+
+.course-id {
+  font-size: 22rpx;
+  color: #999;
+  margin-top: 8rpx;
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+}

@@ -70,6 +70,7 @@
   border: 2rpx solid #134e35;
   box-shadow: 0 8rpx 32rpx rgba(19, 78, 53, 0.12);
   overflow: hidden;
+  padding: 4rpx;
 }
 
 .profile-avatar {
@@ -101,13 +102,43 @@
   letter-spacing: 0.02em;
 }
 
+/* 未登录：与头像同逻辑，用透明按钮承接手机号授权 */
+.profile-name--phone-btn {
+  margin-top: 28rpx;
+  padding: 0;
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #134e35;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  background: transparent;
+  border: none;
+  width: auto;
+  min-height: 0;
+  align-self: center;
+}
+.profile-name--phone-btn::after {
+  border: none;
+}
+
 .profile-badge {
   margin-top: 12rpx;
   font-size: 24rpx;
-  color: #134e35;
+  color: #fff;
   padding: 6rpx 20rpx;
-  background: rgba(19, 78, 53, 0.1);
   border-radius: 999rpx;
+}
+
+.profile-badge--manager {
+  background: #ff3d71;
+}
+
+.profile-badge--coach {
+  background: #ffaa00;
+}
+
+.profile-badge--vip {
+  background: #000000;
 }
 
 /* 课时卡片：外层间距；内层由 card 组件提供描边与双层底 */
@@ -258,4 +289,8 @@
   width: 28rpx;
   height: 28rpx;
   transform: rotate(180deg);
+}
+
+.profile-menu-common {
+  margin-top: 38rpx;
 }

@@ -1,0 +1,9 @@
+{
+  "name": "adminGetUserByPhone",
+  "version": "1.0.0",
+  "description": "管理员按手机号查询用户资料（昵称/头像/VIP/教练）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

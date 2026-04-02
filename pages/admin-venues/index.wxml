@@ -1,0 +1,20 @@
+<view class="admin-sub-page">
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="场馆与场地" />
+  </view>
+  <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
+    <button class="add-btn" bindtap="goAdd">新建场馆</button>
+    <view wx:if="{{loading}}" class="muted">加载中…</view>
+    <block wx:for="{{venues}}" wx:key="_id">
+      <view class="venue-row">
+        <navigator url="/pages/admin-venue-edit/index?id={{item._id}}" class="venue-main" hover-class="venue-main--hover">
+          <text class="venue-name">{{item.name || '未命名'}}</text>
+          <text class="venue-meta">{{item.address || '—'}} · {{item.courtCount}} 片场地</text>
+        </navigator>
+        <view class="venue-del" data-id="{{item._id}}" data-name="{{item.name}}" bindtap="onDeleteTap">删除</view>
+      </view>
+    </block>
+    <view wx:if="{{!loading && venues.length === 0}}" class="muted">暂无场馆，请点击「新建场馆」</view>
+    <view class="footer-space"></view>
+  </scroll-view>
+</view>

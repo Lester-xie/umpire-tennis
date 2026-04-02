@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "编辑场馆",
+  "usingComponents": {
+    "header": "/components/header/header"
+  }
+}

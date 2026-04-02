@@ -1,6 +1,10 @@
 // 云数据库封装
 
 const courseCache = require('./courseCache');
+const { venueIdLooseEqual } = require('../utils/venueId');
+
+/** 与 app.js、pages/location 一致 */
+const STORAGE_SELECTED_VENUE = 'selected_venue';
 
 function getDb() {
   return wx.cloud.database();
@@ -10,18 +14,117 @@ function getDb() {
 const DEFAULT_USER_AVATAR = '/assets/images/default-avatar.jpg';
 
 /**
- * 获取场馆列表
+ * 获取场馆列表（增删改见云函数 adminVenue，仅 isManager）
  * venue 集合建议字段：
  * - name
  * - address
  * - latitude
  * - longitude
  * - （可选）image
- * - courtList: [{ name, priceList, specialPrice? }] — priceList 长度 14；周六日单价用 specialPrice（可选）
+ * - courtList: [{ name, priceList, vipPriceList?, specialPrice? }] — 各 14 段；周末一口价 specialPrice 仅非 VIP 订场生效
  */
 function getVenues() {
   const db = getDb();
   return db.collection('db_venue').get();
+}
+
+/**
+ * 与 pages/location loadVenues 映射一致；保留云库其它字段，避免后台增字段后客户端丢数据。
+ */
+function normalizeVenueDoc(v, idx) {
+  if (!v) return null;
+  const i = idx != null ? idx : 0;
+  const id = v.id || v.venueId || v._id || String(v._id || i);
+  const image =
+    v.image ||
+    (i % 2 === 0 ? '/assets/images/court1.jpg' : '/assets/images/court2.jpg');
+  return {
+    ...v,
+    id,
+    name: v.name != null ? String(v.name) : '',
+    address: v.address != null ? String(v.address) : '',
+    latitude: v.latitude,
+    longitude: v.longitude,
+    image,
+    courtList: Array.isArray(v.courtList) ? v.courtList : [],
+  };
+}
+
+/**
+ * 按逻辑 id 拉取单条场馆（优先 doc / where，避免整表 get 的缓存与带宽问题）。
+ */
+function fetchVenueRawByLogicalId(wantId) {
+  const db = getDb();
+  const s = String(wantId).trim();
+
+  const fromFullList = () =>
+    getVenues().then((res) => {
+      const docs = res && res.data ? res.data : [];
+      for (let i = 0; i < docs.length; i += 1) {
+        const r = docs[i];
+        const id = r.id || r.venueId || r._id || String(r._id || i);
+        if (venueIdLooseEqual(id, wantId)) return r;
+      }
+      return null;
+    });
+
+  const tryWhere = (field) =>
+    db
+      .collection('db_venue')
+      .where({ [field]: s })
+      .limit(1)
+      .get()
+      .then((res) => (res.data && res.data[0] ? res.data[0] : null))
+      .catch(() => null);
+
+  if (/^[a-fA-F0-9]{24}$/.test(s)) {
+    return db
+      .collection('db_venue')
+      .doc(s)
+      .get()
+      .then((res) => (res && res.data ? res.data : null))
+      .catch(() => null)
+      .then((row) => row || tryWhere('id'))
+      .then((row) => row || tryWhere('venueId'))
+      .then((row) => row || fromFullList());
+  }
+
+  return tryWhere('id').then((row) => row || tryWhere('venueId')).then((row) => row || fromFullList());
+}
+
+/**
+ * 从 db_venue 重拉当前已选场馆并写回 globalData 与本地缓存。
+ * 订场依赖内存中的 courtList、名称等任意字段，任意后台变更后都应调用以与云端一致。
+ * @param {WechatMiniprogram.App.Instance} [appInstance] App.onShow 等时机 getApp() 可能为 undefined，可传入 this
+ */
+function refreshSelectedVenueFromCloud(appInstance) {
+  const app =
+    appInstance && appInstance.globalData
+      ? appInstance
+      : typeof getApp === 'function'
+        ? getApp()
+        : null;
+  if (!app || !app.globalData) {
+    return Promise.resolve(null);
+  }
+  const current = app.globalData.selectedVenue;
+  if (!current || current.id == null || String(current.id).trim() === '') {
+    return Promise.resolve(null);
+  }
+  const wantId = current.id;
+  return fetchVenueRawByLogicalId(wantId).then((raw) => {
+    if (!raw) return null;
+    return normalizeVenueDoc(raw, 0);
+  }).then((normalized) => {
+    if (!normalized) return null;
+    app.globalData.selectedVenue = normalized;
+    try {
+      wx.setStorageSync(STORAGE_SELECTED_VENUE, normalized);
+    } catch (e) {
+      console.warn('refreshSelectedVenueFromCloud storage', e);
+    }
+    return normalized;
+  });
 }
 
 /**
@@ -190,7 +293,7 @@ function getBookedSlots({ venueId, orderDate } = {}) {
 }
 
 /**
- * 占用场地（云函数内：畅打需 isManager，体验/正课/团课需 isCoach）
+ * 占用场地（云函数内：畅打需 isManager；体验/正课/团课需 isCoach）
  * @param {{ venueId: string, venueName?: string, orderDate: string, slots: Array<{courtId:number, slotIndex:number}>, lessonType: string, pairMode?: string, groupMode?: string }} payload
  */
 function coachHoldSlots(payload) {
@@ -233,9 +336,58 @@ function updateCoachHolds(payload) {
   });
 }
 
+/** 管理员：按手机号设置教练/VIP（isManager 仅数据库维护，见云函数说明） */
+function adminSetUserRoles(payload) {
+  return wx.cloud.callFunction({
+    name: 'adminSetUserRoles',
+    data: payload || {},
+  });
+}
+
+/** 管理员：按手机号查询用户昵称、头像、VIP/教练（需 isManager） */
+function adminGetUserByPhone(payload) {
+  return wx.cloud.callFunction({
+    name: 'adminGetUserByPhone',
+    data: payload || {},
+  });
+}
+
+/** 管理员：更新课程文档 */
+function adminUpdateCourse(payload) {
+  return wx.cloud.callFunction({
+    name: 'adminUpdateCourse',
+    data: payload || {},
+  });
+}
+
+/** 管理员：代教练/管理员写入场地占用 */
+function adminCoachHoldForCoach(payload) {
+  return wx.cloud.callFunction({
+    name: 'adminCoachHoldForCoach',
+    data: payload || {},
+  });
+}
+
+/** 管理员：按月交易汇总 */
+function adminOrderStatsByMonth(payload) {
+  return wx.cloud.callFunction({
+    name: 'adminOrderStatsByMonth',
+    data: payload || {},
+  });
+}
+
+/** 管理员：场馆/场地 CRUD，event.action: list | get | create | update | remove */
+function adminVenue(payload) {
+  return wx.cloud.callFunction({
+    name: 'adminVenue',
+    data: payload || {},
+  });
+}
+
 module.exports = {
   DEFAULT_USER_AVATAR,
   getVenues,
+  refreshSelectedVenueFromCloud,
   getCategories,
   getCourses,
   invalidateCourseCache,
@@ -254,5 +406,11 @@ module.exports = {
   listCoachHolds,
   cancelCoachHold,
   updateCoachHolds,
+  adminSetUserRoles,
+  adminGetUserByPhone,
+  adminUpdateCourse,
+  adminCoachHoldForCoach,
+  adminOrderStatsByMonth,
+  adminVenue,
 };
 

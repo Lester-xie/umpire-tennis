@@ -66,16 +66,18 @@ Page({
     const isLoggedIn = app ? app.checkLogin() : false;
     const userPhone = wx.getStorageSync(STORAGE_KEYS.userPhone) || '';
     let isCoach = false;
+    let isManager = false;
     if (isLoggedIn && userPhone) {
       try {
         const res = await getUserByPhone(userPhone);
         const user = res && res.data && res.data.length > 0 ? res.data[0] : null;
         isCoach = !!(user && user.isCoach);
+        isManager = !!(user && user.isManager);
       } catch (e) {
         console.warn('profile-coach-holds role', e);
       }
     }
-    this.setData({ isCoach });
+    this.setData({ isCoach, isManager });
     if (!isCoach) {
       this.setData({ coachHolds: [] });
       wx.showToast({ title: '仅教练可查看', icon: 'none' });

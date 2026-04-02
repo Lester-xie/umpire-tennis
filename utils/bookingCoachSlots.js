@@ -113,6 +113,7 @@ function buildCourtSlotsRow({
   bookedSlotKeySet,
   purposeOnlyOpenPlay,
   myCoachHoldIdSet,
+  isVipUser,
 }) {
   const slots = [];
   const metaMap = coachHoldMeta || {};
@@ -134,7 +135,8 @@ function buildCourtSlotsRow({
       courtId,
       i,
       selectedDate,
-      slotPriceMap
+      slotPriceMap,
+      { isVipUser: !!isVipUser }
     );
     const key = `${courtId}-${i}`;
     const isBookedByOrder = bookedSet.has(key);
@@ -188,6 +190,7 @@ function buildCoachCourts(params) {
     bookedSlotKeySet,
     purposeOnlyOpenPlay,
     myCoachHoldIdSet,
+    isVipUser,
   } = params;
   const list = Array.isArray(courtList) ? courtList : [];
 
@@ -207,6 +210,7 @@ function buildCoachCourts(params) {
         bookedSlotKeySet,
         purposeOnlyOpenPlay,
         myCoachHoldIdSet,
+        isVipUser,
       }),
     }));
   }
@@ -226,6 +230,7 @@ function buildCoachCourts(params) {
       bookedSlotKeySet,
       purposeOnlyOpenPlay,
       myCoachHoldIdSet,
+      isVipUser,
     }),
   }));
 }

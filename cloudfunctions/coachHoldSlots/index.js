@@ -172,7 +172,7 @@ function defaultCapacityLimit(lessonType, pairMode, groupMode) {
 /**
  * 教练占用场地（写入 db_coach_slot_hold，与已支付订单一并参与 getBookedSlots 占用计算）
  * event: { venueId, orderDate, slots: [{courtId, slotIndex}], lessonType, pairMode?, groupMode? }
- * lessonType: experience | regular | group | open_play（畅打，仅 isManager）
+ * lessonType: experience | regular | group | open_play（畅打，需 isManager）
  * pairMode（体验课/正课）: 1v1 | 1v2
  * groupMode（团课）: 如 group35，或与 db_category.scaleList.code 一致
  * scaleDisplayName（可选）: 规模展示名，写入 capacityLabel（与 scaleList.name 一致时推荐传入）

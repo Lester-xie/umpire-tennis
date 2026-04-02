@@ -1,0 +1,136 @@
+<view class="admin-sub-page">
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="{{isNew ? '新建场馆' : '编辑场馆'}}" />
+  </view>
+  <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
+    <view wx:if="{{loading}}" class="muted">加载中…</view>
+    <block wx:else>
+      <view class="field">
+        <text class="field-label">名称 *</text>
+        <input class="field-input" placeholder="场馆名称" value="{{name}}" bindinput="onName" />
+      </view>
+      <view class="field">
+        <text class="field-label">地址</text>
+        <input class="field-input" placeholder="详细地址" value="{{address}}" bindinput="onAddress" />
+      </view>
+      <view class="field field--row">
+        <view class="field-half">
+          <text class="field-label">纬度 *</text>
+          <input class="field-input" type="digit" placeholder="如 26.5889" value="{{latitude}}" bindinput="onLat" />
+        </view>
+        <view class="field-half">
+          <text class="field-label">经度 *</text>
+          <input class="field-input" type="digit" placeholder="如 106.7153" value="{{longitude}}" bindinput="onLon" />
+        </view>
+      </view>
+      <view class="field">
+        <text class="field-label">封面图（可选）</text>
+        <text class="field-hint">上传后保存为云文件 ID，前台与订场列表使用「场馆 image」字段。</text>
+        <view class="admin-image-block">
+          <view class="admin-image-preview-wrap">
+            <image wx:if="{{imageDisplayUrl}}" class="admin-image-preview" src="{{imageDisplayUrl}}" mode="aspectFill" />
+            <view wx:else class="admin-image-placeholder">暂无封面</view>
+          </view>
+          <view class="admin-image-actions">
+            <button
+              class="admin-image-btn"
+              size="mini"
+              type="default"
+              loading="{{uploadingImage}}"
+              disabled="{{uploadingImage}}"
+              bindtap="onPickVenueCover"
+            >上传图片</button>
+            <view wx:if="{{image}}" class="admin-image-clear" bindtap="onClearVenueCover">清除</view>
+          </view>
+        </view>
+      </view>
+
+      <view class="field">
+        <text class="field-label">场地列表 *</text>
+        <text class="field-hint">每片场地：名称、常规/VIP 各 14 个时段单价（8:00–21:00）、可选周末一口价（仅非 VIP 订场）。</text>
+
+        <block wx:for="{{courts}}" wx:for-item="court" wx:for-index="cIdx" wx:key="cIdx">
+          <view class="court-card">
+            <view class="court-card-head">
+              <text class="court-num">场地 {{cIdx + 1}}</text>
+              <view wx:if="{{courts.length > 1}}" class="court-remove" data-cidx="{{cIdx}}" bindtap="onRemoveCourt">删除该片</view>
+            </view>
+            <input
+              class="court-name-input"
+              placeholder="场地名称，如 1 号场"
+              value="{{court.name}}"
+              data-cidx="{{cIdx}}"
+              bindinput="onCourtName"
+            />
+
+            <view class="court-price-tabs">
+              <view
+                class="court-price-tab {{court.priceTab === 'vip' ? '' : 'court-price-tab--on'}}"
+                data-cidx="{{cIdx}}"
+                data-tab="regular"
+                bindtap="onCourtPriceTab"
+              >常规</view>
+              <view
+                class="court-price-tab {{court.priceTab === 'vip' ? 'court-price-tab--on' : ''}}"
+                data-cidx="{{cIdx}}"
+                data-tab="vip"
+                bindtap="onCourtPriceTab"
+              >VIP</view>
+            </view>
+
+            <view wx:if="{{court.priceTab !== 'vip'}}" class="slot-grid">
+              <block wx:for="{{court.priceList}}" wx:for-item="pv" wx:for-index="sIdx" wx:key="sIdx">
+                <view class="slot-cell">
+                  <text class="slot-lab">{{slotLabels[sIdx]}}</text>
+                  <input
+                    class="slot-in"
+                    type="digit"
+                    value="{{pv}}"
+                    data-cidx="{{cIdx}}"
+                    data-sidx="{{sIdx}}"
+                    data-tab="regular"
+                    bindinput="onSlotPrice"
+                  />
+                </view>
+              </block>
+            </view>
+            <view wx:else class="slot-grid">
+              <block wx:for="{{court.vipPriceList}}" wx:for-item="pv" wx:for-index="sIdx" wx:key="sIdx">
+                <view class="slot-cell">
+                  <text class="slot-lab">{{slotLabels[sIdx]}}</text>
+                  <input
+                    class="slot-in"
+                    type="digit"
+                    value="{{pv}}"
+                    data-cidx="{{cIdx}}"
+                    data-sidx="{{sIdx}}"
+                    data-tab="vip"
+                    bindinput="onSlotPrice"
+                  />
+                </view>
+              </block>
+            </view>
+
+            <view wx:if="{{court.priceTab !== 'vip'}}" class="sp-block">
+              <text class="sp-label">周末单价（可选，与订场「周末价」规则一致）</text>
+              <input
+                class="sp-in"
+                type="digit"
+                placeholder="不填则按上面各时段计价"
+                value="{{court.specialPrice}}"
+                data-cidx="{{cIdx}}"
+                bindinput="onSpecialPrice"
+              />
+            </view>
+          </view>
+        </block>
+
+        <view class="add-court" bindtap="onAddCourt">+ 添加一片场地</view>
+      </view>
+
+      <button class="submit-btn" bindtap="onSave">保存</button>
+      <button wx:if="{{!isNew}}" class="delete-btn" bindtap="onDelete">删除该场馆</button>
+    </block>
+    <view class="footer-space"></view>
+  </scroll-view>
+</view>

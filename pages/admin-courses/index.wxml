@@ -1,0 +1,19 @@
+<view class="admin-sub-page">
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="课程列表" />
+  </view>
+  <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
+    <view wx:if="{{loading}}" class="loading-text">加载中…</view>
+    <block wx:for="{{courses}}" wx:key="_id">
+      <navigator
+        url="/pages/admin-course-edit/index?id={{item._id}}"
+        class="course-row"
+        hover-class="course-row--hover"
+      >
+        <text class="course-name">{{item.name || '未命名'}}</text>
+        <text class="course-id mono">{{item._id}}</text>
+      </navigator>
+    </block>
+    <view wx:if="{{!loading && courses.length === 0}}" class="empty">暂无课程数据</view>
+  </scroll-view>
+</view>

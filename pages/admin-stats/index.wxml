@@ -1,0 +1,40 @@
+<view class="admin-sub-page">
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="交易统计" />
+  </view>
+  <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
+    <view class="picker-row">
+      <text class="picker-label">月份</text>
+      <picker mode="date" fields="month" value="{{monthValue}}" bindchange="onMonthChange">
+        <view class="picker-value">{{monthValue}}</view>
+      </picker>
+    </view>
+    <button class="submit-btn" bindtap="onQuery">查询</button>
+
+    <view wx:if="{{stats}}" class="stats-card">
+      <view class="stats-row">
+        <text class="stats-k">订场订单数</text>
+        <text class="stats-v">{{stats.bookingCount}}</text>
+      </view>
+      <view class="stats-row">
+        <text class="stats-k">订场实付（元）</text>
+        <text class="stats-v">{{bookingYuan}}</text>
+      </view>
+      <view class="stats-row">
+        <text class="stats-k">课时包订单数</text>
+        <text class="stats-v">{{stats.coursePurchaseCount}}</text>
+      </view>
+      <view class="stats-row">
+        <text class="stats-k">课时包实付（元）</text>
+        <text class="stats-v">{{purchaseYuan}}</text>
+      </view>
+      <view class="stats-row stats-row--total">
+        <text class="stats-k">合计（元）</text>
+        <text class="stats-v">{{totalYuan}}</text>
+      </view>
+      <view wx:if="{{stats.truncated}}" class="warn">单月订单超过 1000 条时统计可能不完整，请在云控制台用聚合校准。</view>
+    </view>
+
+    <view class="hint">按支付成功时间 paidAt 所在自然月统计；仅含 status 为 paid 的订单。</view>
+  </scroll-view>
+</view>

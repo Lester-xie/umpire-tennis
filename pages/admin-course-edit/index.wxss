@@ -1,0 +1,172 @@
+.admin-sub-page {
+  min-height: 100vh;
+  background: #f7f9ff;
+}
+
+.header-wrapper {
+  position: relative;
+  z-index: 2;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+  box-sizing: border-box;
+}
+
+.admin-scroll {
+  box-sizing: border-box;
+  padding: 24rpx 32rpx 48rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #888;
+  padding: 24rpx;
+}
+
+.id-line {
+  font-size: 22rpx;
+  color: #666;
+  margin-bottom: 16rpx;
+  word-break: break-all;
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+}
+
+.field {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  border: 1rpx solid #e8ecf4;
+}
+
+.field-label {
+  display: block;
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 12rpx;
+}
+
+.field-hint {
+  display: block;
+  font-size: 22rpx;
+  color: #888;
+  line-height: 1.45;
+  margin-bottom: 16rpx;
+}
+
+.field-textarea {
+  width: 100%;
+  min-height: 120rpx;
+  font-size: 28rpx;
+  color: #1a1a1a;
+}
+
+.picker-display {
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+  color: #134e35;
+  background: #f8faf9;
+  border-radius: 12rpx;
+  border: 1rpx solid #dce8e0;
+}
+
+.muted-inline {
+  font-size: 26rpx;
+  color: #999;
+  padding: 16rpx 0;
+}
+
+.tm-card {
+  margin-top: 20rpx;
+  padding: 20rpx;
+  background: #f8faf9;
+  border-radius: 16rpx;
+  border: 1rpx solid #e0ebe4;
+}
+
+.tm-card:first-child {
+  margin-top: 0;
+}
+
+.tm-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.tm-card-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #134e35;
+}
+
+.tm-remove {
+  font-size: 26rpx;
+  color: #c62828;
+  padding: 6rpx 12rpx;
+}
+
+.tm-format-input {
+  border: 1rpx solid #e8ecf4;
+  margin-bottom: 16rpx;
+}
+
+.tm-session-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.tm-session-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.tm-sublabel {
+  display: block;
+  font-size: 22rpx;
+  color: #888;
+  margin-bottom: 6rpx;
+}
+
+.tm-input-sm {
+  border-radius: 10rpx;
+  border: 1rpx solid #e0e0e0;
+}
+
+.tm-remove-sess {
+  flex-shrink: 0;
+  font-size: 24rpx;
+  color: #c62828;
+  padding: 12rpx 8rpx;
+  margin-bottom: 4rpx;
+}
+
+.tm-add-sess {
+  font-size: 26rpx;
+  color: #134e35;
+  padding: 12rpx 0;
+}
+
+.tm-add-format {
+  margin-top: 20rpx;
+  padding: 24rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: #134e35;
+  background: #fff;
+  border-radius: 16rpx;
+  border: 2rpx dashed #134e35;
+}
+
+.submit-btn {
+  margin-top: 16rpx;
+  background: #134e35;
+  color: #fff;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+}

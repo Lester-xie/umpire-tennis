@@ -1,0 +1,26 @@
+<view class="admin-page">
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="管理后台" />
+  </view>
+  <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
+    <view class="admin-grid">
+      <navigator url="/pages/admin-users/index" class="admin-card" hover-class="admin-card--hover">
+        <text class="admin-card-title">用户与角色</text>
+        <text class="admin-card-desc">按手机号设置教练与 VIP（管理员仅数据库配置）</text>
+      </navigator>
+      <navigator url="/pages/admin-venues/index" class="admin-card" hover-class="admin-card--hover">
+        <text class="admin-card-title">场馆与场地</text>
+        <text class="admin-card-desc">增删改场馆及场地、时段单价</text>
+      </navigator>
+      <navigator url="/pages/admin-courses/index" class="admin-card" hover-class="admin-card--hover">
+        <text class="admin-card-title">课程信息</text>
+        <text class="admin-card-desc">编辑 db_course 价格与说明</text>
+      </navigator>
+      <navigator url="/pages/admin-stats/index" class="admin-card" hover-class="admin-card--hover">
+        <text class="admin-card-title">交易统计</text>
+        <text class="admin-card-desc">按月汇总订场与课时包实付</text>
+      </navigator>
+    </view>
+    <view class="admin-footer-space"></view>
+  </scroll-view>
+</view>

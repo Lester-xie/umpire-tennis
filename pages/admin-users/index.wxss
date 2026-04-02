@@ -1,0 +1,130 @@
+.admin-sub-page {
+  min-height: 100vh;
+  background: #f7f9ff;
+}
+
+.header-wrapper {
+  position: relative;
+  z-index: 2;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+  box-sizing: border-box;
+}
+
+.admin-scroll {
+  box-sizing: border-box;
+  padding: 24rpx 32rpx 48rpx;
+}
+
+.field {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+  border: 1rpx solid #e8ecf4;
+}
+
+.field-label {
+  display: block;
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 12rpx;
+}
+
+.field-input {
+  font-size: 30rpx;
+  color: #1a1a1a;
+}
+
+.query-btn {
+  width: 100%;
+  margin-bottom: 16rpx;
+  background: #134e35;
+  color: #fff;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+}
+
+.page-hint {
+  display: block;
+  font-size: 24rpx;
+  color: #888;
+  line-height: 1.5;
+  margin-bottom: 24rpx;
+}
+
+.user-card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+  border: 1rpx solid #e8ecf4;
+}
+
+.user-card-main {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  margin-bottom: 24rpx;
+  padding-bottom: 24rpx;
+  border-bottom: 1rpx solid #eef1f6;
+}
+
+.user-avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 60rpx;
+  flex-shrink: 0;
+  background: #eef1f6;
+}
+
+.user-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+.user-name {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  word-break: break-all;
+}
+
+.user-phone {
+  font-size: 28rpx;
+  color: #666;
+  font-family: ui-monospace, monospace;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  margin-bottom: 16rpx;
+  border: 1rpx solid #e8ecf4;
+}
+
+.switch-row--danger {
+  border-color: rgba(180, 60, 60, 0.25);
+}
+
+.switch-label {
+  font-size: 28rpx;
+  color: #333;
+  flex: 1;
+  padding-right: 16rpx;
+}
+
+.submit-btn {
+  margin-top: 32rpx;
+  background: #134e35;
+  color: #fff;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+}

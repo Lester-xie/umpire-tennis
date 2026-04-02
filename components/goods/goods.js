@@ -1,4 +1,4 @@
-const { getCourses } = require('../../api/tennisDb');
+const { getCourses, invalidateCourseCache } = require('../../api/tennisDb');
 const {
   ALL_CATEGORY_ID,
   collectHomeExcludedCategoryRefs,
@@ -91,25 +91,33 @@ Component({
   lifetimes: {
     attached() {
       this._formattedGoodsMemo = Object.create(null);
-      this.loadCourses();
     },
   },
 
   pageLifetimes: {
     show() {
-      this.loadCourses();
+      /** 每次进入首页：清空 db_course 内存缓存与组件 memo，保证改价/改名后立即一致 */
+      this.loadCourses(true);
     },
   },
 
   methods: {
-    loadCourses() {
+    /**
+     * @param {boolean} [forceRefresh] 为 true 时失效 courseCache 与列表 memo，强制重拉云库
+     */
+    loadCourses(forceRefresh) {
+      const fr = !!forceRefresh;
+      if (fr) {
+        invalidateCourseCache();
+        this._formattedGoodsMemo = Object.create(null);
+      }
       const categoryId = this.properties.categoryId;
       const app = getApp();
       const venue = app && app.globalData && app.globalData.selectedVenue;
       const selectedVenueId = normalizeVenueId(venue && venue.id);
       const cacheKey = `${categoryId}@@${selectedVenueId || '__none__'}`;
       const memo = this._formattedGoodsMemo;
-      if (memo && memo[cacheKey]) {
+      if (!fr && memo && memo[cacheKey]) {
         this.setData({
           goods: memo[cacheKey].goods,
           courseLoaded: true,

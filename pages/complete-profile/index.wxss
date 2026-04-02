@@ -39,6 +39,7 @@
   height: 88rpx;
   padding: 0 32rpx;
   font-size: 32rpx;
+  line-height: 88rpx;
   color: #134E35;
   letter-spacing: 1rpx;
   border: 3rpx solid #E8EFEB;

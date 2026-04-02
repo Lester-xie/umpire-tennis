@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "交易统计",
+  "usingComponents": {
+    "header": "/components/header/header"
+  }
+}

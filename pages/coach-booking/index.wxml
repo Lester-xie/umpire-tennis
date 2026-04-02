@@ -128,20 +128,22 @@
   <view class="purpose-mask" wx:if="{{showPurposeSheet}}" catchtap="closePurposeSheet"></view>
   <view class="purpose-sheet" wx:if="{{showPurposeSheet}}">
     <view class="purpose-sheet-title">{{ purposeSheetMode === 'edit' ? '更改场地类型' : '填写场地用途' }}</view>
-    <block wx:if="{{purposeShowStandardTypes}}">
+    <block wx:if="{{purposeShowStandardTypes || showOpenPlayChip}}">
       <view class="purpose-section-label">课程类型</view>
       <view class="purpose-chip-row">
         <view class="purpose-chip {{lessonType === 'experience' ? 'purpose-chip--on' : ''}}" data-v="experience" bindtap="selectLessonType">体验课</view>
         <view class="purpose-chip {{lessonType === 'regular' ? 'purpose-chip--on' : ''}}" data-v="regular" bindtap="selectLessonType">正课</view>
         <view class="purpose-chip {{lessonType === 'group' ? 'purpose-chip--on' : ''}}" data-v="group" bindtap="selectLessonType">团课</view>
+        <view wx:if="{{showOpenPlayChip}}" class="purpose-chip {{lessonType === 'open_play' ? 'purpose-chip--on' : ''}}" data-v="open_play" bindtap="selectLessonType">畅打</view>
       </view>
     </block>
-    <block wx:if="{{purposeOnlyOpenPlay}}">
-      <view class="purpose-section-label">场地用途</view>
-      <view class="purpose-chip-row">
-        <view class="purpose-chip purpose-chip--on purpose-chip--readonly">畅打</view>
-      </view>
+    <block wx:if="{{isManagerUser && (lessonType === 'experience' || lessonType === 'regular' || lessonType === 'group')}}">
+      <view class="purpose-section-label">指定教练</view>
+      <picker mode="selector" range="{{coachPickerLabels}}" value="{{coachPickerIndex}}" bindchange="onCoachPickerChange">
+        <view class="purpose-coach-pick">{{coachPickerLabels.length ? coachPickerLabels[coachPickerIndex] : '加载教练列表…'}}</view>
+      </picker>
     </block>
+    <view wx:if="{{isManagerUser && lessonType === 'open_play'}}" class="purpose-open-hint">畅打可不指定教练，占用记在本人管理员账号下</view>
     <block wx:if="{{lessonType === 'experience' || lessonType === 'regular'}}">
       <view class="purpose-section-label">规模</view>
       <view class="purpose-chip-row">

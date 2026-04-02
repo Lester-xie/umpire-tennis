@@ -1,0 +1,9 @@
+{
+  "name": "adminUpdateCourse",
+  "version": "1.0.0",
+  "description": "管理员更新 db_course",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

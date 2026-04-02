@@ -1,4 +1,4 @@
-const { getBookedSlots } = require('../../api/tennisDb');
+const { getBookedSlots, refreshSelectedVenueFromCloud, getUserByPhone } = require('../../api/tennisDb');
 const { getTodayDateStr, buildBookingDateList } = require('../../utils/bookingDate');
 const {
   buildSlotPriceMapFromCourtList,
@@ -22,6 +22,15 @@ function normalizeDateForWatch(raw) {
   if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return s;
   return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
+
+/** 云库 watch 依赖 WebSocket；开发者工具/弱网下常报 -402002，属环境问题非业务逻辑错误 */
+function isRealtimeWatchTransportError(err) {
+  if (!err) return false;
+  const code = err.errCode !== undefined ? err.errCode : err.code;
+  const msg = String(err.errMsg || err.message || err || '');
+  if (code === -402002) return true;
+  return /ws connection|login fail|invalid state|init watch fail|realtime listener/i.test(msg);
+}
 Page({
   data: {
     dateList: [], // 日期列表
@@ -37,6 +46,7 @@ Page({
     selectedVenueName: '', // 当前选定的球场名称
     selectedVenueId: '', // 当前选定的球场 id
     priceLoading: false, // 加载价格规则状态
+    isVipUser: false, // db_user.isVip，用于 VIP 时段价与周末价规则
   },
   
   // 动画定时器
@@ -66,6 +76,12 @@ Page({
   _initialLoadFinished: false,
   /** 是否正在跳转到选场页，避免重复触发 */
   _navigatingToLocation: false,
+  /** watch 连续失败次数，用于重连退避 */
+  _realtimeWatchFailCount: 0,
+  /** 是否已输出过「watch 不可用」提示，避免刷屏 */
+  _realtimeWatchLoggedNoise: false,
+  /** watch 不可用时轮询已订格子的定时器 */
+  _bookingSlotsPollTimer: null,
 
   /** 标题：去选场页，选完后返回本页 */
   handleContentHeaderTitleTap() {
@@ -75,6 +91,7 @@ Page({
   },
 
   onLoad() {
+    this._bookingIsVipUser = false;
     this.coachHoldMeta = {};
     this.syncSelectedVenueName();
     this.ensureVenueSelected();
@@ -92,9 +109,16 @@ Page({
       return;
     }
     const newVenueId = this.syncSelectedVenueName();
-    if (newVenueId) {
-      this.loadSlotPricesAndRender(newVenueId);
+    /** 仅 id/名变时 sync 才非空；改价后二者不变也需重拉 courtList */
+    const venueIdToReload =
+      newVenueId != null && String(newVenueId).trim() !== ''
+        ? newVenueId
+        : this.data.selectedVenueId;
+    if (venueIdToReload) {
+      this.loadSlotPricesAndRender(venueIdToReload);
     }
+    this._realtimeWatchFailCount = 0;
+    this._realtimeWatchLoggedNoise = false;
     this.restartRealtimeWatch();
     this.refreshBookedSlotsNow({ showLoading: true });
     // 检查是否需要清空数据（下单成功后返回）
@@ -115,6 +139,7 @@ Page({
       clearTimeout(this._realtimeReconnectTimer);
       this._realtimeReconnectTimer = null;
     }
+    this.stopBookedSlotsPollFallback();
     this.stopRealtimeWatch();
   },
 
@@ -124,6 +149,7 @@ Page({
       clearTimeout(this._watchErrorDeferTimer);
       this._watchErrorDeferTimer = null;
     }
+    this.stopBookedSlotsPollFallback();
     this.stopRealtimeWatch();
     this.destroyLoadingAnimation();
     if (this._realtimeRefreshTimer) {
@@ -249,6 +275,17 @@ Page({
 
   loadSlotPricesAndRender(venueIdOverride) {
     this.beginLoading();
+    refreshSelectedVenueFromCloud()
+      .then(() => {
+        this.syncSelectedVenueName();
+        this.loadSlotPricesAndRenderCore(venueIdOverride);
+      })
+      .catch(() => {
+        this.loadSlotPricesAndRenderCore(venueIdOverride);
+      });
+  },
+
+  async loadSlotPricesAndRenderCore(venueIdOverride) {
     const venueId =
       venueIdOverride !== undefined ? venueIdOverride : this.data.selectedVenueId;
 
@@ -256,11 +293,21 @@ Page({
 
     const selectedDate = this.data.selectedDate || getTodayDateStr();
 
-    // 没有 venueId 时直接走旧逻辑（不可用/无价格）
-    if (!venueId) {
-      this.bookedSlotKeySet = new Set();
-      this.coachHoldMeta = {};
-      this.generateTimeSchedule();
+    let isVipUser = false;
+    const phone = String(wx.getStorageSync('user_phone') || '').trim();
+    if (phone) {
+      try {
+        const res = await getUserByPhone(phone);
+        const user = res && res.data && res.data[0];
+        isVipUser = !!(user && user.isVip);
+      } catch (e) {
+        console.warn('getUserByPhone booking', e);
+      }
+    }
+    this._bookingIsVipUser = isVipUser;
+    this.setData({ isVipUser });
+
+    const afterFetchBooked = () => {
       this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
         if (applied) this.generateTimeSchedule();
         this.restartRealtimeWatch();
@@ -268,6 +315,14 @@ Page({
       }).catch(() => {
         this.endLoading();
       });
+    };
+
+    // 没有 venueId 时直接走旧逻辑（不可用/无价格）
+    if (!venueId) {
+      this.bookedSlotKeySet = new Set();
+      this.coachHoldMeta = {};
+      this.generateTimeSchedule();
+      afterFetchBooked();
       return;
     }
 
@@ -275,19 +330,15 @@ Page({
     const venue = app && app.globalData && app.globalData.selectedVenue;
     const courtList = venue && Array.isArray(venue.courtList) ? venue.courtList : [];
 
-    // 优先使用 venue 文档里的 courtList[].priceList（与时段索引一一对应）
+    // 优先使用 venue 文档里的 courtList（VIP 用户用 vipPriceList 建图）
     if (courtList.length > 0) {
-      this.slotPriceMap = buildSlotPriceMapFromCourtList(courtList);
+      this.slotPriceMap = buildSlotPriceMapFromCourtList(courtList, {
+        useVipPrices: isVipUser,
+      });
       this.bookedSlotKeySet = new Set();
       this.coachHoldMeta = {};
       this.generateTimeSchedule();
-      this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
-        if (applied) this.generateTimeSchedule();
-        this.restartRealtimeWatch();
-        this.endLoading();
-      }).catch(() => {
-        this.endLoading();
-      });
+      afterFetchBooked();
       return;
     }
 
@@ -297,13 +348,7 @@ Page({
     this.bookedSlotKeySet = new Set();
     this.coachHoldMeta = {};
     this.generateTimeSchedule();
-    this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
-      if (applied) this.generateTimeSchedule();
-      this.restartRealtimeWatch();
-      this.endLoading();
-    }).catch(() => {
-      this.endLoading();
-    });
+    afterFetchBooked();
   },
 
   beginLoading() {
@@ -382,6 +427,21 @@ Page({
     this.loadingAnimation = null;
   },
 
+  ensureBookedSlotsPollFallback() {
+    if (this._bookingSlotsPollTimer) return;
+    const tick = () => {
+      this.refreshBookedSlotsNow({ showLoading: false });
+    };
+    this._bookingSlotsPollTimer = setInterval(tick, 30000);
+  },
+
+  stopBookedSlotsPollFallback() {
+    if (this._bookingSlotsPollTimer) {
+      clearInterval(this._bookingSlotsPollTimer);
+      this._bookingSlotsPollTimer = null;
+    }
+  },
+
   restartRealtimeWatch() {
     const venueId = this.data.selectedVenueId;
     const selectedDate = this.data.selectedDate || getTodayDateStr();
@@ -409,10 +469,30 @@ Page({
       })
       .watch({
         onChange: () => {
+          this._realtimeWatchFailCount = 0;
+          this.stopBookedSlotsPollFallback();
           this.handleRealtimeSignalChange();
         },
         onError: (err) => {
-          console.error('booking realtime watch error', err);
+          const transport = isRealtimeWatchTransportError(err);
+          if (transport) {
+            if (!this._realtimeWatchLoggedNoise) {
+              this._realtimeWatchLoggedNoise = true;
+              console.warn(
+                '[预订] 实时监听暂不可用（多为开发者工具/网络导致 WebSocket 未就绪），已改为定时拉取已订场次；真机一般可正常监听。',
+                err && err.errMsg ? err.errMsg : err,
+              );
+            }
+            this.ensureBookedSlotsPollFallback();
+          } else {
+            console.error('booking realtime watch error', err);
+          }
+          this._realtimeWatchFailCount = (this._realtimeWatchFailCount || 0) + 1;
+          const baseMs = transport ? 5000 : 1500;
+          const reconnectMs = Math.min(
+            60000,
+            Math.round(baseMs * Math.pow(1.35, Math.min(this._realtimeWatchFailCount - 1, 14))),
+          );
           if (this._realtimeReconnectTimer) {
             clearTimeout(this._realtimeReconnectTimer);
             this._realtimeReconnectTimer = null;
@@ -433,7 +513,7 @@ Page({
               this._realtimeReconnectTimer = null;
               if (sessionAtWatch !== this._watchSessionGen) return;
               this.restartRealtimeWatch();
-            }, 1500);
+            }, reconnectMs);
           }, 0);
         },
       });
@@ -536,12 +616,14 @@ Page({
     const app = getApp();
     const venue = app && app.globalData && app.globalData.selectedVenue;
     const courtList = venue && Array.isArray(venue.courtList) ? venue.courtList : [];
+    const isVipUser = this._bookingIsVipUser != null ? !!this._bookingIsVipUser : !!this.data.isVipUser;
     return resolveCourtSlotPrice(
       courtList,
       courtId,
       slotIndex,
       selectedDate,
-      this.slotPriceMap
+      this.slotPriceMap,
+      { isVipUser }
     );
   },
   

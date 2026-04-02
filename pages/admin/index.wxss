@@ -1,0 +1,58 @@
+.admin-page {
+  min-height: 100vh;
+  background: #f7f9ff;
+}
+
+.header-wrapper {
+  position: relative;
+  z-index: 2;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+  box-sizing: border-box;
+}
+
+.admin-scroll {
+  box-sizing: border-box;
+  padding: 24rpx 32rpx 48rpx;
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+  color: #134e35;
+}
+
+.admin-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.admin-card {
+  display: flex;
+  flex-direction: column;
+  padding: 28rpx 32rpx;
+  background: #fff;
+  border-radius: 20rpx;
+  border: 2rpx solid #e8ecf4;
+}
+
+.admin-card--hover {
+  opacity: 0.92;
+}
+
+.admin-card-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 8rpx;
+}
+
+.admin-card-desc {
+  font-size: 26rpx;
+  color: #666;
+  line-height: 1.4;
+}
+
+.admin-footer-space {
+  height: 80rpx;
+}

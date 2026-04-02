@@ -1,0 +1,195 @@
+.admin-sub-page {
+  min-height: 100vh;
+  background: #f7f9ff;
+}
+
+.header-wrapper {
+  position: relative;
+  z-index: 2;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+  box-sizing: border-box;
+}
+
+.admin-scroll {
+  box-sizing: border-box;
+  padding: 24rpx 32rpx 48rpx;
+}
+
+.muted {
+  font-size: 26rpx;
+  color: #888;
+  padding: 16rpx 0;
+}
+
+.field {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 20rpx;
+  border: 1rpx solid #e8ecf4;
+}
+
+.field--row {
+  display: flex;
+  gap: 20rpx;
+}
+
+.field-half {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-label {
+  display: block;
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 12rpx;
+}
+
+.field-hint {
+  display: block;
+  font-size: 22rpx;
+  color: #888;
+  line-height: 1.45;
+  margin-bottom: 20rpx;
+}
+
+.court-card {
+  margin-top: 20rpx;
+  padding: 20rpx;
+  background: #f8faf9;
+  border-radius: 16rpx;
+  border: 1rpx solid #e0ebe4;
+}
+
+.court-card:first-child {
+  margin-top: 0;
+}
+
+.court-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.court-num {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #134e35;
+}
+
+.court-remove {
+  font-size: 26rpx;
+  color: #c62828;
+  padding: 8rpx 12rpx;
+}
+
+/* 高度见 app.wxss 全局 .court-name-input */
+.court-name-input {
+  border: 1rpx solid #e8ecf4;
+  margin-bottom: 16rpx;
+}
+
+.court-price-tabs {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.court-price-tab {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 12rpx;
+  font-size: 26rpx;
+  color: #666;
+  background: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid #dce8e0;
+}
+
+.court-price-tab--on {
+  color: #134e35;
+  font-weight: 600;
+  border-color: #134e35;
+  background: rgba(19, 78, 53, 0.08);
+}
+
+.slot-grid {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -6rpx;
+}
+
+.slot-cell {
+  width: 50%;
+  box-sizing: border-box;
+  padding: 6rpx;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.slot-lab {
+  width: 76rpx;
+  flex-shrink: 0;
+  font-size: 22rpx;
+  color: #666;
+}
+
+.slot-in {
+  flex: 1;
+  min-width: 0;
+  border-radius: 10rpx;
+  border: 1rpx solid #e0e0e0;
+}
+
+.sp-block {
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+  border-top: 1rpx dashed #dce8e0;
+}
+
+.sp-label {
+  display: block;
+  font-size: 24rpx;
+  color: #666;
+  margin-bottom: 8rpx;
+}
+
+.sp-in {
+  border: 1rpx solid #e8ecf4;
+}
+
+.add-court {
+  margin-top: 20rpx;
+  padding: 24rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: #134e35;
+  background: #fff;
+  border-radius: 16rpx;
+  border: 2rpx dashed #134e35;
+}
+
+.submit-btn {
+  margin-top: 8rpx;
+  background: #134e35;
+  color: #fff;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+}
+
+.delete-btn {
+  margin-top: 20rpx;
+  background: #fff;
+  color: #c62828;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  border: 1rpx solid rgba(198, 40, 40, 0.45);
+}
+
+.footer-space {
+  height: 48rpx;
+}

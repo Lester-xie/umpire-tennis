@@ -1,0 +1,120 @@
+<view class="admin-sub-page">
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="编辑课程" />
+  </view>
+  <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
+    <view wx:if="{{loading}}" class="loading-text">加载中…</view>
+    <block wx:else>
+      <view class="mono id-line">ID：{{courseId}}</view>
+
+      <view class="field">
+        <text class="field-label">名称</text>
+        <input class="field-input" placeholder="课程名称" value="{{name}}" bindinput="onName" />
+      </view>
+      <view class="field">
+        <text class="field-label">说明</text>
+        <textarea class="field-textarea" placeholder="课程描述" value="{{description}}" bindinput="onDesc" auto-height />
+      </view>
+
+      <view class="field">
+        <text class="field-label">课程图（可选）</text>
+        <text class="field-hint">与商城/课程列表展示一致：优先使用 picture，其次 image；保存时会同步写入两者。</text>
+        <view class="admin-image-block">
+          <view class="admin-image-preview-wrap">
+            <image wx:if="{{imageDisplayUrl}}" class="admin-image-preview" src="{{imageDisplayUrl}}" mode="aspectFill" />
+            <view wx:else class="admin-image-placeholder">暂无配图</view>
+          </view>
+          <view class="admin-image-actions">
+            <button
+              class="admin-image-btn"
+              size="mini"
+              type="default"
+              loading="{{uploadingImage}}"
+              disabled="{{uploadingImage}}"
+              bindtap="onPickCourseCover"
+            >上传图片</button>
+            <view wx:if="{{image}}" class="admin-image-clear" bindtap="onClearCourseCover">清除</view>
+          </view>
+        </view>
+      </view>
+
+      <view class="field">
+        <text class="field-label">所属场馆</text>
+        <text class="field-hint">在「场馆与场地」中维护场馆列表。</text>
+        <picker
+          wx:if="{{venueNames.length > 0}}"
+          mode="selector"
+          range="{{venueNames}}"
+          value="{{venueIndex}}"
+          bindchange="onVenuePick"
+        >
+          <view class="picker-display">{{venueNames[venueIndex]}}</view>
+        </picker>
+        <view wx:else class="muted-inline">暂无场馆数据，请先新建场馆</view>
+      </view>
+
+      <view class="field">
+        <text class="field-label">价格规格 typeMap</text>
+        <text class="field-hint">每种「上课形式」下可配置多个「课时/节数」与单价（元）。内层键一般为数字节数，如 1、10。</text>
+
+        <block wx:for="{{typeMapRows}}" wx:for-item="row" wx:for-index="fi" wx:key="fi">
+          <view class="tm-card">
+            <view class="tm-card-head">
+              <text class="tm-card-title">上课形式 {{fi + 1}}</text>
+              <view wx:if="{{typeMapRows.length > 1}}" class="tm-remove" data-fi="{{fi}}" bindtap="onRemoveFormat">删除</view>
+            </view>
+            <input
+              class="tm-format-input"
+              placeholder="如 1V1、1V2"
+              value="{{row.formatKey}}"
+              data-fi="{{fi}}"
+              bindinput="onFormatKeyInput"
+            />
+
+            <block wx:for="{{row.sessions}}" wx:for-item="sess" wx:for-index="si" wx:key="si">
+              <view class="tm-session-row">
+                <view class="tm-session-field">
+                  <text class="tm-sublabel">课时/节数</text>
+                  <input
+                    class="tm-input-sm"
+                    type="text"
+                    placeholder="如 1、10"
+                    value="{{sess.sessionKey}}"
+                    data-fi="{{fi}}"
+                    data-si="{{si}}"
+                    bindinput="onSessionKeyInput"
+                  />
+                </view>
+                <view class="tm-session-field">
+                  <text class="tm-sublabel">单价(元)</text>
+                  <input
+                    class="tm-input-sm"
+                    type="digit"
+                    placeholder="0"
+                    value="{{sess.price}}"
+                    data-fi="{{fi}}"
+                    data-si="{{si}}"
+                    bindinput="onSessionPriceInput"
+                  />
+                </view>
+                <view
+                  wx:if="{{row.sessions.length > 1}}"
+                  class="tm-remove-sess"
+                  data-fi="{{fi}}"
+                  data-si="{{si}}"
+                  bindtap="onRemoveSession"
+                >删</view>
+              </view>
+            </block>
+
+            <view class="tm-add-sess" data-fi="{{fi}}" bindtap="onAddSession">+ 加一条规格</view>
+          </view>
+        </block>
+
+        <view class="tm-add-format" bindtap="onAddFormat">+ 添加上课形式</view>
+      </view>
+
+      <button class="submit-btn" bindtap="onSave">保存</button>
+    </block>
+  </scroll-view>
+</view>

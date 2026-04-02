@@ -423,6 +423,24 @@ async function markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, 
     })
   }
   console.log('db_member_course_hours 已入账', phone, venueId, lessonKey, grantHours)
+
+  if (grantHours >= 10) {
+    try {
+      const userHit = await db.collection('db_user').where({ phone }).limit(1).get()
+      const udoc = userHit.data && userHit.data[0]
+      if (udoc && udoc._id) {
+        await db.collection('db_user').doc(udoc._id).update({
+          data: {
+            isVip: true,
+            updatedAt: now,
+          },
+        })
+        console.log('db_user 已设为 VIP（单次购课包≥10课时）', phone, grantHours)
+      }
+    } catch (e) {
+      console.error('setVipAfterCoursePurchase failed', phone, e)
+    }
+  }
 }
 
 /** 会员微信支付成功后释放教练占用的连续时段 */

@@ -41,8 +41,19 @@
             bindgetphonenumber="onPhoneRegister"
           />
         </view>
-        <view class="profile-name">{{userDisplayName}}</view>
-        <view wx:if="{{userIdentity}}" class="profile-badge">{{userIdentity}}</view>
+        <button
+          wx:if="{{!isLoggedIn}}"
+          class="profile-name profile-name--phone-btn"
+          open-type="getPhoneNumber"
+          bindgetphonenumber="onPhoneRegister"
+        >
+          {{userDisplayName}}
+        </button>
+        <view wx:else class="profile-name">{{userDisplayName}}</view>
+        <view
+          wx:if="{{userIdentity}}"
+          class="profile-badge profile-badge--{{identityBadgeKind}}"
+        >{{userIdentity}}</view>
       </view>
 
       <!-- 奖励/课时卡片 -->
@@ -67,8 +78,17 @@
 
       <!-- 菜单列表 -->
       <view class="profile-menu-card">
+        <block wx:if="{{isManager}}">
+          <view class="profile-menu-item profile-menu-admin" bindtap="goAdminConsole" hover-class="profile-menu-item--hover">
+            <image src="/assets/images/profile/profile-list.svg" class="profile-menu-icon" mode="aspectFit" />
+            <text class="profile-menu-label">管理后台</text>
+            <view class="profile-menu-sep" />
+            <image src="/assets/images/profile/arrow-green.svg" class="profile-menu-arrow" mode="aspectFit" />
+          </view>
+          <view class="profile-menu-divider" />
+        </block>
         <block wx:if="{{isCoach || isManager}}">
-          <view  class="profile-menu-item" bindtap="handleCoachBookCourt" hover-class="profile-menu-item--hover">
+          <view  class="profile-menu-item profile-menu-admin" bindtap="handleCoachBookCourt" hover-class="profile-menu-item--hover">
             <image src="/assets/images/profile/profile-booking.svg" class="profile-menu-icon" mode="aspectFit" />
             <text class="profile-menu-label">预约场地</text>
             <view class="profile-menu-sep" />
@@ -77,7 +97,7 @@
           <view class="profile-menu-divider" />
         </block>
         <block wx:if="{{isCoach}}">
-          <view class="profile-menu-item" bindtap="goCoachHolds" hover-class="profile-menu-item--hover">
+          <view class="profile-menu-item profile-menu-admin" bindtap="goCoachHolds" hover-class="profile-menu-item--hover">
             <image src="/assets/images/profile/profile-lock.svg" class="profile-menu-icon" mode="aspectFit" />
             <text class="profile-menu-label">我的场地占用</text>
             <view class="profile-menu-sep" />
@@ -85,7 +105,7 @@
           </view>
           <view class="profile-menu-divider" />
         </block>
-        <view class="profile-menu-item" bindtap="goCourtOrders" hover-class="profile-menu-item--hover">
+        <view class="profile-menu-item {{isManager || isCoach ? 'profile-menu-common' : ''}}" bindtap="goCourtOrders" hover-class="profile-menu-item--hover">
           <image src="/assets/images/profile/profile-history.svg" class="profile-menu-icon" mode="aspectFit" />
           <text class="profile-menu-label">订场历史</text>
           <view class="profile-menu-sep" />

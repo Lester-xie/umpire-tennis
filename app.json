@@ -13,7 +13,14 @@
     "pages/profile-goods-orders/index",
     "pages/profile-course-hours/index",
     "pages/coach-booking/index",
-    "pages/complete-profile/index"
+    "pages/complete-profile/index",
+    "pages/admin/index",
+    "pages/admin-users/index",
+    "pages/admin-venues/index",
+    "pages/admin-venue-edit/index",
+    "pages/admin-courses/index",
+    "pages/admin-course-edit/index",
+    "pages/admin-stats/index"
   ],
   "window": {
     "backgroundTextStyle": "light",

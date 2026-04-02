@@ -3,9 +3,11 @@ const {
   getCategories,
   getUserByPhone,
   coachHoldSlots,
+  adminCoachHoldForCoach,
   listCoachHolds,
   cancelCoachHold,
   updateCoachHolds,
+  refreshSelectedVenueFromCloud,
 } = require('../../api/tennisDb');
 const { indexCategoriesByCoachLessonType } = require('../../utils/coachPurposeScales');
 const { indexDocsById } = require('../../utils/courseCatalog');
@@ -116,12 +118,20 @@ Page({
     selectedVenueId: '', // 当前选定的球场 id
     priceLoading: false, // 加载价格规则状态
     showPurposeSheet: false,
-    /** experience | regular | group | open_play（畅打，仅管理员用途） */
+    /** experience | regular | group | open_play（畅打仅管理员可选） */
     lessonType: 'experience',
-    /** 管理员：用途仅畅打；与 isCoach 互斥展示（教练+管理员时管理员优先） */
+    /** 管理员：与 bookingCoachSlots 中「可管理全部占用」一致 */
     purposeOnlyOpenPlay: false,
-    /** 非管理员教练：展示体验课/正课/团课，不含畅打 */
+    isManagerUser: false,
+    /** 管理员可见「畅打」类型 */
+    showOpenPlayChip: false,
+    /** 教练或管理员：展示体验/正课/团课 */
     purposeShowStandardTypes: false,
+    /** 管理员指定教练：db_user.isCoach */
+    coachPickerList: [],
+    coachPickerLabels: [],
+    coachPickerIndex: 0,
+    selectedCoachPhone: '',
     /** 体验课/正课：1v1 | 1v2 */
     pairMode: '1v1',
     /** 团课：固定 group35（3-5人） */
@@ -185,19 +195,77 @@ Page({
         console.warn('refreshManagerAndCoachCatalog', e);
       }
     }
-    const purposeOnlyOpenPlay = !!isManager;
-    const purposeShowStandardTypes = !!isCoach && !isManager;
-    const hadPurposeOnlyOpenPlay = this.data.purposeOnlyOpenPlay;
-    this.setData({ purposeOnlyOpenPlay, purposeShowStandardTypes });
-    await this.loadCoachCategories(purposeOnlyOpenPlay);
-    if (purposeOnlyOpenPlay) {
-      const patch = this.applyPurposeScalesForLessonType('open_play', '', '');
-      this.setData({ lessonType: 'open_play', ...patch });
-    } else if (hadPurposeOnlyOpenPlay && !purposeOnlyOpenPlay && this.data.lessonType === 'open_play') {
-      const patch = this.applyPurposeScalesForLessonType('experience', '1v1', 'group35');
-      this.setData({ lessonType: 'experience', ...patch });
+    const isManagerUser = !!isManager;
+    const purposeShowStandardTypes = !!(isCoach || isManager);
+    const showOpenPlayChip = isManagerUser;
+
+    this.setData({
+      isManagerUser,
+      purposeOnlyOpenPlay: isManagerUser,
+      showOpenPlayChip,
+      purposeShowStandardTypes,
+    });
+    await this.loadCoachCategories(showOpenPlayChip);
+
+    if (!purposeShowStandardTypes && !showOpenPlayChip) {
+      this.endLoading();
+      return;
     }
+
+    let lt = this.data.lessonType || 'experience';
+    if (!isManagerUser && lt === 'open_play') {
+      lt = 'experience';
+    }
+    let patch;
+    if (lt === 'open_play') {
+      patch = this.applyPurposeScalesForLessonType('open_play', '', this.data.groupMode || 'group35');
+    } else if (lt === 'group') {
+      patch = this.applyPurposeScalesForLessonType('group', '', this.data.groupMode || 'group35');
+    } else {
+      patch = this.applyPurposeScalesForLessonType(
+        lt,
+        this.data.pairMode || '1v1',
+        'group35'
+      );
+    }
+    this.setData({ lessonType: lt, ...patch });
     this.endLoading();
+  },
+
+  async ensureCoachPickerLoaded() {
+    if (!this.data.isManagerUser || this.data.coachPickerList.length > 0) return;
+    try {
+      const db = wx.cloud.database();
+      const res = await db.collection('db_user').where({ isCoach: true }).get();
+      const rows = (res && res.data) || [];
+      const coachPickerList = rows
+        .filter((u) => u && u.phone && /^1\d{10}$/.test(String(u.phone).trim()))
+        .map((u) => ({
+          phone: String(u.phone).trim(),
+          name: u.name != null && String(u.name).trim() !== '' ? String(u.name).trim() : '教练',
+        }));
+      const coachPickerLabels = coachPickerList.map((c) => `${c.name} · ${c.phone}`);
+      const coachPickerIndex = 0;
+      const selectedCoachPhone = coachPickerList[0] ? coachPickerList[0].phone : '';
+      this.setData({
+        coachPickerList,
+        coachPickerLabels,
+        coachPickerIndex,
+        selectedCoachPhone,
+      });
+    } catch (e) {
+      console.warn('ensureCoachPickerLoaded', e);
+      wx.showToast({ title: '教练列表加载失败，请检查数据库权限', icon: 'none' });
+    }
+  },
+
+  onCoachPickerChange(e) {
+    const idx = Number(e.detail.value);
+    const item = this.data.coachPickerList[idx];
+    this.setData({
+      coachPickerIndex: Number.isFinite(idx) ? idx : 0,
+      selectedCoachPhone: item ? item.phone : '',
+    });
   },
 
   applyPurposeScalesForLessonType(lessonType, pairModeIn, groupModeIn) {
@@ -251,8 +319,12 @@ Page({
   onShow() {
     this.refreshManagerAndCoachCatalog();
     const newVenueId = this.syncSelectedVenueName();
-    if (newVenueId) {
-      this.loadSlotPricesAndRender(newVenueId);
+    const venueIdToReload =
+      newVenueId != null && String(newVenueId).trim() !== ''
+        ? newVenueId
+        : this.data.selectedVenueId;
+    if (venueIdToReload) {
+      this.loadSlotPricesAndRender(venueIdToReload);
     }
     const app = getApp();
     if (app && app.globalData && app.globalData.shouldClearBookingData) {
@@ -342,6 +414,17 @@ Page({
 
   loadSlotPricesAndRender(venueIdOverride) {
     this.beginLoading('加载中');
+    refreshSelectedVenueFromCloud()
+      .then(() => {
+        this.syncSelectedVenueName();
+        this.loadSlotPricesAndRenderCore(venueIdOverride);
+      })
+      .catch(() => {
+        this.loadSlotPricesAndRenderCore(venueIdOverride);
+      });
+  },
+
+  loadSlotPricesAndRenderCore(venueIdOverride) {
     const venueId =
       venueIdOverride !== undefined ? venueIdOverride : this.data.selectedVenueId;
 
@@ -371,7 +454,7 @@ Page({
     const courtList = venue && Array.isArray(venue.courtList) ? venue.courtList : [];
 
     if (courtList.length > 0) {
-      this.slotPriceMap = buildSlotPriceMapFromCourtList(courtList);
+      this.slotPriceMap = buildSlotPriceMapFromCourtList(courtList, { useVipPrices: false });
       this.setData({ priceLoading: false });
       resetAndFetch();
       return;
@@ -497,6 +580,7 @@ Page({
       bookedSlotKeySet: this.bookedSlotKeySet,
       purposeOnlyOpenPlay: this.data.purposeOnlyOpenPlay,
       myCoachHoldIdSet: this.myCoachHoldIdSet,
+      isVipUser: false,
     });
 
     this.setData({
@@ -521,7 +605,7 @@ Page({
       .map((s) => s.trim())
       .filter(Boolean);
     const mySet = this.myCoachHoldIdSet || new Set();
-    const isMgr = this.data.purposeOnlyOpenPlay;
+    const isMgr = this.data.isManagerUser;
     const owned = idList.some((id) => mySet.has(id));
     const myIds = isMgr ? idList : idList.filter((id) => mySet.has(id));
     if (myIds.length === 0) {
@@ -559,9 +643,7 @@ Page({
           const pm = ds.pairmode || '1v1';
           const gm = ds.groupmode || 'group35';
           let lt = ds.lessontype || 'experience';
-          if (this.data.purposeOnlyOpenPlay) {
-            lt = 'open_play';
-          } else if (lt === 'open_play') {
+          if (!this.data.isManagerUser && lt === 'open_play') {
             lt = 'experience';
           }
           const scalePatch = this.applyPurposeScalesForLessonType(lt, pm, gm);
@@ -585,7 +667,7 @@ Page({
       .map((s) => s.trim())
       .filter(Boolean);
     const mySet = this.myCoachHoldIdSet || new Set();
-    const isMgr = this.data.purposeOnlyOpenPlay;
+    const isMgr = this.data.isManagerUser;
     const ids = isMgr ? raw : raw.filter((id) => mySet.has(id));
     if (ids.length === 0) {
       wx.showToast({ title: '无可用占用记录', icon: 'none' });
@@ -620,8 +702,15 @@ Page({
   },
 
   confirmPurposeSheet() {
-    const { lessonType, purposeSheetMode, purposeOnlyOpenPlay } = this.data;
-    if (lessonType === 'group' && !purposeOnlyOpenPlay) {
+    const { lessonType, purposeSheetMode, isManagerUser } = this.data;
+    if (isManagerUser && ['experience', 'regular', 'group'].includes(lessonType)) {
+      const ph = String(this.data.selectedCoachPhone || '').trim();
+      if (!/^1\d{10}$/.test(ph)) {
+        wx.showToast({ title: '请选择教练', icon: 'none' });
+        return;
+      }
+    }
+    if (lessonType === 'group') {
       let check;
       if (purposeSheetMode === 'edit') {
         const pairs = collectSlotPairsForCoachHoldIds(
@@ -808,7 +897,7 @@ Page({
     return total;
   },
 
-  handleNextToPurpose() {
+  async handleNextToPurpose() {
     if (!this.data.selectedVenueId) {
       wx.showModal({
         title: '未选择场馆',
@@ -830,22 +919,39 @@ Page({
       });
       return;
     }
-    if (!this.data.purposeOnlyOpenPlay && !this.data.purposeShowStandardTypes) {
+    if (!this.data.isManagerUser && !this.data.purposeShowStandardTypes) {
       wx.showToast({ title: '无权限占用场地', icon: 'none' });
       return;
     }
-    const onlyOpen = this.data.purposeOnlyOpenPlay;
-    const lt = onlyOpen ? 'open_play' : this.data.lessonType;
-    const scalePatch = this.applyPurposeScalesForLessonType(
-      lt,
-      onlyOpen ? '' : this.data.pairMode,
-      onlyOpen ? '' : this.data.groupMode
-    );
+    if (this.data.isManagerUser) {
+      await this.ensureCoachPickerLoaded();
+    }
+    const lt = this.data.lessonType || 'experience';
+    let scalePatch;
+    if (lt === 'open_play') {
+      scalePatch = this.applyPurposeScalesForLessonType(
+        'open_play',
+        '',
+        this.data.groupMode || 'group35'
+      );
+    } else if (lt === 'group') {
+      scalePatch = this.applyPurposeScalesForLessonType(
+        'group',
+        '',
+        this.data.groupMode || 'group35'
+      );
+    } else {
+      scalePatch = this.applyPurposeScalesForLessonType(
+        lt,
+        this.data.pairMode || '1v1',
+        'group35'
+      );
+    }
     this.setData({
       showPurposeSheet: true,
       purposeSheetMode: 'create',
       editingHoldIds: [],
-      ...(onlyOpen ? { lessonType: 'open_play' } : {}),
+      lessonType: lt,
       ...scalePatch,
     });
   },
@@ -861,8 +967,20 @@ Page({
   selectLessonType(e) {
     const { v } = e.currentTarget.dataset;
     if (!v) return;
-    if (this.data.purposeOnlyOpenPlay) return;
-    if (v === 'open_play') return;
+    if (v === 'open_play') {
+      if (!this.data.showOpenPlayChip) return;
+      const scalePatch = this.applyPurposeScalesForLessonType(
+        'open_play',
+        '',
+        this.data.groupMode || 'group35'
+      );
+      this.setData({
+        lessonType: 'open_play',
+        ...scalePatch,
+      });
+      return;
+    }
+    if (!this.data.purposeShowStandardTypes) return;
     const scalePatch = this.applyPurposeScalesForLessonType(v, '', '');
     this.setData({
       lessonType: v,
@@ -902,19 +1020,28 @@ Page({
     );
     try {
       const capacityLimit = this.resolveSelectedCapacityLimit(lessonType, pairMode, groupMode);
-      const cloudRes = await coachHoldSlots(
-        buildCoachHoldSlotsPayload({
-          selectedVenueId,
-          venueName,
-          selectedDate,
-          selectedSlots,
-          lessonType,
-          pairMode,
-          groupMode,
-          scaleDisplayName,
-          capacityLimit,
-        })
-      );
+      const payload = buildCoachHoldSlotsPayload({
+        selectedVenueId,
+        venueName,
+        selectedDate,
+        selectedSlots,
+        lessonType,
+        pairMode,
+        groupMode,
+        scaleDisplayName,
+        capacityLimit,
+      });
+      let coachPhoneArg = '';
+      if (this.data.isManagerUser) {
+        coachPhoneArg =
+          lessonType === 'open_play' ? '' : String(this.data.selectedCoachPhone || '').trim();
+      }
+      const cloudRes = this.data.isManagerUser
+        ? await adminCoachHoldForCoach({
+            ...payload,
+            coachPhone: coachPhoneArg,
+          })
+        : await coachHoldSlots(payload);
       const r = (cloudRes && cloudRes.result) || {};
       this.endLoading();
       if (!r.ok) {

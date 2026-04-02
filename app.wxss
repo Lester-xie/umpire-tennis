@@ -4,3 +4,124 @@ page {
   font-family: "PingFang SC", "Helvetica Neue", Arial, sans-serif;
 }
 
+/**
+ * 原生 input 在部分机型上仅设 padding 会高度塌陷，需 min-height + line-height + box-sizing。
+ * 各页可在此基础上覆盖 font-size、border 等。
+ */
+.field-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 88rpx;
+  padding: 22rpx 24rpx;
+  font-size: 28rpx;
+  line-height: 44rpx;
+  color: #1a1a1a;
+}
+
+.court-name-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 88rpx;
+  padding: 22rpx 24rpx;
+  font-size: 28rpx;
+  line-height: 44rpx;
+  color: #1a1a1a;
+  background: #fff;
+  border-radius: 12rpx;
+}
+
+.tm-format-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 88rpx;
+  padding: 22rpx 24rpx;
+  font-size: 28rpx;
+  line-height: 44rpx;
+  color: #1a1a1a;
+  background: #fff;
+  border-radius: 12rpx;
+}
+
+.tm-input-sm,
+.slot-in {
+  box-sizing: border-box;
+  min-height: 72rpx;
+  padding: 16rpx 18rpx;
+  font-size: 26rpx;
+  line-height: 40rpx;
+  color: #1a1a1a;
+  background: #fff;
+}
+
+.sp-in {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 88rpx;
+  padding: 22rpx 24rpx;
+  font-size: 28rpx;
+  line-height: 44rpx;
+  color: #1a1a1a;
+  background: #fff;
+  border-radius: 12rpx;
+}
+
+.phone-input {
+  box-sizing: border-box;
+  min-height: 88rpx;
+  padding: 20rpx 24rpx;
+  line-height: 44rpx;
+}
+
+/* 管理台：封面图上传与预览 */
+.admin-image-block {
+  margin-top: 8rpx;
+}
+
+.admin-image-preview-wrap {
+  width: 100%;
+  height: 280rpx;
+  border-radius: 16rpx;
+  overflow: hidden;
+  background: #eef1f6;
+  margin-bottom: 16rpx;
+}
+
+.admin-image-preview {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.admin-image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  color: #999;
+}
+
+.admin-image-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+}
+
+.admin-image-btn {
+  margin: 0 !important;
+  font-size: 26rpx !important;
+  padding: 0 28rpx !important;
+  line-height: 2 !important;
+  background: #134e35 !important;
+  color: #fff !important;
+}
+
+.admin-image-clear {
+  font-size: 26rpx;
+  color: #c62828;
+  padding: 8rpx 0;
+}
+

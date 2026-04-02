@@ -40,10 +40,19 @@ function resolveAvatarForUI(avatarValue) {
   });
 }
 
-/** isCoach 优先于 isVip；均为 false 时为空串 */
-function buildUserIdentity(isCoach, isVip) {
+/** 管理员（isManager）> 教练 > VIP：徽章只展示最高一档 */
+function buildUserIdentity(isCoach, isVip, isManager) {
+  if (isManager) return '管理员';
   if (isCoach) return '教练';
   if (isVip) return 'VIP';
+  return '';
+}
+
+/** 与 buildUserIdentity 同优先级，用于 profile-badge 背景色 */
+function identityBadgeKind(isCoach, isVip, isManager) {
+  if (isManager) return 'manager';
+  if (isCoach) return 'coach';
+  if (isVip) return 'vip';
   return '';
 }
 
@@ -60,8 +69,9 @@ Page({
     placeholderHeight: 0,
     isVip: false, // db_user.isVip
     isCoach: false, // db_user.isCoach
-    isManager: false, // db_user.isManager（畅打占用等）
-    userIdentity: '', // 教练 | VIP | ''
+    isManager: false, // db_user.isManager（畅打 + 后台管理）
+    userIdentity: '', // 管理员 | 教练 | VIP | ''（优先级见 buildUserIdentity）
+    identityBadgeKind: '', // manager | coach | vip | ''
     lottieLoadingVisible: false,
     /** 全部场馆剩余课时合计（展示在账户卡片） */
     totalCourseHours: 0,
@@ -102,7 +112,8 @@ Page({
         isCoach = flags.isCoach;
         isManager = flags.isManager;
       }
-      const userIdentity = buildUserIdentity(isCoach, isVip);
+      const userIdentity = buildUserIdentity(isCoach, isVip, isManager);
+      const badgeKind = identityBadgeKind(isCoach, isVip, isManager);
       let totalCourseHours = 0;
       if (isLoggedIn && userPhone) {
         totalCourseHours = await this.fetchTotalCourseHoursSum();
@@ -122,6 +133,7 @@ Page({
         isCoach,
         isManager,
         userIdentity,
+        identityBadgeKind: badgeKind,
         totalCourseHours,
         totalCourseHoursText,
       });
@@ -160,13 +172,17 @@ Page({
     }
   },
 
-  /** 从 db_user 读取 isVip、isCoach、isManager（一次查询） */
+  /** 从 db_user 读取角色 */
   async fetchUserRoleFlags(phone) {
-    if (!phone) return { isVip: false, isCoach: false, isManager: false };
+    if (!phone) {
+      return { isVip: false, isCoach: false, isManager: false };
+    }
     try {
       const res = await getUserByPhone(phone);
       const user = res && res.data && res.data.length > 0 ? res.data[0] : null;
-      if (!user) return { isVip: false, isCoach: false, isManager: false };
+      if (!user) {
+        return { isVip: false, isCoach: false, isManager: false };
+      }
       return {
         isVip: !!user.isVip,
         isCoach: !!user.isCoach,
@@ -316,7 +332,8 @@ Page({
           isVip,
           isCoach,
           isManager,
-          userIdentity: buildUserIdentity(isCoach, isVip),
+          userIdentity: buildUserIdentity(isCoach, isVip, isManager),
+          identityBadgeKind: identityBadgeKind(isCoach, isVip, isManager),
           totalCourseHours,
           totalCourseHoursText: this.formatHoursNumber(totalCourseHours),
         });
@@ -347,6 +364,7 @@ Page({
         isCoach: false,
         isManager: false,
         userIdentity: '',
+        identityBadgeKind: '',
         totalCourseHours: 0,
         totalCourseHoursText: '0',
       });
@@ -446,10 +464,16 @@ Page({
           isCoach: false,
           isManager: false,
           userIdentity: '',
+          identityBadgeKind: '',
           totalCourseHours: 0,
           totalCourseHoursText: '—',
         });
       },
     });
+  },
+
+  goAdminConsole() {
+    if (!this.data.isManager) return;
+    wx.navigateTo({ url: '/pages/admin/index' });
   },
 });

@@ -3,6 +3,8 @@ const STORAGE_USER_PHONE = 'user_phone';
 /** 与 pages/location、pages/welcome 一致：已选球场持久化 key */
 const STORAGE_SELECTED_VENUE = 'selected_venue';
 
+const { refreshSelectedVenueFromCloud, invalidateCourseCache } = require('./api/tennisDb');
+
 App({
   globalData: {
     brand: "昂湃网球",
@@ -16,6 +18,13 @@ App({
     this.initCloud();
     this.restoreLoginSession();
     this.restoreSelectedVenue();
+  },
+  /** 从后台切回小程序、或云开发控制台改库后回到前台：场馆 + 课程缓存一并失效再拉 */
+  onShow() {
+    invalidateCourseCache();
+    if (this.globalData.selectedVenue && this.globalData.selectedVenue.id) {
+      refreshSelectedVenueFromCloud(this).catch(() => {});
+    }
   },
   /**
    * 冷启动时 globalData 会清空，但本地可能仍有上次选的球场。

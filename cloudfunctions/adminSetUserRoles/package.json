@@ -1,0 +1,9 @@
+{
+  "name": "adminSetUserRoles",
+  "version": "1.0.0",
+  "description": "管理员按手机号设置教练/VIP（isManager 仅数据库）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}
