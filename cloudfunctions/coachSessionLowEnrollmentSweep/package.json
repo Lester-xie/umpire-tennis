@@ -1,0 +1,9 @@
+{
+  "name": "coachSessionLowEnrollmentSweep",
+  "version": "1.0.0",
+  "description": "团课/畅打未成班自动取消并退款（定时触发）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

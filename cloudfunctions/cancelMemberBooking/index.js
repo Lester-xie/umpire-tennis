@@ -46,17 +46,27 @@ function orderDateInValues(orderDateRaw, normalized) {
 
 function defaultCapacityLimit(lessonType, pairMode, groupMode) {
   const lt = String(lessonType || '').trim();
-  if (lt === 'group') return 5;
+  if (lt === 'group') {
+    const gm = String(groupMode || '').trim().toLowerCase();
+    if (gm.includes('1v2')) return 1;
+    return 5;
+  }
   if (lt === 'open_play') {
     const gm = String(groupMode || '').trim().toLowerCase();
     if (gm === 'group36') return 6;
     return 6;
   }
-  const pm = String(pairMode || '')
-    .trim()
-    .toLowerCase();
-  if (pm === '1v2') return 2;
   return 1;
+}
+
+function clampCoachCapacityFromModes(lessonType, pairMode, groupMode, cap) {
+  const n = Math.floor(Number(cap));
+  if (!Number.isFinite(n) || n < 1) return cap;
+  const pm = String(pairMode || '').trim().toLowerCase();
+  const lt = String(lessonType || '').trim();
+  const gm = String(groupMode || '').trim().toLowerCase();
+  if (pm === '1v2' || (lt === 'group' && gm.includes('1v2'))) return Math.min(n, 1);
+  return Math.min(99, n);
 }
 
 async function getCoachSessionLimitForHoldIds(holdIds) {
@@ -69,7 +79,7 @@ async function getCoachSessionLimitForHoldIds(holdIds) {
     if (!Number.isFinite(cap) || cap < 1) {
       cap = defaultCapacityLimit(doc.lessonType, doc.pairMode, doc.groupMode);
     }
-    return Math.min(99, cap);
+    return clampCoachCapacityFromModes(doc.lessonType, doc.pairMode, doc.groupMode, cap);
   } catch (e) {
     return 1;
   }
@@ -127,10 +137,32 @@ async function earliestSessionStartMsWithHolds(orderDate, bookedSlots, coachHold
   return earliestSessionStartMs(orderDate, [{ slotIndex: minIdx }]);
 }
 
-function memberWithinCancelDeadline(sessionStartMs, nowMs) {
+async function getRefundLeadMsFromCoachHolds(coachHoldIds) {
+  const ids = Array.isArray(coachHoldIds) ? coachHoldIds : [];
+  if (!ids[0]) return null;
+  try {
+    const d = await db.collection('db_coach_slot_hold').doc(String(ids[0]).trim()).get();
+    const doc = d.data;
+    if (!doc) return null;
+    const lt = String(doc.lessonType || '').trim();
+    if ((lt === 'group' || lt === 'open_play') && doc.refundHoursBeforeStart != null) {
+      const h = Math.floor(Number(doc.refundHoursBeforeStart));
+      if (Number.isFinite(h) && h >= 0) return h * 3600000;
+    }
+  } catch (e) {
+    console.warn('getRefundLeadMsFromCoachHolds', e);
+  }
+  return null;
+}
+
+function memberWithinCancelDeadline(sessionStartMs, nowMs, leadMsOpt) {
   if (sessionStartMs == null) return true;
   if (nowMs >= sessionStartMs) return false;
-  return sessionStartMs - nowMs >= MEMBER_CANCEL_LEAD_MS;
+  const lead =
+    leadMsOpt != null && Number.isFinite(leadMsOpt) && leadMsOpt >= 0
+      ? leadMsOpt
+      : MEMBER_CANCEL_LEAD_MS;
+  return sessionStartMs - nowMs >= lead;
 }
 
 async function refundWeChatPortion(booking, now) {
@@ -317,7 +349,7 @@ async function emitBookingRealtimeSignal({ venueId, orderDate }) {
 /**
  * 会员取消订场/教练课订单
  * event: { phone, bookingId }
- * 规则：距首场开始不足 6 小时不可取消；已付订单原路退微信、退回课时；pending 仅关单
+ * 规则：距首场开始不足规定时间不可取消（普通 6h；团课/畅打以占用上的 refundHoursBeforeStart 为准）；已付原路退；pending 仅关单
  */
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext();
@@ -360,11 +392,20 @@ exports.main = async (event) => {
     booking.bookedSlots,
     booking.coachHoldIds
   );
-  if (!memberWithinCancelDeadline(sessionStartMs, now)) {
+  let leadMs = MEMBER_CANCEL_LEAD_MS;
+  if (String(booking.bookingSubtype || '').trim() === 'coach_course') {
+    const customLead = await getRefundLeadMsFromCoachHolds(booking.coachHoldIds);
+    if (customLead != null) leadMs = customLead;
+  }
+  if (!memberWithinCancelDeadline(sessionStartMs, now, leadMs)) {
     if (sessionStartMs != null && now >= sessionStartMs) {
       return { ok: false, errMsg: '场次已开始或已结束，无法取消' };
     }
-    return { ok: false, errMsg: '距开场不足 6 小时，无法取消；如需协调请联系场馆' };
+    const hoursLabel = Math.max(1, Math.round(leadMs / 3600000));
+    return {
+      ok: false,
+      errMsg: `距开场不足 ${hoursLabel} 小时，无法取消；如需协调请联系场馆`,
+    };
   }
 
   if (st === 'pending' || st === 'payment_confirming') {

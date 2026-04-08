@@ -52,13 +52,17 @@ function resolveSelectedCapacityLimit(
 ) {
   if (lessonType === 'group' || lessonType === 'open_play') {
     const row = (purposeGroupScales || []).find((s) => s.modeCode === groupMode);
-    const fb = lessonType === 'open_play' ? 6 : 5;
-    const lim = row && row.limit != null ? Math.floor(Number(row.limit)) : fb;
+    const gm = String(groupMode || '').trim().toLowerCase();
+    const fb =
+      lessonType === 'open_play' ? 6 : gm.includes('1v2') ? 1 : 5;
+    let lim = row && row.limit != null ? Math.floor(Number(row.limit)) : fb;
+    if (lessonType === 'group' && gm.includes('1v2')) lim = Math.min(lim, 1);
     return Number.isFinite(lim) && lim >= 1 ? lim : fb;
   }
   const row = (purposePairScales || []).find((s) => s.modeCode === pairMode);
-  const fb = pairMode === '1v2' ? 2 : 1;
-  const lim = row && row.limit != null ? Math.floor(Number(row.limit)) : fb;
+  const fb = 1;
+  let lim = row && row.limit != null ? Math.floor(Number(row.limit)) : fb;
+  if (pairMode === '1v2') lim = Math.min(lim, 1);
   return Number.isFinite(lim) && lim >= 1 ? lim : fb;
 }
 

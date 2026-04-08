@@ -143,6 +143,10 @@ Page({
     purposePairScales: [],
     purposeGroupScales: [],
     lottieLoadingVisible: false,
+    /** 团课/畅打：人数与退课、成团检查 */
+    minParticipants: 3,
+    maxParticipants: 12,
+    refundHoursBeforeStart: 6,
   },
 
   // 动画定时器
@@ -269,13 +273,27 @@ Page({
   },
 
   applyPurposeScalesForLessonType(lessonType, pairModeIn, groupModeIn) {
-    return coachPurpose.applyPurposeScalesForLessonType(
-      lessonType,
+    const lt = String(lessonType || '').trim();
+    const gmIn =
+      lt === 'open_play'
+        ? 'group36'
+        : lt === 'group'
+          ? 'group35'
+          : groupModeIn;
+    const out = coachPurpose.applyPurposeScalesForLessonType(
+      lt,
       pairModeIn,
-      groupModeIn,
+      gmIn,
       this._coachCategoryIndex,
       this._courseScaleById
     );
+    if (lt === 'group') {
+      return { ...out, purposeGroupScales: [], groupMode: 'group35' };
+    }
+    if (lt === 'open_play') {
+      return { ...out, purposeGroupScales: [], groupMode: 'group36' };
+    }
+    return out;
   },
 
   resolveSelectedScaleDisplayName(lessonType, pairMode, groupMode) {
@@ -594,7 +612,8 @@ Page({
   },
 
   handleCoachHoldCellTap(e) {
-    const ds = e.currentTarget.dataset || {};
+    const tapDs = e.currentTarget.dataset || {};
+    const ds = tapDs;
     if (!this._isTruthyDataset(ds.canmanage)) {
       wx.showToast({ title: '非本人占用，无法操作', icon: 'none' });
       return;
@@ -647,12 +666,33 @@ Page({
             lt = 'experience';
           }
           const scalePatch = this.applyPurposeScalesForLessonType(lt, pm, gm);
+          const minP =
+            tapDs.minparticipants != null && String(tapDs.minparticipants).trim() !== ''
+              ? Math.floor(Number(tapDs.minparticipants))
+              : NaN;
+          const maxP =
+            tapDs.maxparticipants != null && String(tapDs.maxparticipants).trim() !== ''
+              ? Math.floor(Number(tapDs.maxparticipants))
+              : NaN;
+          const rh =
+            tapDs.refundhours != null && String(tapDs.refundhours).trim() !== ''
+              ? Math.floor(Number(tapDs.refundhours))
+              : NaN;
+          const enrollPatch =
+            lt === 'group' || lt === 'open_play'
+              ? {
+                  minParticipants: Number.isFinite(minP) && minP >= 1 ? minP : 3,
+                  maxParticipants: Number.isFinite(maxP) && maxP >= 1 ? maxP : 12,
+                  refundHoursBeforeStart: Number.isFinite(rh) && rh >= 0 ? rh : 6,
+                }
+              : {};
           this.setData({
             showPurposeSheet: true,
             purposeSheetMode: 'edit',
             editingHoldIds: myIds,
             lessonType: lt,
             ...scalePatch,
+            ...enrollPatch,
           });
         } else if (res.tapIndex === 1) {
           this.confirmCancelCoachHolds(myIds.join(','));
@@ -731,6 +771,23 @@ Page({
         return;
       }
     }
+    if (lessonType === 'group' || lessonType === 'open_play') {
+      const mn = Math.floor(Number(this.data.minParticipants));
+      const mx = Math.floor(Number(this.data.maxParticipants));
+      const rh = Math.floor(Number(this.data.refundHoursBeforeStart));
+      if (!Number.isFinite(mn) || mn < 1) {
+        wx.showToast({ title: '请填写最少参加人数', icon: 'none' });
+        return;
+      }
+      if (!Number.isFinite(mx) || mx < mn) {
+        wx.showToast({ title: '最多人数须不少于最少人数', icon: 'none' });
+        return;
+      }
+      if (!Number.isFinite(rh) || rh < 0) {
+        wx.showToast({ title: '请填写开课前时间（小时）', icon: 'none' });
+        return;
+      }
+    }
     if (purposeSheetMode === 'edit') {
       this.submitCoachHoldEdit();
     } else {
@@ -755,7 +812,10 @@ Page({
     );
     this.beginLoading('保存中...');
     try {
-      const capacityLimit = this.resolveSelectedCapacityLimit(lessonType, pairMode, groupMode);
+      const capacityLimit =
+        lessonType === 'group' || lessonType === 'open_play'
+          ? Math.floor(Number(this.data.maxParticipants))
+          : this.resolveSelectedCapacityLimit(lessonType, pairMode, groupMode);
       const cloudRes = await updateCoachHolds(
         buildUpdateCoachHoldsPayload({
           holdIds: ids,
@@ -764,6 +824,9 @@ Page({
           groupMode,
           scaleDisplayName,
           capacityLimit,
+          minParticipants: this.data.minParticipants,
+          maxParticipants: this.data.maxParticipants,
+          refundHoursBeforeStart: this.data.refundHoursBeforeStart,
         })
       );
       const r = (cloudRes && cloudRes.result) || {};
@@ -947,13 +1010,19 @@ Page({
         'group35'
       );
     }
-    this.setData({
+    const patch = {
       showPurposeSheet: true,
       purposeSheetMode: 'create',
       editingHoldIds: [],
       lessonType: lt,
       ...scalePatch,
-    });
+    };
+    if (lt === 'group' || lt === 'open_play') {
+      patch.minParticipants = 3;
+      patch.maxParticipants = 12;
+      patch.refundHoursBeforeStart = 6;
+    }
+    this.setData(patch);
   },
 
   closePurposeSheet() {
@@ -977,25 +1046,40 @@ Page({
       this.setData({
         lessonType: 'open_play',
         ...scalePatch,
+        minParticipants: 3,
+        maxParticipants: 12,
+        refundHoursBeforeStart: 6,
       });
       return;
     }
     if (!this.data.purposeShowStandardTypes) return;
     const scalePatch = this.applyPurposeScalesForLessonType(v, '', '');
-    this.setData({
+    const patch = {
       lessonType: v,
       ...scalePatch,
-    });
+    };
+    if (v === 'group') {
+      patch.minParticipants = 3;
+      patch.maxParticipants = 12;
+      patch.refundHoursBeforeStart = 6;
+    }
+    this.setData(patch);
+  },
+
+  onMinParticipantsInput(e) {
+    this.setData({ minParticipants: e.detail.value });
+  },
+  onMaxParticipantsInput(e) {
+    this.setData({ maxParticipants: e.detail.value });
+  },
+  onRefundHoursInput(e) {
+    this.setData({ refundHoursBeforeStart: e.detail.value });
   },
 
   selectPurposeScale(e) {
     const { kind, code } = e.currentTarget.dataset;
-    if (!code) return;
-    if (kind === 'group') {
-      this.setData({ groupMode: code });
-    } else {
-      this.setData({ pairMode: code });
-    }
+    if (!code || kind !== 'pair') return;
+    this.setData({ pairMode: code });
   },
 
   async submitCoachHold() {
@@ -1019,7 +1103,10 @@ Page({
       groupMode
     );
     try {
-      const capacityLimit = this.resolveSelectedCapacityLimit(lessonType, pairMode, groupMode);
+      const capacityLimit =
+        lessonType === 'group' || lessonType === 'open_play'
+          ? Math.floor(Number(this.data.maxParticipants))
+          : this.resolveSelectedCapacityLimit(lessonType, pairMode, groupMode);
       const payload = buildCoachHoldSlotsPayload({
         selectedVenueId,
         venueName,
@@ -1030,6 +1117,9 @@ Page({
         groupMode,
         scaleDisplayName,
         capacityLimit,
+        minParticipants: this.data.minParticipants,
+        maxParticipants: this.data.maxParticipants,
+        refundHoursBeforeStart: this.data.refundHoursBeforeStart,
       });
       let coachPhoneArg = '';
       if (this.data.isManagerUser) {

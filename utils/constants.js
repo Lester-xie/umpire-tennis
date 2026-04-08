@@ -2,7 +2,7 @@
 const ALL_CATEGORY_ID = '__category_all__';
 
 /** 首页分类栏与课程列表不展示的分类（与 db_category.name trim 后全等） */
-const HOME_EXCLUDED_CATEGORY_NAMES = ['畅打'];
+const HOME_EXCLUDED_CATEGORY_NAMES = ['畅打', '团课'];
 
 function isCategoryExcludedFromHome(categoryDoc) {
   const n =

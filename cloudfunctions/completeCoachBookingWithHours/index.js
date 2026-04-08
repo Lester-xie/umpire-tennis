@@ -49,17 +49,27 @@ function sessionKeyFromHoldIds(ids) {
 
 function defaultCapacityLimit(lessonType, pairMode, groupMode) {
   const lt = String(lessonType || '').trim()
-  if (lt === 'group') return 5
+  if (lt === 'group') {
+    const gm = String(groupMode || '').trim().toLowerCase()
+    if (gm.includes('1v2')) return 1
+    return 5
+  }
   if (lt === 'open_play') {
     const gm = String(groupMode || '').trim().toLowerCase()
     if (gm === 'group36') return 6
     return 6
   }
-  const pm = String(pairMode || '')
-    .trim()
-    .toLowerCase()
-  if (pm === '1v2') return 2
   return 1
+}
+
+function clampCoachCapacityFromModes(lessonType, pairMode, groupMode, cap) {
+  const n = Math.floor(Number(cap))
+  if (!Number.isFinite(n) || n < 1) return cap
+  const pm = String(pairMode || '').trim().toLowerCase()
+  const lt = String(lessonType || '').trim()
+  const gm = String(groupMode || '').trim().toLowerCase()
+  if (pm === '1v2' || (lt === 'group' && gm.includes('1v2'))) return Math.min(n, 1)
+  return Math.min(99, n)
 }
 
 function venueIdInValues(venueIdRaw) {
@@ -176,7 +186,7 @@ exports.main = async (event) => {
   if (!Number.isFinite(capLimit) || capLimit < 1) {
     capLimit = defaultCapacityLimit(v0.lessonType, v0.pairMode, v0.groupMode)
   }
-  capLimit = Math.min(99, capLimit)
+  capLimit = clampCoachCapacityFromModes(v0.lessonType, v0.pairMode, v0.groupMode, capLimit)
 
   const preBook = await db
     .collection('db_booking')

@@ -31,6 +31,11 @@ function applyCoachHoldMergeAndLayout(slots, courtId, {
     slots[i].prefillPairMode = '1v1';
     slots[i].prefillGroupMode = 'group35';
     slots[i].prefillCoachName = '';
+    slots[i].coachJoinedCount = 0;
+    slots[i].coachCapacityLimit = 1;
+    slots[i].coachMinParticipants = null;
+    slots[i].prefillRefundHours = null;
+    slots[i].prefillMaxParticipants = 1;
   }
 
   let i = 0;
@@ -77,11 +82,22 @@ function applyCoachHoldMergeAndLayout(slots, courtId, {
     cur.coachSessionReleased = !!m0.fromReleasedSession;
     cur.prefillLessonType = m0.lessonType || 'experience';
     cur.prefillPairMode = m0.pairMode || '1v1';
-    cur.prefillGroupMode = 'group35';
+    cur.prefillGroupMode = m0.groupMode || 'group35';
     cur.prefillCoachName =
       m0.coachName != null && String(m0.coachName).trim() !== ''
         ? String(m0.coachName).trim()
         : '';
+    cur.coachJoinedCount = m0.joinedCount != null ? Number(m0.joinedCount) : 0;
+    cur.coachCapacityLimit = m0.capacityLimit != null ? Number(m0.capacityLimit) : 1;
+    cur.coachMinParticipants =
+      m0.minParticipants != null && Number.isFinite(Number(m0.minParticipants))
+        ? Number(m0.minParticipants)
+        : null;
+    cur.prefillRefundHours =
+      m0.refundHoursBeforeStart != null && Number.isFinite(Number(m0.refundHoursBeforeStart))
+        ? Number(m0.refundHoursBeforeStart)
+        : null;
+    cur.prefillMaxParticipants = cur.coachCapacityLimit;
     for (let k = i + 1; k < i + span; k += 1) {
       slots[k].coachMergeSkip = true;
     }
@@ -167,6 +183,11 @@ function buildCourtSlotsRow({
       prefillPairMode: '1v1',
       prefillGroupMode: 'group35',
       prefillCoachName: coachName,
+      coachJoinedCount: 0,
+      coachCapacityLimit: 1,
+      coachMinParticipants: null,
+      prefillRefundHours: null,
+      prefillMaxParticipants: 1,
     });
   }
 

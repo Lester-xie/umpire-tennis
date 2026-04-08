@@ -11,8 +11,11 @@ function buildCoachHoldSlotsPayload({
   groupMode,
   scaleDisplayName,
   capacityLimit,
+  minParticipants,
+  maxParticipants,
+  refundHoursBeforeStart,
 }) {
-  return {
+  const base = {
     venueId: selectedVenueId,
     venueName: venueName != null ? String(venueName).trim() : '',
     orderDate: selectedDate,
@@ -23,6 +26,12 @@ function buildCoachHoldSlotsPayload({
     scaleDisplayName,
     capacityLimit,
   };
+  if (lessonType === 'group' || lessonType === 'open_play') {
+    base.minParticipants = minParticipants;
+    base.maxParticipants = maxParticipants;
+    base.refundHoursBeforeStart = refundHoursBeforeStart;
+  }
+  return base;
 }
 
 function buildUpdateCoachHoldsPayload({
@@ -32,8 +41,11 @@ function buildUpdateCoachHoldsPayload({
   groupMode,
   scaleDisplayName,
   capacityLimit,
+  minParticipants,
+  maxParticipants,
+  refundHoursBeforeStart,
 }) {
-  return {
+  const base = {
     holdIds,
     lessonType,
     pairMode,
@@ -41,6 +53,12 @@ function buildUpdateCoachHoldsPayload({
     scaleDisplayName,
     capacityLimit,
   };
+  if (lessonType === 'group' || lessonType === 'open_play') {
+    base.minParticipants = minParticipants;
+    base.maxParticipants = maxParticipants;
+    base.refundHoursBeforeStart = refundHoursBeforeStart;
+  }
+  return base;
 }
 
 module.exports = {

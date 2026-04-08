@@ -1,8 +1,10 @@
 const cloud = require('wx-server-sdk');
+const { parseGroupOpenEnrollment } = require('./groupOpenEnrollment');
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
+const _ = db.command;
 
 function sanitizeScaleDisplayName(raw) {
   const s = String(raw || '')
@@ -51,17 +53,27 @@ function isValidGroupMode(gm) {
 
 function defaultCapacityLimit(lessonType, pairMode, groupMode) {
   const lt = String(lessonType || '').trim();
-  if (lt === 'group') return 5;
+  if (lt === 'group') {
+    const gm = String(groupMode || '').trim().toLowerCase();
+    if (gm.includes('1v2')) return 1;
+    return 5;
+  }
   if (lt === 'open_play') {
     const gm = String(groupMode || '').trim().toLowerCase();
     if (gm === 'group36') return 6;
     return 6;
   }
-  const pm = String(pairMode || '')
-    .trim()
-    .toLowerCase();
-  if (pm === '1v2') return 2;
   return 1;
+}
+
+function clampCoachCapacityFromModes(lessonType, pairMode, groupMode, cap) {
+  const n = Math.floor(Number(cap));
+  if (!Number.isFinite(n) || n < 1) return cap;
+  const pm = String(pairMode || '').trim().toLowerCase();
+  const lt = String(lessonType || '').trim();
+  const gm = String(groupMode || '').trim().toLowerCase();
+  if (pm === '1v2' || (lt === 'group' && gm.includes('1v2'))) return Math.min(n, 1);
+  return Math.min(99, n);
 }
 
 function normalizeOrderDate(raw) {
@@ -157,11 +169,19 @@ exports.main = async (event) => {
   }
 
   const capacityLabel = buildCapacityLabel(lessonType, pairMode, groupMode, scaleDisplayName);
-  let capacityLimit = Math.floor(Number(event.capacityLimit));
-  if (!Number.isFinite(capacityLimit) || capacityLimit < 1) {
-    capacityLimit = defaultCapacityLimit(lessonType, pairMode, groupMode);
+  const ge = parseGroupOpenEnrollment(event, lessonType);
+  if (!ge.ok) {
+    return { ok: false, errMsg: ge.errMsg || '参数无效' };
   }
-  capacityLimit = Math.min(99, capacityLimit);
+  let capacityLimit = ge.capacityLimit;
+  if (lessonType !== 'group' && lessonType !== 'open_play') {
+    if (!Number.isFinite(capacityLimit) || capacityLimit < 1) {
+      capacityLimit = defaultCapacityLimit(lessonType, pairMode, groupMode);
+    }
+  } else if (!Number.isFinite(capacityLimit) || capacityLimit < 1) {
+    return { ok: false, errMsg: '人数参数无效' };
+  }
+  capacityLimit = clampCoachCapacityFromModes(lessonType, pairMode, groupMode, capacityLimit);
   const coachName =
     user.name != null && String(user.name).trim() !== '' ? String(user.name).trim() : '';
   const now = Date.now();
@@ -185,20 +205,25 @@ exports.main = async (event) => {
       if (!signalVenueId && doc.venueId != null) signalVenueId = String(doc.venueId).trim();
       if (!signalOrderDate && doc.orderDate != null) signalOrderDate = String(doc.orderDate).trim();
 
-      await db
-        .collection('db_coach_slot_hold')
-        .doc(holdId)
-        .update({
-          data: {
-            lessonType,
-            pairMode: lessonType === 'group' || lessonType === 'open_play' ? '' : pairMode,
-            groupMode: lessonType === 'group' || lessonType === 'open_play' ? groupMode : '',
-            capacityLabel,
-            capacityLimit,
-            coachName,
-            updatedAt: now,
-          },
-        });
+      const patch = {
+        lessonType,
+        pairMode: lessonType === 'group' || lessonType === 'open_play' ? '' : pairMode,
+        groupMode: lessonType === 'group' || lessonType === 'open_play' ? groupMode : '',
+        capacityLabel,
+        capacityLimit,
+        coachName,
+        updatedAt: now,
+      };
+      if (lessonType === 'group' || lessonType === 'open_play') {
+        patch.minParticipants = ge.minParticipants;
+        patch.refundHoursBeforeStart = ge.refundHoursBeforeStart;
+      } else {
+        patch.minParticipants = _.remove();
+        patch.refundHoursBeforeStart = _.remove();
+      }
+      await db.collection('db_coach_slot_hold').doc(holdId).update({
+        data: patch,
+      });
     }
     try {
       await emitBookingRealtimeSignal({

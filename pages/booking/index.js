@@ -765,6 +765,10 @@ Page({
         : cur.prefillCoachName || '';
       cur.coachJoinedCount = m0.joinedCount != null ? Number(m0.joinedCount) : 0;
       cur.coachCapacityLimit = m0.capacityLimit != null ? Number(m0.capacityLimit) : 1;
+      cur.coachMinParticipants =
+        m0.minParticipants != null && Number.isFinite(Number(m0.minParticipants))
+          ? Number(m0.minParticipants)
+          : null;
       cur.coachSessionFull = !!m0.sessionFull;
       cur.coachViewerAlreadyJoined = !!m0.viewerAlreadyJoined;
       for (let k = i + 1; k < i + span; k += 1) {
@@ -839,6 +843,7 @@ Page({
         prefillCoachName: coachName,
         coachJoinedCount: 0,
         coachCapacityLimit: 1,
+        coachMinParticipants: null,
         coachSessionFull: false,
         coachViewerAlreadyJoined: false,
       });

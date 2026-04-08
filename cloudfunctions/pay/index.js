@@ -28,17 +28,27 @@ function sessionKeyFromHoldIdsPay(ids) {
 
 function defaultCapacityLimitPay(lessonType, pairMode, groupMode) {
   const lt = String(lessonType || '').trim()
-  if (lt === 'group') return 5
+  if (lt === 'group') {
+    const gm = String(groupMode || '').trim().toLowerCase()
+    if (gm.includes('1v2')) return 1
+    return 5
+  }
   if (lt === 'open_play') {
     const gm = String(groupMode || '').trim().toLowerCase()
     if (gm === 'group36') return 6
     return 6
   }
-  const pm = String(pairMode || '')
-    .trim()
-    .toLowerCase()
-  if (pm === '1v2') return 2
   return 1
+}
+
+function clampCoachCapacityFromModes(lessonType, pairMode, groupMode, cap) {
+  const n = Math.floor(Number(cap))
+  if (!Number.isFinite(n) || n < 1) return cap
+  const pm = String(pairMode || '').trim().toLowerCase()
+  const lt = String(lessonType || '').trim()
+  const gm = String(groupMode || '').trim().toLowerCase()
+  if (pm === '1v2' || (lt === 'group' && gm.includes('1v2'))) return Math.min(n, 1)
+  return Math.min(99, n)
 }
 
 function venueIdInValuesPay(venueIdRaw) {
@@ -122,7 +132,7 @@ async function assertCoachCourseCanCreatePending(dbConn, cmd, { phone, venueId, 
   if (!Number.isFinite(limit) || limit < 1) {
     limit = defaultCapacityLimitPay(hd && hd.lessonType, hd && hd.pairMode, hd && hd.groupMode)
   }
-  limit = Math.min(99, limit)
+  limit = clampCoachCapacityFromModes(hd && hd.lessonType, hd && hd.pairMode, hd && hd.groupMode, limit)
 
   const all = await dbConn
     .collection('db_booking')

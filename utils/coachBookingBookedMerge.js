@@ -54,6 +54,10 @@ function mergeBookedSlotsAndCoachHolds(bookedResult, holdRows, venueId, normDate
       lessonType: row.lessonType,
       pairMode: row.pairMode,
       groupMode: row.groupMode,
+      minParticipants:
+        row.minParticipants != null ? row.minParticipants : cur.minParticipants,
+      refundHoursBeforeStart:
+        row.refundHoursBeforeStart != null ? row.refundHoursBeforeStart : cur.refundHoursBeforeStart,
     };
   });
 

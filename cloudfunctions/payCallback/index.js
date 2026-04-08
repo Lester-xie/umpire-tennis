@@ -27,17 +27,28 @@ function sessionKeyFromHoldIdsCb(ids) {
 
 function defaultCapacityLimitCb(lessonType, pairMode, groupMode) {
   const lt = String(lessonType || '').trim()
-  if (lt === 'group') return 5
+  if (lt === 'group') {
+    const gm = String(groupMode || '').trim().toLowerCase()
+    if (gm.includes('1v2')) return 1
+    return 5
+  }
   if (lt === 'open_play') {
     const gm = String(groupMode || '').trim().toLowerCase()
     if (gm === 'group36') return 6
     return 6
   }
-  const pm = String(pairMode || '')
-    .trim()
-    .toLowerCase()
-  if (pm === '1v2') return 2
   return 1
+}
+
+/** 1v2（体验/正课）与团课 groupMode 含 1v2 时最多 1 人，覆盖历史 capacityLimit=2 */
+function clampCoachCapacityFromModes(lessonType, pairMode, groupMode, cap) {
+  const n = Math.floor(Number(cap))
+  if (!Number.isFinite(n) || n < 1) return cap
+  const pm = String(pairMode || '').trim().toLowerCase()
+  const lt = String(lessonType || '').trim()
+  const gm = String(groupMode || '').trim().toLowerCase()
+  if (pm === '1v2' || (lt === 'group' && gm.includes('1v2'))) return Math.min(n, 1)
+  return Math.min(99, n)
 }
 
 function venueIdInValuesCb(venueIdRaw) {
@@ -104,7 +115,7 @@ async function getCoachSessionLimitForHoldIds(holdIds) {
     if (!Number.isFinite(cap) || cap < 1) {
       cap = defaultCapacityLimitCb(doc.lessonType, doc.pairMode, doc.groupMode)
     }
-    return Math.min(99, cap)
+    return clampCoachCapacityFromModes(doc.lessonType, doc.pairMode, doc.groupMode, cap)
   } catch (e) {
     return 1
   }

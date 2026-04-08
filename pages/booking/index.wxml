@@ -1,3 +1,4 @@
+<wxs src="../../wxs/string.wxs" module="str" />
 <view class="container">
   <header title="预订球场" />
   <view class="divider"></view>
@@ -101,7 +102,7 @@
                             data-slotpast="{{slot.past ? 1 : 0}}"
                           >
                             <text class="slot-coach-purpose">{{slot.coachPurpose}}</text>
-                            <text class="slot-coach-name" wx:if="{{slot.prefillCoachName}}">{{slot.prefillCoachName}}</text>
+                            <text class="slot-coach-name" wx:if="{{slot.prefillCoachName}}">{{str.truncate(slot.prefillCoachName, 4)}}</text>
                             <text class="slot-coach-cap" wx:if="{{slot.past}}">已结束</text>
                             <text class="slot-coach-cap" wx:elif="{{slot.coachCapacityLimit > 0}}">名额 {{slot.coachJoinedCount}}/{{slot.coachCapacityLimit}}</text>
                           </view>

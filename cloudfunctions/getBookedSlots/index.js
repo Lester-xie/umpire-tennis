@@ -38,17 +38,27 @@ function orderDateInValues(orderDateRaw, normalized) {
 
 function defaultCapacityLimit(lessonType, pairMode, groupMode) {
   const lt = String(lessonType || '').trim()
-  if (lt === 'group') return 5
+  if (lt === 'group') {
+    const gm = String(groupMode || '').trim().toLowerCase()
+    if (gm.includes('1v2')) return 1
+    return 5
+  }
   if (lt === 'open_play') {
     const gm = String(groupMode || '').trim().toLowerCase()
     if (gm === 'group36') return 6
     return 6
   }
-  const pm = String(pairMode || '')
-    .trim()
-    .toLowerCase()
-  if (pm === '1v2') return 2
   return 1
+}
+
+function clampCoachCapacityFromModes(lessonType, pairMode, groupMode, cap) {
+  const n = Math.floor(Number(cap))
+  if (!Number.isFinite(n) || n < 1) return cap
+  const pm = String(pairMode || '').trim().toLowerCase()
+  const lt = String(lessonType || '').trim()
+  const gm = String(groupMode || '').trim().toLowerCase()
+  if (pm === '1v2' || (lt === 'group' && gm.includes('1v2'))) return Math.min(n, 1)
+  return Math.min(99, n)
 }
 
 function slotKeysFromBookedSlots(slots) {
@@ -78,7 +88,7 @@ function sessionHoldIdsForSlotKey(slotKey, sessionsPaid) {
 function defaultLimitFromLessonKey(lk) {
   const s = String(lk || '').trim()
   if (!s) return 5
-  if (s.includes('1v2')) return 2
+  if (s.includes('1v2')) return 1
   if (s.startsWith('group:')) return 5
   if (s.startsWith('open_play:')) return 6
   return 1
@@ -253,7 +263,7 @@ exports.main = async (event) => {
       if (!Number.isFinite(cap) || cap < 1) {
         cap = defaultCapacityLimit(doc.lessonType, doc.pairMode, doc.groupMode)
       }
-      cap = Math.min(99, cap)
+      cap = clampCoachCapacityFromModes(doc.lessonType, doc.pairMode, doc.groupMode, cap)
       const rawList = rosterByHoldId[holdId] || []
       const seenPhones = new Set()
       const participants = []
@@ -272,6 +282,14 @@ exports.main = async (event) => {
       }
       const fromPaid = sessionHoldIdsForSlotKey(k, sessionsPaid)
       const sessionHoldIds = fromPaid.length > 0 ? fromPaid : holdId ? [holdId] : []
+      const minP =
+        doc.minParticipants != null && String(doc.minParticipants).trim() !== ''
+          ? Math.floor(Number(doc.minParticipants))
+          : null
+      const refundH =
+        doc.refundHoursBeforeStart != null && String(doc.refundHoursBeforeStart).trim() !== ''
+          ? Math.floor(Number(doc.refundHoursBeforeStart))
+          : null
       coachHoldMeta[k] = {
         holdId,
         sessionHoldIds,
@@ -281,6 +299,8 @@ exports.main = async (event) => {
         pairMode: doc.pairMode != null ? String(doc.pairMode).trim() : '1v1',
         groupMode: doc.groupMode != null ? String(doc.groupMode).trim() : '',
         capacityLimit: cap,
+        minParticipants: Number.isFinite(minP) && minP >= 1 ? minP : null,
+        refundHoursBeforeStart: Number.isFinite(refundH) && refundH >= 0 ? refundH : null,
         joinedCount,
         sessionFull,
         participants,

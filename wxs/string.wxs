@@ -1,0 +1,13 @@
+/**
+ * 展示用截断：超过 maxLen 个字符时追加 ...
+ */
+function truncate(str, maxLen) {
+  var n = maxLen != null ? maxLen : 4;
+  var s = str == null ? '' : ('' + str);
+  if (s.length <= n) return s;
+  return s.substring(0, n) + '...';
+}
+
+module.exports = {
+  truncate: truncate,
+};

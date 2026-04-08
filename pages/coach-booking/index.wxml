@@ -1,3 +1,4 @@
+<wxs src="../../wxs/string.wxs" module="str" />
 <view class="container">
   <lottie-loading visible="{{lottieLoadingVisible}}" />
   <header showBackButton="{{true}}" title="预约场地" />
@@ -92,9 +93,12 @@
                           data-lessontype="{{slot.prefillLessonType}}"
                           data-pairmode="{{slot.prefillPairMode}}"
                           data-groupmode="{{slot.prefillGroupMode}}"
+                          data-minparticipants="{{slot.coachMinParticipants}}"
+                          data-maxparticipants="{{slot.prefillMaxParticipants}}"
+                          data-refundhours="{{slot.prefillRefundHours}}"
                         >
                           <text class="slot-coach-purpose">{{slot.coachPurpose}}</text>
-                          <text class="slot-coach-name" wx:if="{{slot.prefillCoachName}}">{{slot.prefillCoachName}}</text>
+                          <text class="slot-coach-name" wx:if="{{slot.prefillCoachName}}">{{str.truncate(slot.prefillCoachName, 4)}}</text>
                           <text class="slot-coach-cap" wx:if="{{slot.coachCapacityLimit > 0}}">名额 {{slot.coachJoinedCount}}/{{slot.coachCapacityLimit}}</text>
                         </view>
                       </block>
@@ -158,17 +162,25 @@
       </view>
     </block>
     <block wx:if="{{lessonType === 'group' || lessonType === 'open_play'}}">
-      <view class="purpose-section-label">{{lessonType === 'open_play' ? '畅打规模' : '团课规模'}}</view>
-      <view class="purpose-chip-row">
-        <view
-          wx:for="{{purposeGroupScales}}"
-          wx:key="id"
-          class="purpose-chip {{groupMode === item.modeCode ? 'purpose-chip--on' : ''}}"
-          data-kind="group"
-          data-code="{{item.modeCode}}"
-          bindtap="selectPurposeScale"
-        >{{item.name}}</view>
+      <view class="purpose-section-label">人数与规则</view>
+      <view class="purpose-enroll-grid">
+        <view class="purpose-enroll-row">
+          <text class="purpose-enroll-label">最少人数</text>
+          <input class="purpose-enroll-input" type="number" value="{{minParticipants}}" bindinput="onMinParticipantsInput" />
+        </view>
+        <view class="purpose-enroll-row">
+          <text class="purpose-enroll-label">最多人数</text>
+          <input class="purpose-enroll-input" type="number" value="{{maxParticipants}}" bindinput="onMaxParticipantsInput" />
+        </view>
+        <view class="purpose-enroll-row">
+          <text class="purpose-enroll-label">开课前（小时）</text>
+          <view class="purpose-enroll-field">
+            <input class="purpose-enroll-input purpose-enroll-input--narrow" type="number" value="{{refundHoursBeforeStart}}" bindinput="onRefundHoursInput" />
+            <text class="purpose-enroll-unit">小时</text>
+          </view>
+        </view>
       </view>
+      <view class="purpose-enroll-hint">该时间前可退课；到达该时刻若已付人数仍少于最少人数，将自动取消并退款</view>
     </block>
     <view class="purpose-hint">{{ purposeSheetMode === 'edit' ? '保存后会员在订场页将看到更新后的用途说明' : '确定后该时段将对会员显示为已占用，不可再订' }}</view>
     <view class="purpose-sheet-actions">

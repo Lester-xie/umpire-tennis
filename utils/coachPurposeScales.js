@@ -1,7 +1,7 @@
 /**
  * 教练约场「场地用途」弹层：按 db_category.scaleList 生成规模选项
  * scaleList 项：{ id, name, code? }；code 可选，缺省时从 name 推断
- * db_course_scale 可通过 scaleList.id 关联，字段 limit 表示该规模最多可报名人数（含 1v1=1、1v2=2、团课=5 等）
+ * db_course_scale 可通过 scaleList.id 关联，字段 limit 表示该规模最多可报名人数（含 1v1=1、1v2=1、团课=5 等）
  */
 
 const NAME_TO_LESSON_TYPE = {
@@ -92,8 +92,9 @@ function parsePairScale(raw, scaleById) {
     scaleById && id
       ? scaleById[id] || scaleById[String(Number(id))]
       : null;
-  const fb = modeCode === '1v2' ? 2 : 1;
-  const limit = pickLimitFromScaleDoc(scaleDoc, fb);
+  const fb = 1;
+  let limit = pickLimitFromScaleDoc(scaleDoc, fb);
+  if (modeCode === '1v2') limit = Math.min(limit, 1);
   return {
     id: id || modeCode,
     name: name || modeCode.replace('v', 'V').toUpperCase(),
@@ -106,6 +107,18 @@ function parseGroupScale(raw, scaleById) {
   if (!raw || typeof raw !== 'object') return null;
   const id = raw.id != null ? String(raw.id).trim() : '';
   const name = raw.name != null ? String(raw.name).trim() : '';
+  const compact = String(name || '')
+    .toUpperCase()
+    .replace(/\s/g, '');
+  if (compact.includes('1V2') || /1对2|一对二/.test(name)) {
+    const modeCode = 'group_1v2';
+    return {
+      id: id || modeCode,
+      name: name || '1V2',
+      modeCode,
+      limit: 1,
+    };
+  }
   let modeCode = inferGroupModeCode({ ...raw, name });
   if (!modeCode) {
     const slug = id.replace(/[^a-z0-9]/gi, '').slice(0, 16);
@@ -159,7 +172,7 @@ function scalesForLessonType(lessonType, categoryIndex, scaleById) {
   if (pairScales.length) return { pairScales, groupScales: [] };
   const fb = DEFAULT_PAIR_SCALES.map((d) => ({
     ...d,
-    limit: d.modeCode === '1v2' ? 2 : 1,
+    limit: 1,
   }));
   return {
     pairScales: fb,
