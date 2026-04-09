@@ -7,12 +7,9 @@ function applyPurposeScalesForLessonType(
   lessonType,
   pairModeIn,
   groupModeIn,
-  coachCategoryIndex,
-  courseScaleById
+  venue
 ) {
-  const idx = coachCategoryIndex || {};
-  const scaleById = courseScaleById || {};
-  const { pairScales, groupScales } = scalesForLessonType(lessonType, idx, scaleById);
+  const { pairScales, groupScales } = scalesForLessonType(venue, lessonType);
   const { pairMode, groupMode } = coerceModes(
     lessonType,
     pairModeIn,

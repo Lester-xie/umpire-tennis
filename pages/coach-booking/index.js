@@ -1,6 +1,5 @@
 const {
   getBookedSlots,
-  getCategories,
   getUserByPhone,
   coachHoldSlots,
   adminCoachHoldForCoach,
@@ -9,8 +8,6 @@ const {
   updateCoachHolds,
   refreshSelectedVenueFromCloud,
 } = require('../../api/tennisDb');
-const { indexCategoriesByCoachLessonType } = require('../../utils/coachPurposeScales');
-const { indexDocsById } = require('../../utils/courseCatalog');
 const {
   normalizeOrderDateStr,
   getTodayDateStr,
@@ -140,7 +137,7 @@ Page({
     /** purpose 弹层：create 新占场 | edit 改本人占用 */
     purposeSheetMode: 'create',
     editingHoldIds: [],
-    /** 来自 db_category.scaleList，随课程类型切换 */
+    /** 1v1/1v2 等规模选项（内置默认） */
     purposePairScales: [],
     purposeGroupScales: [],
     lottieLoadingVisible: false,
@@ -162,31 +159,6 @@ Page({
   _bookedSlotsFetchToken: 0,
   /** loading 并发计数 */
   _loadingTaskCount: 0,
-
-  /**
-   * @param {boolean} [allowOpenPlayOpt] 传入时可避免 setData 尚未合并时读错 purposeOnlyOpenPlay
-   */
-  async loadCoachCategories(allowOpenPlayOpt) {
-    try {
-      const [catRes, scaleRes] = await Promise.all([
-        getCategories(),
-        wx.cloud
-          .database()
-          .collection('db_course_scale')
-          .get()
-          .catch(() => ({ data: [] })),
-      ]);
-      const list = (catRes && catRes.data) || [];
-      const allowOpenPlay =
-        allowOpenPlayOpt !== undefined ? !!allowOpenPlayOpt : !!this.data.purposeOnlyOpenPlay;
-      this._coachCategoryIndex = indexCategoriesByCoachLessonType(list, { allowOpenPlay });
-      this._courseScaleById = indexDocsById((scaleRes && scaleRes.data) || []);
-    } catch (err) {
-      console.error('loadCoachCategories', err);
-      this._coachCategoryIndex = {};
-      this._courseScaleById = {};
-    }
-  },
 
   async refreshManagerAndCoachCatalog() {
     this.beginLoading('加载中');
@@ -213,7 +185,6 @@ Page({
       showOpenPlayChip,
       purposeShowStandardTypes,
     });
-    await this.loadCoachCategories(showOpenPlayChip);
 
     if (!purposeShowStandardTypes && !showOpenPlayChip) {
       this.endLoading();
@@ -294,13 +265,9 @@ Page({
         : lt === 'group'
           ? 'group35'
           : groupModeIn;
-    const out = coachPurpose.applyPurposeScalesForLessonType(
-      lt,
-      pairModeIn,
-      gmIn,
-      this._coachCategoryIndex,
-      this._courseScaleById
-    );
+    const app = getApp();
+    const venue = app && app.globalData && app.globalData.selectedVenue;
+    const out = coachPurpose.applyPurposeScalesForLessonType(lt, pairModeIn, gmIn, venue);
     if (lt === 'group') {
       return { ...out, purposeGroupScales: [], groupMode: 'group35' };
     }
@@ -340,8 +307,6 @@ Page({
   onLoad() {
     this.coachHoldMeta = {};
     this.myCoachHoldIdSet = new Set();
-    this._coachCategoryIndex = {};
-    this._courseScaleById = {};
     this.refreshManagerAndCoachCatalog();
     const newVenueId = this.syncSelectedVenueName();
     this.generateDateList();

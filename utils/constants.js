@@ -1,7 +1,7 @@
 /** 分类组件「全部」项 _id，与 db_course.category 无关联；选中全部时不按 category 筛选 */
 const ALL_CATEGORY_ID = '__category_all__';
 
-/** 首页分类栏与课程列表不展示的分类（与 db_category.name trim 后全等） */
+/** 首页课程列表：按课程名排除（或与 course.category 旧外键匹配，若仍使用） */
 const HOME_EXCLUDED_CATEGORY_NAMES = ['畅打', '团课'];
 
 function isCategoryExcludedFromHome(categoryDoc) {
@@ -10,7 +10,7 @@ function isCategoryExcludedFromHome(categoryDoc) {
   return HOME_EXCLUDED_CATEGORY_NAMES.includes(n);
 }
 
-/** @param {Record<string, object>} categoryById courseCache / indexDocsById 结果 */
+/** @param {Record<string, object>} categoryById 兼容旧分类文档索引（可为空对象） */
 function collectHomeExcludedCategoryRefs(categoryById) {
   const set = new Set();
   const seenDoc = new Set();

@@ -136,22 +136,11 @@ function refreshSelectedVenueFromCloud(appInstance) {
 }
 
 /**
- * 首页分类入口 db_category 建议字段：
- * - name（展示名）
- * - image（https 或 cloud:// 文件 ID，若界面展示图时用）
- * - sortOrder（可选，数字越小越靠前）
- */
-function getCategories() {
-  const db = getDb();
-  return db.collection('db_category').get();
-}
-
-/**
  * 课程列表：courseCache 拉取 db_course 并缓存；切换分类仅在内存筛选（新 schema 无 category 时等效于全部分类）。
  * 新 db_course：name、description、image、venueId、typeMap；旧版仍可含 category、type 外键。
  * @param {string} filterCategoryId
  * @param {{ forceRefresh?: boolean }} [options]
- * @returns {Promise<{ data: object[], scaleById: Record<string,object>, categoryById: Record<string,object> }>}
+ * @returns {Promise<{ data: object[] }>}
  */
 function getCourses(filterCategoryId, options) {
   return courseCache.getCourses(filterCategoryId, options);
@@ -411,7 +400,6 @@ module.exports = {
   DEFAULT_USER_AVATAR,
   getVenues,
   refreshSelectedVenueFromCloud,
-  getCategories,
   getCourses,
   invalidateCourseCache,
   getUserByPhone,

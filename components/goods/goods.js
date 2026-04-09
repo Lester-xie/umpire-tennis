@@ -5,8 +5,6 @@ const {
   isCourseInHomeExcludedCategory,
 } = require('../../utils/constants');
 const {
-  pickCourseScale,
-  pickCategory,
   courseImageSource,
   formatCourseRow,
   DEFAULT_GOODS_IMAGE,
@@ -127,11 +125,9 @@ Component({
       }
       this.triggerEvent('courseloading', { loading: true });
       getCourses(categoryId)
-        .then(({ data, scaleById, categoryById }) =>
-          resolveCourseImages(data || []).then((rows) => ({ rows, scaleById, categoryById })),
-        )
-        .then(({ rows, scaleById, categoryById }) => {
-          const excludedCats = collectHomeExcludedCategoryRefs(categoryById);
+        .then(({ data }) => resolveCourseImages(data || []).then((rows) => ({ rows })))
+        .then(({ rows }) => {
+          const excludedCats = collectHomeExcludedCategoryRefs({});
           let baseRows = rows.filter((c) => !isCourseInHomeExcludedCategory(c, excludedCats));
           let hint = '';
           let filtered = baseRows;
@@ -146,11 +142,7 @@ Component({
               hint = '当前场馆暂无上架课程';
             }
           }
-          const sid = scaleById || {};
-          const cid = categoryById || {};
-          const goods = filtered.map((c) =>
-            formatCourseRow(c, pickCourseScale(sid, c.type), pickCategory(cid, c.category)),
-          );
+          const goods = filtered.map((c) => formatCourseRow(c, null, null));
           if (this._formattedGoodsMemo) {
             this._formattedGoodsMemo[cacheKey] = { goods, hint };
           }

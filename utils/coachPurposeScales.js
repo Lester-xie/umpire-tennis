@@ -1,15 +1,10 @@
 /**
- * 教练约场「场地用途」弹层：按 db_category.scaleList 生成规模选项
- * scaleList 项：{ id, name, code? }；code 可选，缺省时从 name 推断
- * db_course_scale 可通过 scaleList.id 关联，字段 limit 表示该规模最多可报名人数（含 1v1=1、1v2=1、团课=5 等）
+ * 教练约场「场地用途」弹层：规模选项优先来自 db_venue.category_list（与会员价同一套配置）。
+ * scaleList 为对象时：{ 1V1: 元, 1V2: 元 }；团课/畅打为单场价 row.price。
+ * 未配置或无法解析时使用 DEFAULT_* 兜底。
  */
 
-const NAME_TO_LESSON_TYPE = {
-  体验课: 'experience',
-  正课: 'regular',
-  团课: 'group',
-  畅打: 'open_play',
-};
+const { extractCategoryList, LESSON_TYPE_TO_NAME } = require('./venueCategoryList');
 
 const DEFAULT_PAIR_SCALES = [
   { id: 'default-1v1', name: '1V1', modeCode: '1v1' },
@@ -17,44 +12,6 @@ const DEFAULT_PAIR_SCALES = [
 ];
 
 const DEFAULT_GROUP_SCALES = [{ id: 'default-g35', name: '3-5人', modeCode: 'group35' }];
-
-/** 与历史配置「3-5人班」等对齐为「3-5人」 */
-function normalizeGroupScaleDisplayName(raw) {
-  const s = String(raw || '').trim();
-  if (!s) return s;
-  if (/3\s*[-~～]\s*5\s*人\s*班/.test(s)) return '3-5人';
-  return s;
-}
-
-function mapCategoryNameToLessonType(name) {
-  const n = String(name || '').trim();
-  if (NAME_TO_LESSON_TYPE[n]) return NAME_TO_LESSON_TYPE[n];
-  if (n.includes('畅打')) return 'open_play';
-  if (n.includes('体验')) return 'experience';
-  if (n.includes('团课') || (n.includes('团') && n.includes('课'))) return 'group';
-  if (n.includes('正课') || n.includes('正')) return 'regular';
-  return '';
-}
-
-/**
- * @param {object[]} categories getCategories().data
- * @param {{ allowOpenPlay?: boolean }} [options] 仅 isManager 为 true 时应传 allowOpenPlay: true，才索引「畅打」
- * @returns {Record<string, object>}
- */
-function indexCategoriesByCoachLessonType(categories, options = {}) {
-  const allowOpenPlay = options.allowOpenPlay === true;
-  const index = {};
-  (categories || []).forEach((cat) => {
-    const lt =
-      cat && cat.coachLessonType != null
-        ? String(cat.coachLessonType).trim()
-        : mapCategoryNameToLessonType(cat && cat.name);
-    if (lt === 'open_play' && !allowOpenPlay) return;
-    if (!['experience', 'regular', 'group', 'open_play'].includes(lt)) return;
-    if (!index[lt]) index[lt] = cat;
-  });
-  return index;
-}
 
 function inferPairModeCode(scale) {
   const code = scale.code != null ? String(scale.code).trim().toLowerCase() : '';
@@ -67,117 +24,101 @@ function inferPairModeCode(scale) {
   return '';
 }
 
-function inferGroupModeCode(scale) {
-  const code = scale.code != null ? String(scale.code).trim().toLowerCase() : '';
-  if (/^group[a-z0-9_]+$/i.test(code)) return code.toLowerCase();
-  const name = String(scale.name || '');
-  if (/3\s*[-–~～]\s*6|三\s*[-–~～]?\s*六|3.?6\s*人/.test(name)) return 'group36';
-  if (/3\s*[-–~～]\s*5|三五|3.?5/.test(name)) return 'group35';
-  return '';
+function modeCodeFromScaleListKey(key) {
+  const s = String(key || '').trim();
+  const u = s.replace(/\s/g, '').toUpperCase();
+  if (u === '1V1') return '1v1';
+  if (u === '1V2') return '1v2';
+  if (/^1对1|^一对一/.test(s)) return '1v1';
+  if (/^1对2|^一对二/.test(s)) return '1v2';
+  return inferPairModeCode({ name: s, code: s });
 }
 
-function pickLimitFromScaleDoc(scaleDoc, fallback) {
-  const n = Math.floor(Number(scaleDoc && scaleDoc.limit));
-  if (Number.isFinite(n) && n >= 1) return Math.min(99, n);
-  return fallback;
-}
-
-function parsePairScale(raw, scaleById) {
-  if (!raw || typeof raw !== 'object') return null;
-  const id = raw.id != null ? String(raw.id).trim() : '';
-  const name = raw.name != null ? String(raw.name).trim() : '';
-  const modeCode = inferPairModeCode({ ...raw, name });
-  if (!modeCode) return null;
-  const scaleDoc =
-    scaleById && id
-      ? scaleById[id] || scaleById[String(Number(id))]
-      : null;
-  const fb = 1;
-  let limit = pickLimitFromScaleDoc(scaleDoc, fb);
-  if (modeCode === '1v2') limit = Math.min(limit, 1);
-  return {
-    id: id || modeCode,
-    name: name || modeCode.replace('v', 'V').toUpperCase(),
-    modeCode,
-    limit,
-  };
-}
-
-function parseGroupScale(raw, scaleById) {
-  if (!raw || typeof raw !== 'object') return null;
-  const id = raw.id != null ? String(raw.id).trim() : '';
-  const name = raw.name != null ? String(raw.name).trim() : '';
-  const compact = String(name || '')
-    .toUpperCase()
-    .replace(/\s/g, '');
-  if (compact.includes('1V2') || /1对2|一对二/.test(name)) {
-    const modeCode = 'group_1v2';
-    return {
-      id: id || modeCode,
-      name: name || '1V2',
-      modeCode,
-      limit: 1,
-    };
-  }
-  let modeCode = inferGroupModeCode({ ...raw, name });
-  if (!modeCode) {
-    const slug = id.replace(/[^a-z0-9]/gi, '').slice(0, 16);
-    modeCode = slug ? `group_${slug}` : 'group35';
-  }
-  if (!modeCode || !/^group[a-z0-9_]+$/i.test(modeCode)) return null;
-  const scaleDoc =
-    scaleById && id
-      ? scaleById[id] || scaleById[String(Number(id))]
-      : null;
-  const mc = modeCode.toLowerCase();
-  const fbLimit = mc === 'group36' ? 6 : 5;
-  const limit = pickLimitFromScaleDoc(scaleDoc, fbLimit);
-  const normalized = normalizeGroupScaleDisplayName(name);
-  let displayName = normalized;
-  if (!displayName) {
-    if (mc === 'group35') displayName = '3-5人';
-    else if (mc === 'group36') displayName = '3-6人';
-    else displayName = modeCode;
-  }
-  return {
-    id: id || modeCode,
-    name: displayName,
-    modeCode: modeCode.toLowerCase(),
-    limit,
-  };
+function displayNameForPairMode(modeCode) {
+  if (modeCode === '1v1') return '1V1';
+  if (modeCode === '1v2') return '1V2';
+  return String(modeCode || '');
 }
 
 /**
- * @param {Record<string, object>} [scaleById] db_course_scale 按 _id 索引，用于读取 limit
+ * 与 admin 后台「体验课/正课」分项价一致：scaleList 为对象，键为 1V1 / 1V2 等。
+ * @returns {object[]|null}
+ */
+function pairScalesFromVenueScaleList(scaleList) {
+  if (!scaleList || typeof scaleList !== 'object' || Array.isArray(scaleList)) return null;
+  const keys = Object.keys(scaleList);
+  if (keys.length === 0) return null;
+  const entries = keys
+    .map((k) => {
+      const modeCode = modeCodeFromScaleListKey(k);
+      const n = Number(scaleList[k]);
+      if (!modeCode || !Number.isFinite(n) || n < 0) return null;
+      return { k, modeCode };
+    })
+    .filter(Boolean);
+  if (!entries.length) return null;
+  const rank = (m) => (m === '1v1' ? 0 : m === '1v2' ? 1 : 2);
+  entries.sort(
+    (a, b) =>
+      rank(a.modeCode) - rank(b.modeCode) || String(a.k).localeCompare(String(b.k)),
+  );
+  return entries.map((e) => ({
+    id: `venue-${e.modeCode}`,
+    name: displayNameForPairMode(e.modeCode),
+    modeCode: e.modeCode,
+    limit: e.modeCode === '1v2' ? 1 : 1,
+  }));
+}
+
+function findCategoryRowForLessonType(venue, lessonType) {
+  const lt = String(lessonType || '').trim();
+  const wantName = LESSON_TYPE_TO_NAME[lt];
+  if (!wantName) return null;
+  const list = extractCategoryList(venue);
+  return list.find((item) => String(item.name || '').trim() === wantName) || null;
+}
+
+/**
+ * @param {object|null|undefined} venue globalData.selectedVenue
+ * @param {string} lessonType experience | regular | group | open_play
  * @returns {{ pairScales: object[], groupScales: object[] }}
  */
-function scalesForLessonType(lessonType, categoryIndex, scaleById) {
-  const cat = categoryIndex && categoryIndex[lessonType];
-  const raw = cat && Array.isArray(cat.scaleList) ? cat.scaleList : [];
+function scalesForLessonType(venue, lessonType) {
+  const lt = String(lessonType || '').trim();
+  const row = findCategoryRowForLessonType(venue, lt);
 
-  if (lessonType === 'group' || lessonType === 'open_play') {
-    const groupScales = raw.map((row) => parseGroupScale(row, scaleById)).filter(Boolean);
-    if (groupScales.length) return { pairScales: [], groupScales };
+  if (lt === 'group' || lt === 'open_play') {
+    if (row && (row.price != null || row.name)) {
+      const isOpen = lt === 'open_play';
+      const groupScales = [
+        {
+          id: 'venue-group',
+          name: isOpen ? '3-6人' : '3-5人',
+          modeCode: isOpen ? 'group36' : 'group35',
+          limit: isOpen ? 6 : 5,
+        },
+      ];
+      return { pairScales: [], groupScales };
+    }
     const fb = DEFAULT_GROUP_SCALES.map((d) => ({
       ...d,
       limit: d.limit != null ? d.limit : 5,
     }));
-    return {
-      pairScales: [],
-      groupScales: fb,
-    };
+    return { pairScales: [], groupScales: fb };
   }
 
-  const pairScales = raw.map((row) => parsePairScale(row, scaleById)).filter(Boolean);
-  if (pairScales.length) return { pairScales, groupScales: [] };
+  if (row && row.scaleList && typeof row.scaleList === 'object' && !Array.isArray(row.scaleList)) {
+    const pairScales = pairScalesFromVenueScaleList(row.scaleList);
+    if (pairScales && pairScales.length) {
+      return { pairScales, groupScales: [] };
+    }
+  }
+
   const fb = DEFAULT_PAIR_SCALES.map((d) => ({
     ...d,
     limit: 1,
   }));
-  return {
-    pairScales: fb,
-    groupScales: [],
-  };
+  return { pairScales: fb, groupScales: [] };
 }
 
 function firstPairMode(pairScales) {
@@ -211,7 +152,6 @@ function coerceModes(lessonType, pairMode, groupMode, pairScales, groupScales) {
 }
 
 module.exports = {
-  indexCategoriesByCoachLessonType,
   scalesForLessonType,
   firstPairMode,
   firstGroupMode,

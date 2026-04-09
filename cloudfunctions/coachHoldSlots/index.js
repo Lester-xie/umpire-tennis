@@ -196,9 +196,9 @@ function sanitizeMemberPricePerSlotYuan(raw) {
  * event: { venueId, orderDate, slots: [{courtId, slotIndex}], lessonType, pairMode?, groupMode? }
  * lessonType: experience | regular | group | open_play（畅打，需 isManager）
  * pairMode（体验课/正课）: 1v1 | 1v2
- * groupMode（团课）: 如 group35，或与 db_category.scaleList.code 一致
+ * groupMode（团课）: 如 group35、group36 等
  * scaleDisplayName（可选）: 规模展示名，写入 capacityLabel（与 scaleList.name 一致时推荐传入）
- * capacityLimit（可选）: 与 db_course_scale.limit 一致，课节最多可报名会员数
+ * capacityLimit（可选）: 课节最多可报名会员数
  * memberPricePerSlotYuan（必填）: 会员应付的「场次」总价（元），与占用 1 小时或连续多格无关；写入时同时写入 memberPricePerSessionYuan 同值
  */
 exports.main = async (event, context) => {

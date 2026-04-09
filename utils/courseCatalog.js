@@ -1,7 +1,7 @@
 /**
  * 课程列表展示与 lessonKey：
  * - 新 db_course：name、description、image、venueId、typeMap（如 1V1/1V2 → 节数→单价）
- * - 旧版：外键 category、type，关联 db_category / db_course_scale
+ * - category 参数可为 null（课型以 course 字段为准）
  */
 
 const { buildLessonKey } = require('./lessonKey');
@@ -76,15 +76,7 @@ function pickById(map, ref) {
   return null;
 }
 
-function pickCourseScale(scaleById, typeRef) {
-  return pickById(scaleById, typeRef);
-}
-
-function pickCategory(categoryById, categoryRef) {
-  return pickById(categoryById, categoryRef);
-}
-
-/** 规模展示名：仅来自 db_course_scale.name */
+/** 规模展示名（可选 legacy scale 文档） */
 function courseScaleDisplayName(scaleDoc) {
   if (scaleDoc && scaleDoc.name != null && String(scaleDoc.name).trim() !== '') {
     return String(scaleDoc.name).trim();
@@ -92,7 +84,7 @@ function courseScaleDisplayName(scaleDoc) {
   return '';
 }
 
-/** 分类展示名：仅来自 db_category.name */
+/** 分类展示名（可选 legacy 文档） */
 function courseCategoryDisplayName(categoryDoc) {
   if (categoryDoc && categoryDoc.name != null && String(categoryDoc.name).trim() !== '') {
     return String(categoryDoc.name).trim();
@@ -149,7 +141,7 @@ function inferLessonTypeFromCategoryName(catName) {
 
 /**
  * @param {object} course db_course
- * @param {object|null} categoryDoc db_category
+ * @param {object|null} categoryDoc 可为 null
  */
 function inferLessonType(course, categoryDoc) {
   const ex = course.lessonType != null ? String(course.lessonType).trim() : '';
@@ -265,7 +257,7 @@ function resolveLessonKeyFromCourse(course, scaleDoc, categoryDoc) {
 /**
  * @param {object} c db_course（可含 displayImage）
  * @param {object|null} scaleDoc
- * @param {object|null} categoryDoc
+ * @param {object|null} categoryDoc 可为 null
  */
 function formatCourseRow(c, scaleDoc, categoryDoc) {
   const hasTypeMap =
@@ -339,8 +331,6 @@ function formatCourseRow(c, scaleDoc, categoryDoc) {
 module.exports = {
   DEFAULT_GOODS_IMAGE,
   indexDocsById,
-  pickCourseScale,
-  pickCategory,
   courseScaleDisplayName,
   courseCategoryDisplayName,
   courseImageSource,
