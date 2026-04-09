@@ -1,4 +1,5 @@
 const { resolveCourtSlotPrice } = require('./bookingSlotPrice');
+const { applyCoachSessionFlatVenuePrice } = require('./coachSessionVenuePrice');
 
 const ROW = 126;
 const CELL = 120;
@@ -161,6 +162,17 @@ function buildCourtSlotsRow({
     const coachPurpose = bookedByCoach ? coachMeta.capacityLabel || '教练占用' : '';
     const coachName =
       bookedByCoach && coachMeta.coachName ? String(coachMeta.coachName).trim() : '';
+    let venueSlotPriceForOrder = slotPrice;
+    if (
+      bookedByCoach &&
+      coachMeta &&
+      coachMeta.memberPricePerSlotYuan != null
+    ) {
+      const mp = Number(coachMeta.memberPricePerSlotYuan);
+      if (Number.isFinite(mp) && mp > 0) {
+        venueSlotPriceForOrder = mp;
+      }
+    }
 
     const isAvailable = isAvailableTime && slotPrice != null && !isBookedByOrder;
     const past = !isAvailableTime;
@@ -168,6 +180,7 @@ function buildCourtSlotsRow({
     slots.push({
       available: isAvailable,
       price: isAvailable ? slotPrice : null,
+      venueSlotPrice: venueSlotPriceForOrder,
       booked: isBookedByOrder,
       bookedByCoach,
       coachPurpose,
@@ -196,6 +209,7 @@ function buildCourtSlotsRow({
     myCoachHoldIdSet,
     purposeOnlyOpenPlay,
   });
+  applyCoachSessionFlatVenuePrice(slots, courtId, coachHoldMeta);
   return slots;
 }
 

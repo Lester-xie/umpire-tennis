@@ -20,7 +20,7 @@
 
 .goods-image {
   width: 100%;
-  height: 200rpx;
+  height: 300rpx;
   border-radius: 20rpx;
   flex-shrink: 0;
 }

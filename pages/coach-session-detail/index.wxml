@@ -23,6 +23,13 @@
         </view>
       </card>
 
+      <view
+        class="tip-card tip-card--warn"
+        wx:if="{{lessonType === 'experience' && experienceParticipationReady && experienceParticipatedBefore}}"
+      >
+        您已参加过体验课，每个手机号只能参加一次。如需继续学习，请选择正课或咨询场馆。
+      </view>
+
       <view class="divider"></view>
       <card>
         <view class="section">
@@ -58,9 +65,16 @@
     </view>
   </scroll-view>
 
-  <view class="footer" wx:if="{{!loading && !errMsg && canBook}}">
-    <view class="footer-btn" bindtap="onBookTap">
+  <view class="footer" wx:if="{{!loading && !errMsg && (canBook || canCancelEnrollment)}}">
+    <view class="footer-btn" wx:if="{{canBook}}" bindtap="onBookTap">
       <text class="footer-btn-text">立即报名</text>
+    </view>
+    <view
+      class="footer-btn footer-btn--outline"
+      wx:if="{{canCancelEnrollment}}"
+      bindtap="onCancelEnrollmentTap"
+    >
+      <text class="footer-btn-text footer-btn-text--outline">取消报名</text>
     </view>
   </view>
 </view>

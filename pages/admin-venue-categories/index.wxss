@@ -1,0 +1,78 @@
+@import '../admin-venue-edit/index.wxss';
+
+.venue-name-hint {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #134e35;
+  margin-bottom: 16rpx;
+  padding: 0 4rpx;
+}
+
+.cat-card {
+  margin-top: 20rpx;
+  padding: 20rpx;
+  background: #f8faf9;
+  border-radius: 16rpx;
+  border: 1rpx solid #e0ebe4;
+}
+
+.cat-card:first-of-type {
+  margin-top: 0;
+}
+
+.cat-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12rpx;
+}
+
+.cat-num {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #134e35;
+}
+
+.cat-sublab {
+  display: block;
+  font-size: 24rpx;
+  color: #666;
+  margin-bottom: 8rpx;
+}
+
+.cat-in {
+  border: 1rpx solid #e8ecf4;
+  border-radius: 10rpx;
+  padding: 12rpx 16rpx;
+  margin-bottom: 16rpx;
+  font-size: 28rpx;
+}
+
+.cat-in--short {
+  margin-bottom: 0;
+  flex: 1;
+}
+
+.cat-picker {
+  padding: 16rpx 20rpx;
+  background: #fff;
+  border: 1rpx solid #dce8e0;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  color: #134e35;
+  margin-bottom: 16rpx;
+}
+
+.cat-price-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 12rpx;
+}
+
+.cat-mini-label {
+  width: 200rpx;
+  flex-shrink: 0;
+  font-size: 24rpx;
+  color: #666;
+}

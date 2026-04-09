@@ -3,6 +3,7 @@ const STORAGE_KEY = 'booking_success_payload';
 function resolveSuccessKind(payload) {
   if (!payload || typeof payload !== 'object') return 'court';
   if (payload.successKind === 'coursePurchase') return 'coursePurchase';
+  if (payload.successKind === 'coachCourse') return 'coachCourse';
   return 'court';
 }
 
@@ -13,6 +14,8 @@ Page({
     successSub: '',
     campusName: '',
     orderItems: [],
+    coachCapacityLabel: '',
+    coachName: '',
     goodDesc: '',
     grantHours: 0,
     lessonLabel: '',
@@ -37,7 +40,21 @@ Page({
             grantHours: gh,
             lessonLabel: payload.lessonLabel || '',
             orderItems: [],
+            coachCapacityLabel: '',
+            coachName: '',
             footerButtonText: '返回首页',
+          });
+        } else if (kind === 'coachCourse') {
+          this.setData({
+            successKind: 'coachCourse',
+            successTitle: '报名成功',
+            successSub:
+              '您已成功报名该课程，请按约定时间到场参加。如需取消请尽早操作，并遵守开课前退课时间要求。',
+            campusName: payload.campusName || '',
+            orderItems: Array.isArray(payload.orderItems) ? payload.orderItems : [],
+            coachCapacityLabel: payload.coachCapacityLabel != null ? String(payload.coachCapacityLabel).trim() : '',
+            coachName: payload.coachName != null ? String(payload.coachName).trim() : '',
+            footerButtonText: '返回预订',
           });
         } else {
           this.setData({
@@ -46,6 +63,8 @@ Page({
             successSub: '',
             campusName: payload.campusName || '',
             orderItems: Array.isArray(payload.orderItems) ? payload.orderItems : [],
+            coachCapacityLabel: '',
+            coachName: '',
             footerButtonText: '返回预订',
           });
         }

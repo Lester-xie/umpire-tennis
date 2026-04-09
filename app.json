@@ -17,6 +17,8 @@
     "pages/admin-users/index",
     "pages/admin-venues/index",
     "pages/admin-venue-edit/index",
+    "pages/admin-venue-courts/index",
+    "pages/admin-venue-categories/index",
     "pages/admin-courses/index",
     "pages/admin-course-edit/index",
     "pages/admin-stats/index"

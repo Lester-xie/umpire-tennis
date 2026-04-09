@@ -180,6 +180,17 @@ function clampCoachCapacityFromModes(lessonType, pairMode, groupMode, cap) {
   return Math.min(99, n);
 }
 
+function sanitizeMemberPricePerSlotYuan(raw) {
+  if (raw == null || raw === '') {
+    return { ok: false, errMsg: '请填写会员支付单价' };
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0 || n > 999999) {
+    return { ok: false, errMsg: '会员支付单价须为有效正数' };
+  }
+  return { ok: true, value: Math.round(n * 100) / 100 };
+}
+
 /**
  * 教练占用场地（写入 db_coach_slot_hold，与已支付订单一并参与 getBookedSlots 占用计算）
  * event: { venueId, orderDate, slots: [{courtId, slotIndex}], lessonType, pairMode?, groupMode? }
@@ -188,6 +199,7 @@ function clampCoachCapacityFromModes(lessonType, pairMode, groupMode, cap) {
  * groupMode（团课）: 如 group35，或与 db_category.scaleList.code 一致
  * scaleDisplayName（可选）: 规模展示名，写入 capacityLabel（与 scaleList.name 一致时推荐传入）
  * capacityLimit（可选）: 与 db_course_scale.limit 一致，课节最多可报名会员数
+ * memberPricePerSlotYuan（必填）: 会员应付的「场次」总价（元），与占用 1 小时或连续多格无关；写入时同时写入 memberPricePerSessionYuan 同值
  */
 exports.main = async (event, context) => {
   const wxContext = cloud.getWXContext();
@@ -267,6 +279,12 @@ exports.main = async (event, context) => {
   }
   capacityLimit = clampCoachCapacityFromModes(lessonType, pairMode, groupMode, capacityLimit);
 
+  const mpSan = sanitizeMemberPricePerSlotYuan(event.memberPricePerSlotYuan);
+  if (!mpSan.ok) {
+    return { ok: false, errMsg: mpSan.errMsg || '会员支付单价无效' };
+  }
+  const memberPricePerSlotYuan = mpSan.value;
+
   const sessionSlotKeys = normalized
     .map((s) => `${s.courtId}-${s.slotIndex}`)
     .sort()
@@ -315,8 +333,12 @@ exports.main = async (event, context) => {
       };
       if (ge.minParticipants != null) {
         holdData.minParticipants = ge.minParticipants;
+      }
+      if (ge.refundHoursBeforeStart != null) {
         holdData.refundHoursBeforeStart = ge.refundHoursBeforeStart;
       }
+      holdData.memberPricePerSlotYuan = memberPricePerSlotYuan;
+      holdData.memberPricePerSessionYuan = memberPricePerSlotYuan;
       await db.collection('db_coach_slot_hold').add({
         data: holdData,
       });

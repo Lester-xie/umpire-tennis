@@ -1,66 +1,15 @@
 <view class="admin-sub-page">
   <view class="header-wrapper">
-    <header showBackButton="{{true}}" title="{{isNew ? '新建场馆' : '编辑场馆'}}" />
+    <header showBackButton="{{true}}" title="场地管理" />
   </view>
   <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
     <view wx:if="{{loading}}" class="muted">加载中…</view>
     <block wx:else>
-      <view class="field">
-        <text class="field-label">名称 *</text>
-        <input class="field-input" placeholder="场馆名称" value="{{name}}" bindinput="onName" />
-      </view>
-      <view class="field">
-        <text class="field-label">地址</text>
-        <input class="field-input" placeholder="详细地址" value="{{address}}" bindinput="onAddress" />
-      </view>
-      <view class="field field--row">
-        <view class="field-half">
-          <text class="field-label">纬度 *</text>
-          <input class="field-input" type="digit" placeholder="如 26.5889" value="{{latitude}}" bindinput="onLat" />
-        </view>
-        <view class="field-half">
-          <text class="field-label">经度 *</text>
-          <input class="field-input" type="digit" placeholder="如 106.7153" value="{{longitude}}" bindinput="onLon" />
-        </view>
-      </view>
-      <view class="field">
-        <text class="field-label">封面图（可选）</text>
-        <text class="field-hint">上传后保存为云文件 ID，前台与订场列表使用「场馆 image」字段。</text>
-        <view class="admin-image-block">
-          <view class="admin-image-preview-wrap">
-            <image wx:if="{{imageDisplayUrl}}" class="admin-image-preview" src="{{imageDisplayUrl}}" mode="aspectFill" />
-            <view wx:else class="admin-image-placeholder">暂无封面</view>
-          </view>
-          <view class="admin-image-actions">
-            <button
-              class="admin-image-btn"
-              size="mini"
-              type="default"
-              loading="{{uploadingImage}}"
-              disabled="{{uploadingImage}}"
-              bindtap="onPickVenueCover"
-            >上传图片</button>
-            <view wx:if="{{image}}" class="admin-image-clear" bindtap="onClearVenueCover">清除</view>
-          </view>
-        </view>
-      </view>
+      <view class="venue-name-hint" wx:if="{{name}}">场馆：{{name}}</view>
 
-      <view class="field" wx:if="{{!isNew && venueId}}">
-        <text class="field-label">场地与课程定价</text>
-        <text class="field-hint">场地时段价、教练课用途与会员场次价已拆分为独立页面维护。</text>
-        <navigator url="/pages/admin-venue-courts/index?id={{venueId}}" class="manage-entry" hover-class="manage-entry--hover">
-          <text class="manage-entry-text">场地管理</text>
-          <text class="manage-entry-arrow">›</text>
-        </navigator>
-        <navigator url="/pages/admin-venue-categories/index?id={{venueId}}" class="manage-entry" hover-class="manage-entry--hover">
-          <text class="manage-entry-text">用途管理</text>
-          <text class="manage-entry-arrow">›</text>
-        </navigator>
-      </view>
-
-      <view class="field" wx:if="{{isNew}}">
+      <view class="field">
         <text class="field-label">场地列表 *</text>
-        <text class="field-hint">新建场馆需先配置场地与价格；保存后可在「场地管理」中继续修改。</text>
+        <text class="field-hint">每片场地：名称、常规/VIP 各 14 个时段单价（8:00–21:00）、可选周末一口价（仅非 VIP 订场）。</text>
 
         <block wx:for="{{courts}}" wx:for-item="court" wx:for-index="cIdx" wx:key="cIdx">
           <view class="court-card">
@@ -142,7 +91,6 @@
       </view>
 
       <button class="submit-btn" bindtap="onSave">保存</button>
-      <button wx:if="{{!isNew}}" class="delete-btn" bindtap="onDelete">删除该场馆</button>
     </block>
     <view class="footer-space"></view>
   </scroll-view>

@@ -1,0 +1,9 @@
+@import '../admin-venue-edit/index.wxss';
+
+.venue-name-hint {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #134e35;
+  margin-bottom: 16rpx;
+  padding: 0 4rpx;
+}

@@ -1,85 +1,12 @@
 const { adminVenue, refreshSelectedVenueFromCloud } = require('../../api/tennisDb');
+const { extractCategoryList } = require('../../utils/venueCategoryList');
 const { resolveImageUrlForDisplay, uploadTempImageToCloud } = require('../../utils/cloudImage');
-
-const SLOT_COUNT = 14;
-
-function buildSlotLabels() {
-  const labels = [];
-  for (let h = 8; h <= 21; h += 1) {
-    const hs = h < 10 ? `0${h}` : `${h}`;
-    labels.push(`${hs}:00`);
-  }
-  return labels;
-}
-
-function newCourt(customName) {
-  const n = customName != null ? String(customName) : '1号场';
-  const priceList = Array.from({ length: SLOT_COUNT }, () => '100');
-  return {
-    name: n,
-    priceList,
-    vipPriceList: priceList.slice(),
-    priceTab: 'regular',
-    specialPrice: '',
-  };
-}
-
-function courtFromDoc(c) {
-  const pl = Array.isArray(c.priceList) ? c.priceList : [];
-  const priceList = [];
-  for (let i = 0; i < SLOT_COUNT; i += 1) {
-    const n = pl[i];
-    priceList.push(n != null && n !== '' ? String(n) : '0');
-  }
-  const sp = c.specialPrice;
-  let specialPrice = '';
-  if (sp != null && String(sp).trim() !== '') {
-    const num = Number(sp);
-    if (Number.isFinite(num)) {
-      specialPrice = String(sp);
-    }
-  }
-  const vpl = Array.isArray(c.vipPriceList) ? c.vipPriceList : [];
-  const vipPriceList = [];
-  for (let i = 0; i < SLOT_COUNT; i += 1) {
-    const n = vpl[i];
-    vipPriceList.push(n != null && n !== '' ? String(n) : String(priceList[i] || '0'));
-  }
-  return {
-    name: c.name != null ? String(c.name) : '场地',
-    priceList,
-    vipPriceList,
-    priceTab: 'regular',
-    specialPrice,
-  };
-}
-
-function courtsToPayload(courts) {
-  return courts.map((c) => {
-    const name = String(c.name || '').trim();
-    const priceList = [];
-    for (let i = 0; i < SLOT_COUNT; i += 1) {
-      const raw = c.priceList && c.priceList[i] != null ? c.priceList[i] : '0';
-      const n = Number(raw);
-      priceList.push(Number.isFinite(n) && n >= 0 ? n : 0);
-    }
-    const vipPriceList = [];
-    for (let i = 0; i < SLOT_COUNT; i += 1) {
-      const raw = c.vipPriceList && c.vipPriceList[i] != null ? c.vipPriceList[i] : '0';
-      const n = Number(raw);
-      vipPriceList.push(Number.isFinite(n) && n >= 0 ? n : 0);
-    }
-    const item = { name, priceList, vipPriceList };
-    const spStr = c.specialPrice != null ? String(c.specialPrice).trim() : '';
-    if (spStr !== '') {
-      const sp = Number(spStr);
-      if (Number.isFinite(sp) && sp >= 0) {
-        item.specialPrice = sp;
-      }
-    }
-    return item;
-  });
-}
+const {
+  buildSlotLabels,
+  newCourt,
+  courtFromDoc,
+  courtsToPayload,
+} = require('../../utils/adminVenueForm');
 
 Page({
   data: {
@@ -141,12 +68,6 @@ Page({
         return;
       }
       const d = r.data;
-      let courts = [];
-      if (Array.isArray(d.courtList) && d.courtList.length > 0) {
-        courts = d.courtList.map((c) => courtFromDoc(c));
-      } else {
-        courts = [newCourt('1号场')];
-      }
       this.setData({
         loading: false,
         name: d.name != null ? String(d.name) : '',
@@ -154,7 +75,7 @@ Page({
         latitude: d.latitude != null ? String(d.latitude) : '',
         longitude: d.longitude != null ? String(d.longitude) : '',
         image: d.image != null ? String(d.image) : '',
-        courts,
+        courts: [],
       });
       this.refreshVenueCoverDisplay();
     } catch (e) {
@@ -251,30 +172,69 @@ Page({
   },
 
   async onSave() {
-    const courts = this.data.courts || [];
-    for (let i = 0; i < courts.length; i += 1) {
-      if (!String(courts[i].name || '').trim()) {
-        wx.showToast({ title: `请填写「场地 ${i + 1}」的名称`, icon: 'none' });
-        return;
-      }
-    }
-    const courtList = courtsToPayload(courts);
     const lat = Number(this.data.latitude);
     const lon = Number(this.data.longitude);
-    const payload = {
-      name: this.data.name,
-      address: this.data.address,
-      latitude: lat,
-      longitude: lon,
-      image: this.data.image,
-      courtList,
-    };
+    if (!String(this.data.name || '').trim()) {
+      wx.showToast({ title: '请填写场馆名称', icon: 'none' });
+      return;
+    }
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      wx.showToast({ title: '请填写有效经纬度', icon: 'none' });
+      return;
+    }
 
     wx.showLoading({ title: '保存中', mask: true });
     try {
-      const res = this.data.isNew
-        ? await adminVenue({ action: 'create', payload })
-        : await adminVenue({ action: 'update', venueId: this.data.venueId, payload });
+      if (this.data.isNew) {
+        const courts = this.data.courts || [];
+        for (let i = 0; i < courts.length; i += 1) {
+          if (!String(courts[i].name || '').trim()) {
+            wx.hideLoading();
+            wx.showToast({ title: `请填写「场地 ${i + 1}」的名称`, icon: 'none' });
+            return;
+          }
+        }
+        const courtList = courtsToPayload(courts);
+        const payload = {
+          name: this.data.name,
+          address: this.data.address,
+          latitude: lat,
+          longitude: lon,
+          image: this.data.image,
+          courtList,
+          categoryList: [],
+        };
+        const res = await adminVenue({ action: 'create', payload });
+        wx.hideLoading();
+        const r = (res && res.result) || {};
+        if (r.ok) {
+          refreshSelectedVenueFromCloud().catch(() => {});
+          wx.showToast({ title: '已保存', icon: 'success' });
+          setTimeout(() => wx.navigateBack(), 450);
+        } else {
+          wx.showToast({ title: r.errMsg || '失败', icon: 'none' });
+        }
+        return;
+      }
+
+      const fresh = await adminVenue({ action: 'get', venueId: this.data.venueId });
+      const fr = (fresh && fresh.result) || {};
+      if (!fr.ok || !fr.data) {
+        wx.hideLoading();
+        wx.showToast({ title: fr.errMsg || '读取场馆失败', icon: 'none' });
+        return;
+      }
+      const d = fr.data;
+      const payload = {
+        name: String(this.data.name || '').trim(),
+        address: this.data.address != null ? String(this.data.address) : '',
+        latitude: lat,
+        longitude: lon,
+        image: this.data.image != null ? String(this.data.image) : '',
+        courtList: d.courtList,
+        categoryList: extractCategoryList(d),
+      };
+      const res = await adminVenue({ action: 'update', venueId: this.data.venueId, payload });
       wx.hideLoading();
       const r = (res && res.result) || {};
       if (r.ok) {

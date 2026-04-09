@@ -12,15 +12,27 @@
   >
     <view class="content-wrapper">
       <view class="hint-banner" wx:if="{{isLoggedIn && sections.length > 0}}">
-        不同场馆间的课时不可通用，订教练场时请在该场馆下使用对应课时。
+        <text>不同场馆间的课时不可通用，订教练场时请在该场馆下使用对应课时。</text>
+        <text wx:if="{{showRefundExperienceHint}}" class="hint-banner-refund">已参加过体验课且仍有余下体验课时时，可在下方对应条目申请原路退款。</text>
       </view>
       <block wx:if="{{sections.length > 0}}">
         <view class="card section-card" wx:for="{{sections}}" wx:key="venueId">
           <view class="venue-title">{{item.venueName}}</view>
           <view class="hour-list">
             <view class="hour-row" wx:for="{{item.rows}}" wx:for-item="row" wx:key="lessonKey">
-              <text class="hour-label">{{row.lessonLabel}}</text>
-              <text class="hour-value">剩余 {{row.hours}} 小时</text>
+              <view class="hour-row-main">
+                <text class="hour-label">{{row.lessonLabel}}</text>
+                <text class="hour-value">剩余 {{row.hours}} 小时</text>
+              </view>
+              <view
+                wx:if="{{row.showRefundExperience}}"
+                class="refund-btn"
+                data-venueid="{{item.venueId}}"
+                data-lessonkey="{{row.lessonKey}}"
+                catchtap="onRefundExperienceTap"
+              >
+                申请退款
+              </view>
             </view>
           </view>
         </view>

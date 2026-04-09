@@ -25,6 +25,7 @@ const {
   computeBookingMainContentHeightPx,
   estimateBookingHeaderHeightPx,
 } = require('../../utils/bookingLayout');
+const { defaultMemberPriceYuanFromVenue } = require('../../utils/venueCategoryList');
 const {
   buildCoachHoldSlotsPayload,
   buildUpdateCoachHoldsPayload,
@@ -147,6 +148,9 @@ Page({
     minParticipants: 3,
     maxParticipants: 12,
     refundHoursBeforeStart: 6,
+    /** 会员应付场次价（元）；与占用 1 格或多格无关；场馆 category_list 有配置时自动填入；必填 */
+    purposeMemberPriceYuan: '',
+    purposeMemberPricePlaceholder: '必填，元/次',
   },
 
   // 动画定时器
@@ -270,6 +274,16 @@ Page({
       coachPickerIndex: Number.isFinite(idx) ? idx : 0,
       selectedCoachPhone: item ? item.phone : '',
     });
+  },
+
+  async onCoachPickEmptyTap() {
+    await this.ensureCoachPickerLoaded();
+    if (this.data.coachPickerLabels.length === 0) {
+      wx.showToast({
+        title: '仍无教练，请在管理后台先添加教练',
+        icon: 'none',
+      });
+    }
   },
 
   applyPurposeScalesForLessonType(lessonType, pairModeIn, groupModeIn) {
@@ -451,12 +465,14 @@ Page({
     const selectedDate = this.data.selectedDate || getTodayDateStr();
 
     const resetAndFetch = () => {
-      this.bookedSlotKeySet = new Set();
-      this.coachHoldMeta = {};
-      this.myCoachHoldIdSet = new Set();
-      this.generateTimeSchedule();
       this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
-        if (applied) this.generateTimeSchedule();
+        if (applied === null) return;
+        if (!applied) {
+          this.bookedSlotKeySet = new Set();
+          this.coachHoldMeta = {};
+          this.myCoachHoldIdSet = new Set();
+        }
+        this.generateTimeSchedule();
       }).finally(() => {
         this.endLoading();
       });
@@ -516,7 +532,7 @@ Page({
     ])
       .then(([bookedRes, holdsRes]) => {
         if (token !== this._bookedSlotsFetchToken) {
-          return false;
+          return null;
         }
         const r = bookedRes && bookedRes.result ? bookedRes.result : {};
         const rows =
@@ -657,7 +673,7 @@ Page({
     }
     wx.showActionSheet({
       itemList: ['更改场地类型', '取消预订'],
-      success: (res) => {
+      success: async (res) => {
         if (res.tapIndex === 0) {
           const pm = ds.pairmode || '1v1';
           const gm = ds.groupmode || 'group35';
@@ -666,6 +682,13 @@ Page({
             lt = 'experience';
           }
           const scalePatch = this.applyPurposeScalesForLessonType(lt, pm, gm);
+          const courtId = parseInt(ds.courtid, 10);
+          const slotIndex = parseInt(ds.slotindex, 10);
+          const metaKey =
+            Number.isFinite(courtId) && Number.isFinite(slotIndex)
+              ? `${courtId}-${slotIndex}`
+              : '';
+          const m = metaKey ? this.coachHoldMeta[metaKey] : null;
           const minP =
             tapDs.minparticipants != null && String(tapDs.minparticipants).trim() !== ''
               ? Math.floor(Number(tapDs.minparticipants))
@@ -678,22 +701,55 @@ Page({
             tapDs.refundhours != null && String(tapDs.refundhours).trim() !== ''
               ? Math.floor(Number(tapDs.refundhours))
               : NaN;
-          const enrollPatch =
-            lt === 'group' || lt === 'open_play'
-              ? {
-                  minParticipants: Number.isFinite(minP) && minP >= 1 ? minP : 3,
-                  maxParticipants: Number.isFinite(maxP) && maxP >= 1 ? maxP : 12,
-                  refundHoursBeforeStart: Number.isFinite(rh) && rh >= 0 ? rh : 6,
-                }
-              : {};
-          this.setData({
-            showPurposeSheet: true,
-            purposeSheetMode: 'edit',
-            editingHoldIds: myIds,
-            lessonType: lt,
-            ...scalePatch,
-            ...enrollPatch,
-          });
+          const rhMeta =
+            m && m.refundHoursBeforeStart != null
+              ? Math.floor(Number(m.refundHoursBeforeStart))
+              : NaN;
+          let enrollPatch = {};
+          if (lt === 'group' || lt === 'open_play') {
+            enrollPatch = {
+              minParticipants: Number.isFinite(minP) && minP >= 1 ? minP : 3,
+              maxParticipants: Number.isFinite(maxP) && maxP >= 1 ? maxP : 12,
+              refundHoursBeforeStart: Number.isFinite(rh) && rh >= 0 ? rh : 6,
+            };
+          } else if (lt === 'experience' || lt === 'regular') {
+            const rhEff =
+              Number.isFinite(rh) && rh >= 0
+                ? rh
+                : Number.isFinite(rhMeta) && rhMeta >= 0
+                  ? rhMeta
+                  : 6;
+            enrollPatch = { refundHoursBeforeStart: rhEff };
+          }
+          if (this.data.isManagerUser) {
+            await this.ensureCoachPickerLoaded();
+          }
+          let existingPrice = '';
+          const mpEx =
+            m && m.memberPricePerSessionYuan != null
+              ? m.memberPricePerSessionYuan
+              : m && m.memberPricePerSlotYuan != null
+                ? m.memberPricePerSlotYuan
+                : null;
+          if (mpEx != null) {
+            const v = Number(mpEx);
+            if (Number.isFinite(v) && v > 0) existingPrice = String(v);
+          }
+          this.setData(
+            {
+              showPurposeSheet: true,
+              purposeSheetMode: 'edit',
+              editingHoldIds: myIds,
+              lessonType: lt,
+              ...scalePatch,
+              ...enrollPatch,
+              purposeMemberPriceYuan: existingPrice,
+              purposeMemberPricePlaceholder: '必填，元/次',
+            },
+            () => {
+              if (!existingPrice) this.applyPurposeMemberPriceDefault();
+            }
+          );
         } else if (res.tapIndex === 1) {
           this.confirmCancelCoachHolds(myIds.join(','));
         }
@@ -716,7 +772,7 @@ Page({
     wx.showModal({
       title: '取消预订',
       content:
-        '确定取消该时段？连续占用将一并取消。若已有学员报名，相关订单将作废；使用课时的部分将自动退回，微信支付部分请联系场馆处理退款。',
+        '确定取消该时段？连续占用将一并取消。若已有学员报名，相关订单将作废；已扣课时将自动退回；微信支付部分将原路退回。若退款失败会中止取消并提示原因。',
       confirmText: '取消占用',
       confirmColor: '#c62828',
       success: async (res) => {
@@ -742,14 +798,7 @@ Page({
   },
 
   confirmPurposeSheet() {
-    const { lessonType, purposeSheetMode, isManagerUser } = this.data;
-    if (isManagerUser && ['experience', 'regular', 'group'].includes(lessonType)) {
-      const ph = String(this.data.selectedCoachPhone || '').trim();
-      if (!/^1\d{10}$/.test(ph)) {
-        wx.showToast({ title: '请选择教练', icon: 'none' });
-        return;
-      }
-    }
+    const { lessonType, purposeSheetMode } = this.data;
     if (lessonType === 'group') {
       let check;
       if (purposeSheetMode === 'edit') {
@@ -788,6 +837,23 @@ Page({
         return;
       }
     }
+    if (lessonType === 'experience' || lessonType === 'regular') {
+      const rh = Math.floor(Number(this.data.refundHoursBeforeStart));
+      if (!Number.isFinite(rh) || rh < 0) {
+        wx.showToast({ title: '请填写开课前可退课时间（小时）', icon: 'none' });
+        return;
+      }
+    }
+    const rawPurposePrice = String(this.data.purposeMemberPriceYuan || '').trim();
+    if (rawPurposePrice === '') {
+      wx.showToast({ title: '请填写会员支付单价', icon: 'none' });
+      return;
+    }
+    const pn = Number(rawPurposePrice);
+    if (!Number.isFinite(pn) || pn <= 0) {
+      wx.showToast({ title: '会员支付单价须为正数', icon: 'none' });
+      return;
+    }
     if (purposeSheetMode === 'edit') {
       this.submitCoachHoldEdit();
     } else {
@@ -810,6 +876,15 @@ Page({
       pairMode,
       groupMode
     );
+    const mpU = this.parseMemberPriceForUpdate();
+    if (mpU === 'empty') {
+      wx.showToast({ title: '请填写会员支付单价', icon: 'none' });
+      return;
+    }
+    if (Number.isNaN(mpU)) {
+      wx.showToast({ title: '会员支付单价须为正数', icon: 'none' });
+      return;
+    }
     this.beginLoading('保存中...');
     try {
       const capacityLimit =
@@ -827,6 +902,7 @@ Page({
           minParticipants: this.data.minParticipants,
           maxParticipants: this.data.maxParticipants,
           refundHoursBeforeStart: this.data.refundHoursBeforeStart,
+          memberPricePerSlotYuan: mpU,
         })
       );
       const r = (cloudRes && cloudRes.result) || {};
@@ -840,6 +916,8 @@ Page({
         showPurposeSheet: false,
         purposeSheetMode: 'create',
         editingHoldIds: [],
+        purposeMemberPriceYuan: '',
+        purposeMemberPricePlaceholder: '必填，元/次',
       });
       this.loadSlotPricesAndRender();
     } catch (e) {
@@ -851,10 +929,6 @@ Page({
 
   updateSlotsAvailability(selectedDate) {
     this.beginLoading('加载中');
-    this.bookedSlotKeySet = new Set();
-    this.coachHoldMeta = {};
-    this.myCoachHoldIdSet = new Set();
-    this.generateTimeSchedule(selectedDate);
     this.setData({
       selectedDate,
       selectedSlots: [],
@@ -862,7 +936,13 @@ Page({
       totalPrice: 0,
     });
     this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
-      if (applied) this.generateTimeSchedule(selectedDate);
+      if (applied === null) return;
+      if (!applied) {
+        this.bookedSlotKeySet = new Set();
+        this.coachHoldMeta = {};
+        this.myCoachHoldIdSet = new Set();
+      }
+      this.generateTimeSchedule(selectedDate);
     }).finally(() => {
       this.endLoading();
     });
@@ -1021,8 +1101,10 @@ Page({
       patch.minParticipants = 3;
       patch.maxParticipants = 12;
       patch.refundHoursBeforeStart = 6;
+    } else if (lt === 'experience' || lt === 'regular') {
+      patch.refundHoursBeforeStart = 6;
     }
-    this.setData(patch);
+    this.setData(patch, () => this.applyPurposeMemberPriceDefault());
   },
 
   closePurposeSheet() {
@@ -1030,6 +1112,8 @@ Page({
       showPurposeSheet: false,
       purposeSheetMode: 'create',
       editingHoldIds: [],
+      purposeMemberPriceYuan: '',
+      purposeMemberPricePlaceholder: '必填，元/次',
     });
   },
 
@@ -1043,13 +1127,16 @@ Page({
         '',
         this.data.groupMode || 'group35'
       );
-      this.setData({
-        lessonType: 'open_play',
-        ...scalePatch,
-        minParticipants: 3,
-        maxParticipants: 12,
-        refundHoursBeforeStart: 6,
-      });
+      this.setData(
+        {
+          lessonType: 'open_play',
+          ...scalePatch,
+          minParticipants: 3,
+          maxParticipants: 12,
+          refundHoursBeforeStart: 6,
+        },
+        () => this.applyPurposeMemberPriceDefault()
+      );
       return;
     }
     if (!this.data.purposeShowStandardTypes) return;
@@ -1062,8 +1149,10 @@ Page({
       patch.minParticipants = 3;
       patch.maxParticipants = 12;
       patch.refundHoursBeforeStart = 6;
+    } else if (v === 'experience' || v === 'regular') {
+      patch.refundHoursBeforeStart = 6;
     }
-    this.setData(patch);
+    this.setData(patch, () => this.applyPurposeMemberPriceDefault());
   },
 
   onMinParticipantsInput(e) {
@@ -1076,10 +1165,45 @@ Page({
     this.setData({ refundHoursBeforeStart: e.detail.value });
   },
 
+  onPurposeMemberPriceInput(e) {
+    this.setData({ purposeMemberPriceYuan: e.detail.value });
+  },
+
+  applyPurposeMemberPriceDefault() {
+    const app = getApp();
+    const venue = app && app.globalData && app.globalData.selectedVenue;
+    const { lessonType, pairMode } = this.data;
+    const n = defaultMemberPriceYuanFromVenue(venue, lessonType, pairMode);
+    const str = n != null && Number.isFinite(n) ? String(n) : '';
+    this.setData({
+      purposeMemberPriceYuan: str,
+      purposeMemberPricePlaceholder:
+        n != null && Number.isFinite(n)
+          ? `场馆默认 ${n} 元/次，可改`
+          : '必填，元/次',
+    });
+  },
+
+  parseMemberPriceForCreate() {
+    const raw = String(this.data.purposeMemberPriceYuan || '').trim();
+    if (raw === '') return 'empty';
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) return 'invalid';
+    return Math.round(n * 100) / 100;
+  },
+
+  parseMemberPriceForUpdate() {
+    const raw = String(this.data.purposeMemberPriceYuan || '').trim();
+    if (raw === '') return 'empty';
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) return NaN;
+    return Math.round(n * 100) / 100;
+  },
+
   selectPurposeScale(e) {
     const { kind, code } = e.currentTarget.dataset;
     if (!code || kind !== 'pair') return;
-    this.setData({ pairMode: code });
+    this.setData({ pairMode: code }, () => this.applyPurposeMemberPriceDefault());
   },
 
   async submitCoachHold() {
@@ -1092,7 +1216,6 @@ Page({
       groupMode,
     } = this.data;
 
-    this.beginLoading('提交中...');
     const app = getApp();
     const venue = app && app.globalData && app.globalData.selectedVenue;
     const venueName = venue && venue.name ? String(venue.name).trim() : '';
@@ -1102,6 +1225,16 @@ Page({
       pairMode,
       groupMode
     );
+    const mpCreate = this.parseMemberPriceForCreate();
+    if (mpCreate === 'empty') {
+      wx.showToast({ title: '请填写会员支付单价', icon: 'none' });
+      return;
+    }
+    if (mpCreate === 'invalid') {
+      wx.showToast({ title: '会员支付单价须为正数', icon: 'none' });
+      return;
+    }
+    this.beginLoading('提交中...');
     try {
       const capacityLimit =
         lessonType === 'group' || lessonType === 'open_play'
@@ -1120,6 +1253,7 @@ Page({
         minParticipants: this.data.minParticipants,
         maxParticipants: this.data.maxParticipants,
         refundHoursBeforeStart: this.data.refundHoursBeforeStart,
+        memberPricePerSlotYuan: mpCreate,
       });
       let coachPhoneArg = '';
       if (this.data.isManagerUser) {
@@ -1149,6 +1283,8 @@ Page({
         showPurposeSheet: false,
         purposeSheetMode: 'create',
         editingHoldIds: [],
+        purposeMemberPriceYuan: '',
+        purposeMemberPricePlaceholder: '必填，元/次',
         selectedSlots: [],
         selectedSlotsMap: {},
         totalPrice: 0,
@@ -1158,6 +1294,7 @@ Page({
       heldKeys.forEach((k) => this.bookedSlotKeySet.add(k));
       this.generateTimeSchedule(selectedDate);
       this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
+        if (applied === null) return;
         if (!applied) return;
         heldKeys.forEach((k) => this.bookedSlotKeySet.add(k));
         this.generateTimeSchedule(selectedDate);

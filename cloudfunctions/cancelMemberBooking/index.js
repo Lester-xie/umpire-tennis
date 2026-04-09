@@ -145,7 +145,13 @@ async function getRefundLeadMsFromCoachHolds(coachHoldIds) {
     const doc = d.data;
     if (!doc) return null;
     const lt = String(doc.lessonType || '').trim();
-    if ((lt === 'group' || lt === 'open_play') && doc.refundHoursBeforeStart != null) {
+    if (
+      (lt === 'group' ||
+        lt === 'open_play' ||
+        lt === 'experience' ||
+        lt === 'regular') &&
+      doc.refundHoursBeforeStart != null
+    ) {
       const h = Math.floor(Number(doc.refundHoursBeforeStart));
       if (Number.isFinite(h) && h >= 0) return h * 3600000;
     }
@@ -163,6 +169,13 @@ function memberWithinCancelDeadline(sessionStartMs, nowMs, leadMsOpt) {
       ? leadMsOpt
       : MEMBER_CANCEL_LEAD_MS;
   return sessionStartMs - nowMs >= lead;
+}
+
+function refundDescForBooking(booking) {
+  if (String(booking.bookingSubtype || '').trim() === 'coach_course') {
+    return '用户取消报名';
+  }
+  return '用户取消订场';
 }
 
 async function refundWeChatPortion(booking, now) {
@@ -186,7 +199,7 @@ async function refundWeChatPortion(booking, now) {
       refundFee: totalFee,
       subMchId,
       nonceStr: generateRandomString(32),
-      refundDesc: '用户取消订场',
+      refundDesc: refundDescForBooking(booking),
     });
     const refundOk = res.returnCode === 'SUCCESS' || res.resultCode === 'SUCCESS';
     if (!refundOk) {

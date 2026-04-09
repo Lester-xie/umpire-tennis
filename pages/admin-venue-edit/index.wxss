@@ -193,3 +193,30 @@
 .footer-space {
   height: 48rpx;
 }
+
+.manage-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 20rpx;
+  margin-top: 16rpx;
+  background: #f8faf9;
+  border-radius: 16rpx;
+  border: 1rpx solid #e0ebe4;
+}
+
+.manage-entry--hover {
+  opacity: 0.88;
+}
+
+.manage-entry-text {
+  font-size: 30rpx;
+  color: #134e35;
+  font-weight: 500;
+}
+
+.manage-entry-arrow {
+  font-size: 36rpx;
+  color: #81a894;
+  line-height: 1;
+}

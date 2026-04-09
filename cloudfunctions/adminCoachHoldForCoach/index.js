@@ -184,6 +184,17 @@ function clampCoachCapacityFromModes(lessonType, pairMode, groupMode, cap) {
   return Math.min(99, n);
 }
 
+function sanitizeMemberPricePerSlotYuan(raw) {
+  if (raw == null || raw === '') {
+    return { ok: false, errMsg: '请填写会员支付单价' };
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0 || n > 999999) {
+    return { ok: false, errMsg: '会员支付单价须为有效正数' };
+  }
+  return { ok: true, value: Math.round(n * 100) / 100 };
+}
+
 function isStaffUser(u) {
   return !!(u && u.isManager);
 }
@@ -235,6 +246,14 @@ exports.main = async (event) => {
     coachUser = admin;
     targetOpenid = adminOpenid;
     coachPhone = admin.phone != null ? String(admin.phone).trim() : '';
+  } else if (
+    !coachPhoneRaw &&
+    ['experience', 'regular', 'group'].includes(lessonTypeEarly)
+  ) {
+    /** 体验课/正课/团课未选教练：占用记在管理员本人名下（与畅打一致） */
+    coachUser = admin;
+    targetOpenid = adminOpenid;
+    coachPhone = admin.phone != null ? String(admin.phone).trim() : '';
   } else {
     if (!/^1\d{10}$/.test(coachPhoneRaw)) {
       return { ok: false, errMsg: '请选择教练或填写有效手机号' };
@@ -275,8 +294,14 @@ exports.main = async (event) => {
     if (!coachUser.isManager) {
       return { ok: false, errMsg: '畅打占用须使用管理员账号发起' };
     }
-  } else if (!coachUser.isCoach) {
-    return { ok: false, errMsg: '体验课/团课/正课须指定 isCoach 教练账号' };
+  } else {
+    const isAdminSelf =
+      coachUser &&
+      coachUser._openid != null &&
+      String(coachUser._openid).trim() === adminOpenid;
+    if (!isAdminSelf && !coachUser.isCoach) {
+      return { ok: false, errMsg: '体验课/团课/正课须指定 isCoach 教练账号' };
+    }
   }
 
   if (lessonType === 'group' || lessonType === 'open_play') {
@@ -316,6 +341,12 @@ exports.main = async (event) => {
     return { ok: false, errMsg: '人数参数无效' };
   }
   capacityLimit = clampCoachCapacityFromModes(lessonType, pairMode, groupMode, capacityLimit);
+
+  const mpSan = sanitizeMemberPricePerSlotYuan(event.memberPricePerSlotYuan);
+  if (!mpSan.ok) {
+    return { ok: false, errMsg: mpSan.errMsg || '会员支付单价无效' };
+  }
+  const memberPricePerSlotYuan = mpSan.value;
 
   const sessionSlotKeys = normalized
     .map((s) => `${s.courtId}-${s.slotIndex}`)
@@ -370,8 +401,12 @@ exports.main = async (event) => {
       };
       if (ge.minParticipants != null) {
         holdData.minParticipants = ge.minParticipants;
+      }
+      if (ge.refundHoursBeforeStart != null) {
         holdData.refundHoursBeforeStart = ge.refundHoursBeforeStart;
       }
+      holdData.memberPricePerSlotYuan = memberPricePerSlotYuan;
+      holdData.memberPricePerSessionYuan = memberPricePerSlotYuan;
       await db.collection('db_coach_slot_hold').add({
         data: holdData,
       });

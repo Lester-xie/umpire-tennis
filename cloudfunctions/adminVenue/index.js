@@ -68,6 +68,42 @@ function normalizeCourtList(raw) {
   return { ok: true, courtList: out };
 }
 
+/** category_list：教练课用途与会员默认场次价；未传 categoryList 时不覆盖库内原值 */
+function normalizeCategoryList(raw) {
+  if (raw === undefined) {
+    return { ok: true, omit: true, list: null };
+  }
+  if (!Array.isArray(raw)) {
+    return { ok: false, errMsg: 'categoryList 须为数组' };
+  }
+  const out = [];
+  for (let i = 0; i < raw.length; i += 1) {
+    const row = raw[i];
+    if (!row || typeof row !== 'object') {
+      return { ok: false, errMsg: `用途配置第 ${i + 1} 项无效` };
+    }
+    const name = String(row.name || '').trim();
+    if (!name) {
+      return { ok: false, errMsg: `用途配置第 ${i + 1} 项缺少名称` };
+    }
+    const item = { name };
+    if (row.scaleList != null && typeof row.scaleList === 'object' && !Array.isArray(row.scaleList)) {
+      const sl = {};
+      Object.keys(row.scaleList).forEach((k) => {
+        const n = Number(row.scaleList[k]);
+        if (Number.isFinite(n) && n >= 0) sl[k] = n;
+      });
+      if (Object.keys(sl).length) item.scaleList = sl;
+    }
+    if (row.price != null && String(row.price).trim() !== '') {
+      const p = Number(row.price);
+      if (Number.isFinite(p) && p >= 0) item.price = p;
+    }
+    out.push(item);
+  }
+  return { ok: true, omit: false, list: out };
+}
+
 function normalizeVenuePayload(body) {
   const name = body.name != null ? String(body.name).trim() : '';
   if (!name) {
@@ -84,6 +120,10 @@ function normalizeVenuePayload(body) {
   if (!courtNorm.ok) {
     return courtNorm;
   }
+  const catNorm = normalizeCategoryList(body.categoryList);
+  if (!catNorm.ok) {
+    return catNorm;
+  }
   const data = {
     name,
     address,
@@ -94,6 +134,9 @@ function normalizeVenuePayload(body) {
   };
   if (image) {
     data.image = image;
+  }
+  if (!catNorm.omit && catNorm.list != null) {
+    data.category_list = catNorm.list;
   }
   return { ok: true, data };
 }

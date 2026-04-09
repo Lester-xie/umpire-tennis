@@ -107,6 +107,80 @@ async function assertCourtSlotsCanCreatePending(dbConn, cmd, { venueId, orderDat
   return { ok: true }
 }
 
+/** 用户取消支付后订单仍为 pending：再次发起同场次支付前关闭旧待支付单，避免「待支付订单」挡路 */
+async function closePendingCoachBookingSameSession(dbConn, cmd, { phone, venueId, orderDate, coachHoldIds }) {
+  const sk = sessionKeyFromHoldIdsPay(coachHoldIds)
+  const phoneNorm = String(phone || '').trim()
+  const orderDateNorm = normalizeOrderDatePay(orderDate)
+  const venueIds = venueIdInValuesPay(venueId)
+  const dateKeys = orderDateInValuesPay(orderDate, orderDateNorm)
+  if (!phoneNorm || !venueIds.length || !orderDateNorm) return
+  const res = await dbConn
+    .collection('db_booking')
+    .where({
+      venueId: cmd.in(venueIds),
+      orderDate: cmd.in(dateKeys),
+      bookingSubtype: 'coach_course',
+    })
+    .get()
+  const now = Date.now()
+  const tasks = []
+  ;(res.data || []).forEach((doc) => {
+    if (normalizeOrderDatePay(doc.orderDate) !== orderDateNorm) return
+    if (sessionKeyFromHoldIdsPay(doc.coachHoldIds || []) !== sk) return
+    if (String(doc.phone || '').trim() !== phoneNorm) return
+    if (String(doc.status || '') !== 'pending') return
+    if (!doc._id) return
+    tasks.push(
+      dbConn
+        .collection('db_booking')
+        .doc(doc._id)
+        .update({
+          data: {
+            status: 'closed_unpaid',
+            closedReason: 'abandoned_checkout',
+            updatedAt: now,
+          },
+        }),
+    )
+  })
+  await Promise.all(tasks)
+}
+
+/** 体验课：关闭该手机号下未支付的体验课教练订单，避免仅「待支付」占用限购名额 */
+async function closePendingExperienceCoachBookingsForPhone(dbConn, phone) {
+  const phoneNorm = String(phone || '').trim()
+  if (!phoneNorm) return
+  const res = await dbConn
+    .collection('db_booking')
+    .where({
+      phone: phoneNorm,
+      bookingSubtype: 'coach_course',
+    })
+    .get()
+  const now = Date.now()
+  const tasks = []
+  ;(res.data || []).forEach((doc) => {
+    const lk = String(doc.lessonKey || '').trim()
+    if (!isExperienceLessonKeyPay(lk)) return
+    if (String(doc.status || '') !== 'pending') return
+    if (!doc._id) return
+    tasks.push(
+      dbConn
+        .collection('db_booking')
+        .doc(doc._id)
+        .update({
+          data: {
+            status: 'closed_unpaid',
+            closedReason: 'abandoned_checkout',
+            updatedAt: now,
+          },
+        }),
+    )
+  })
+  await Promise.all(tasks)
+}
+
 async function assertCoachCourseCanCreatePending(dbConn, cmd, { phone, venueId, orderDate, coachHoldIds }) {
   const sk = sessionKeyFromHoldIdsPay(coachHoldIds)
   const phoneNorm = String(phone || '').trim()
@@ -134,6 +208,8 @@ async function assertCoachCourseCanCreatePending(dbConn, cmd, { phone, venueId, 
   }
   limit = clampCoachCapacityFromModes(hd && hd.lessonType, hd && hd.pairMode, hd && hd.groupMode, limit)
 
+  await closePendingCoachBookingSameSession(dbConn, cmd, { phone, venueId, orderDate, coachHoldIds })
+
   const all = await dbConn
     .collection('db_booking')
     .where({
@@ -155,6 +231,78 @@ async function assertCoachCourseCanCreatePending(dbConn, cmd, { phone, venueId, 
   })
   if (dup) return { ok: false, msg: '您已在该课节报名或存在待支付订单' }
   if (taken >= limit) return { ok: false, msg: '该课节名额已满' }
+  return { ok: true }
+}
+
+function isExperienceLessonKeyPay(lk) {
+  return String(lk || '').trim().toLowerCase().startsWith('experience:')
+}
+
+/** 体验课约课：同一手机号只能有一笔「已付」体验课教练订单；待支付不算已参加 */
+async function assertExperienceCoachBookingOnce(dbConn, phone) {
+  const phoneNorm = String(phone || '').trim()
+  if (!phoneNorm) return { ok: false, msg: '缺少手机号' }
+  const res = await dbConn
+    .collection('db_booking')
+    .where({
+      phone: phoneNorm,
+      bookingSubtype: 'coach_course',
+    })
+    .get()
+  const rows = res.data || []
+  for (let i = 0; i < rows.length; i += 1) {
+    const lk = String(rows[i].lessonKey || '').trim()
+    const st = String(rows[i].status || '')
+    if (!isExperienceLessonKeyPay(lk)) continue
+    if (st === 'paid' || st === 'payment_confirming') {
+      return { ok: false, msg: '体验课每个手机号只能参加一次' }
+    }
+  }
+  return { ok: true }
+}
+
+async function closePendingExperienceCoursePurchasesForPhone(dbConn, phone) {
+  const phoneNorm = String(phone || '').trim()
+  if (!phoneNorm) return
+  const res = await dbConn.collection('db_course_purchase').where({ phone: phoneNorm }).get()
+  const now = Date.now()
+  const tasks = []
+  ;(res.data || []).forEach((doc) => {
+    const lk = String(doc.lessonKey || '').trim()
+    if (!isExperienceLessonKeyPay(lk)) return
+    if (String(doc.status || '') !== 'pending') return
+    if (!doc._id) return
+    tasks.push(
+      dbConn
+        .collection('db_course_purchase')
+        .doc(doc._id)
+        .update({
+          data: {
+            status: 'closed_unpaid',
+            closedReason: 'abandoned_checkout',
+            updatedAt: now,
+          },
+        }),
+    )
+  })
+  await Promise.all(tasks)
+}
+
+/** 体验课：同一手机号只能购买一次「已付」体验课课时包；待支付可重新下单 */
+async function assertExperienceCoursePurchaseOnce(dbConn, phone, lessonKeyNew) {
+  if (!isExperienceLessonKeyPay(lessonKeyNew)) return { ok: true }
+  const phoneNorm = String(phone || '').trim()
+  if (!phoneNorm) return { ok: false, msg: '缺少手机号' }
+  const res = await dbConn.collection('db_course_purchase').where({ phone: phoneNorm }).get()
+  const rows = res.data || []
+  for (let i = 0; i < rows.length; i += 1) {
+    const lk = String(rows[i].lessonKey || '').trim()
+    const st = String(rows[i].status || '')
+    if (!isExperienceLessonKeyPay(lk)) continue
+    if (st === 'paid' || st === 'payment_confirming') {
+      return { ok: false, msg: '体验课每个手机号只能购买一次' }
+    }
+  }
   return { ok: true }
 }
 
@@ -298,6 +446,36 @@ exports.main = async (event, context) => {
           returnMsg: gate.msg || '无法下单',
           payment: undefined,
         };
+      }
+      const lkCoach = event.booking.lessonKey != null ? String(event.booking.lessonKey).trim() : '';
+      if (isExperienceLessonKeyPay(lkCoach)) {
+        await closePendingExperienceCoachBookingsForPhone(db, bookingPhone);
+        const expGate = await assertExperienceCoachBookingOnce(db, bookingPhone);
+        if (!expGate.ok) {
+          return {
+            returnCode: 'FAIL',
+            returnMsg: expGate.msg || '体验课限购',
+            payment: undefined,
+          };
+        }
+      }
+    }
+  }
+
+  if (event.goodsPurchase && event.goodsPurchase.type === 'course_hours') {
+    const gp = event.goodsPurchase
+    const gpPhone = String(gp.phone || '').trim()
+    await closePendingExperienceCoursePurchasesForPhone(db, gpPhone)
+    const gate = await assertExperienceCoursePurchaseOnce(
+      db,
+      gpPhone,
+      String(gp.lessonKey || '').trim(),
+    )
+    if (!gate.ok) {
+      return {
+        returnCode: 'FAIL',
+        returnMsg: gate.msg || '体验课限购',
+        payment: undefined,
       }
     }
   }

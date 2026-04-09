@@ -9,6 +9,7 @@ const {
   computeBookingMainContentHeightPx,
   estimateBookingHeaderHeightPx,
 } = require('../../utils/bookingLayout');
+const { applyCoachSessionFlatVenuePrice } = require('../../utils/coachSessionVenuePrice');
 const lottie = require('lottie-miniprogram');
 const loadingAnimationData = require('../../assets/images/loading.js');
 
@@ -309,19 +310,24 @@ Page({
 
     const afterFetchBooked = () => {
       this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
-        if (applied) this.generateTimeSchedule();
+        if (applied === null) return;
+        if (!applied) {
+          this.bookedSlotKeySet = new Set();
+          this.coachHoldMeta = {};
+        }
+        this.generateTimeSchedule();
         this.restartRealtimeWatch();
-        this.endLoading();
       }).catch(() => {
+        this.bookedSlotKeySet = new Set();
+        this.coachHoldMeta = {};
+        this.generateTimeSchedule();
+      }).finally(() => {
         this.endLoading();
       });
     };
 
     // 没有 venueId 时直接走旧逻辑（不可用/无价格）
     if (!venueId) {
-      this.bookedSlotKeySet = new Set();
-      this.coachHoldMeta = {};
-      this.generateTimeSchedule();
       afterFetchBooked();
       return;
     }
@@ -335,9 +341,6 @@ Page({
       this.slotPriceMap = buildSlotPriceMapFromCourtList(courtList, {
         useVipPrices: isVipUser,
       });
-      this.bookedSlotKeySet = new Set();
-      this.coachHoldMeta = {};
-      this.generateTimeSchedule();
       afterFetchBooked();
       return;
     }
@@ -345,9 +348,6 @@ Page({
     // 无 courtList / priceList 时无法在客户端展示单价
     this.slotPriceMap = {};
     wx.showToast({ title: '场馆未配置场地价格', icon: 'none' });
-    this.bookedSlotKeySet = new Set();
-    this.coachHoldMeta = {};
-    this.generateTimeSchedule();
     afterFetchBooked();
   },
 
@@ -549,6 +549,7 @@ Page({
     if (showLoading) this.beginLoading();
     const selectedDate = this.data.selectedDate || getTodayDateStr();
     this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
+      if (applied === null) return;
       if (!applied) return;
       this.generateTimeSchedule(selectedDate);
       this.reconcileSelectedSlotsAfterRealtime();
@@ -582,7 +583,7 @@ Page({
 
   /**
    * 拉取某日已支付占用，写入 bookedSlotKeySet（整表替换为本次 keys）。
-   * resolve(true) 表示本次结果已采纳，可再调 generateTimeSchedule；false 表示跳过（无场馆/过期/失败）。
+   * resolve(true) 已写入；false 未写入（无场馆/失败）；null 表示响应已过期（用户已切换请求），勿改界面。
    */
   fetchBookedSlotsForDate(orderDate) {
     const venueId = this.data.selectedVenueId;
@@ -594,7 +595,7 @@ Page({
     return getBookedSlots({ venueId, orderDate })
       .then((res) => {
         if (token !== this._bookedSlotsFetchToken) {
-          return false;
+          return null;
         }
         const r = res && res.result ? res.result : {};
         const keys = Array.isArray(r.keys) ? r.keys : [];
@@ -819,6 +820,13 @@ Page({
         ? (coachMeta.capacityLabel || '教练占用')
         : '';
       const coachName = bookedByCoach && coachMeta.coachName ? String(coachMeta.coachName).trim() : '';
+      let venueSlotPriceForOrder = slotPrice;
+      if (bookedByCoach && coachMeta && coachMeta.memberPricePerSlotYuan != null) {
+        const mp = Number(coachMeta.memberPricePerSlotYuan);
+        if (Number.isFinite(mp) && mp > 0) {
+          venueSlotPriceForOrder = mp;
+        }
+      }
 
       const isAvailable =
         isAvailableTime && slotPrice != null && !isBookedByOrder;
@@ -827,7 +835,7 @@ Page({
       slots.push({
         available: isAvailable,
         price: isAvailable ? slotPrice : null,
-        venueSlotPrice: slotPrice,
+        venueSlotPrice: venueSlotPriceForOrder,
         booked: isBookedByOrder,
         bookedByCoach,
         coachPurpose,
@@ -850,6 +858,7 @@ Page({
     }
 
     this.applyCoachHoldMergeAndLayout(slots, courtId);
+    applyCoachSessionFlatVenuePrice(slots, courtId, metaMap);
     return slots;
   },
 
@@ -896,12 +905,9 @@ Page({
     });
   },
 
-  // 切换日期：先按「无占用」立即刷新格子，再异步合并 getBookedSlots 结果
+  // 切换日期：等 getBookedSlots 返回后再一次性生成格子，避免「先清空占用→仅标价→再合并」的中间帧闪烁
   updateSlotsAvailability(selectedDate) {
     this.beginLoading();
-    this.bookedSlotKeySet = new Set();
-    this.coachHoldMeta = {};
-    this.generateTimeSchedule(selectedDate);
     this.setData({
       selectedDate,
       selectedSlots: [],
@@ -909,10 +915,18 @@ Page({
       totalPrice: 0,
     });
     this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
-      if (applied) this.generateTimeSchedule(selectedDate);
+      if (applied === null) return;
+      if (!applied) {
+        this.bookedSlotKeySet = new Set();
+        this.coachHoldMeta = {};
+      }
+      this.generateTimeSchedule(selectedDate);
       this.restartRealtimeWatch();
-      this.endLoading();
     }).catch(() => {
+      this.bookedSlotKeySet = new Set();
+      this.coachHoldMeta = {};
+      this.generateTimeSchedule(selectedDate);
+    }).finally(() => {
       this.endLoading();
     });
   },

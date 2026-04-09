@@ -13,13 +13,24 @@
     <view class="content-wrapper">
       <view class="card section-card">
         <view class="section-list" wx:if="{{goodsOrders.length > 0}}">
-          <view class="list-item goods-item" wx:for="{{goodsOrders}}" wx:key="orderNumber">
-            <image class="goods-thumb" src="{{item.goodItem.image}}" mode="aspectFill"></image>
-            <view class="item-main">
-              <view class="item-desc">{{item.goodItem.desc}}</view>
-              <view class="item-time">{{item.formattedTime}}</view>
+          <view class="goods-order-block" wx:for="{{goodsOrders}}" wx:key="orderNumber">
+            <view class="list-item goods-item">
+              <image class="goods-thumb" src="{{item.goodItem.image}}" mode="aspectFill"></image>
+              <view class="item-main">
+                <view class="item-desc">{{item.goodItem.desc}}</view>
+                <view class="item-time">{{item.formattedTime}}</view>
+              </view>
+              <view class="item-price">¥ {{item.totalPrice}}</view>
             </view>
-            <view class="item-price">¥ {{item.totalPrice}}</view>
+            <view
+              wx:if="{{item.showRefundExperience}}"
+              class="goods-refund-btn"
+              data-venueid="{{item.refundVenueId}}"
+              data-lessonkey="{{item.refundLessonKey}}"
+              catchtap="onRefundExperienceTap"
+            >
+              申请退款
+            </view>
           </view>
         </view>
         <view class="empty-tip" wx:else>

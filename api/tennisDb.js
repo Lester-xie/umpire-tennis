@@ -22,6 +22,7 @@ const DEFAULT_USER_AVATAR = '/assets/images/default-avatar.jpg';
  * - longitude
  * - （可选）image
  * - courtList: [{ name, priceList, vipPriceList?, specialPrice? }] — 各 14 段；周末一口价 specialPrice 仅非 VIP 订场生效
+ * - category_list（或 categoryList）: 教练课用途与会员默认「场次」价，见 utils/venueCategoryList.js
  */
 function getVenues() {
   const db = getDb();
@@ -38,6 +39,12 @@ function normalizeVenueDoc(v, idx) {
   const image =
     v.image ||
     (i % 2 === 0 ? '/assets/images/court1.jpg' : '/assets/images/court2.jpg');
+  const categoryList =
+    v.category_list != null
+      ? v.category_list
+      : v.categoryList != null
+        ? v.categoryList
+        : [];
   return {
     ...v,
     id,
@@ -47,6 +54,7 @@ function normalizeVenueDoc(v, idx) {
     longitude: v.longitude,
     image,
     courtList: Array.isArray(v.courtList) ? v.courtList : [],
+    category_list: Array.isArray(categoryList) ? categoryList : [],
   };
 }
 
@@ -272,6 +280,21 @@ function listAllMemberCourseHours() {
 }
 
 /**
+ * 体验课课时包原路退款（须已登录且手机号与 openid 绑定）
+ * @param {{ venueId: string, lessonKey: string }} payload
+ */
+function refundExperienceCoursePurchase(payload) {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'refundExperienceCoursePurchase',
+    data: {
+      phone,
+      ...(payload || {}),
+    },
+  });
+}
+
+/**
  * 使用已购课时预订教练占用时段
  * @param {{ phone: string, holdIds: string[], snapshot: object }} payload
  */
@@ -400,6 +423,7 @@ module.exports = {
   listCoursePurchases,
   listMemberCourseHours,
   listAllMemberCourseHours,
+  refundExperienceCoursePurchase,
   completeCoachBookingWithHours,
   getBookedSlots,
   coachHoldSlots,

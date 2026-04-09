@@ -72,6 +72,64 @@ function clampCoachCapacityFromModes(lessonType, pairMode, groupMode, cap) {
   return Math.min(99, n)
 }
 
+function isExperienceLessonKeyHours(lk) {
+  return String(lk || '').trim().toLowerCase().startsWith('experience:')
+}
+
+/** 与 pay 云函数一致：关闭未支付的体验课教练订单，避免仅待支付占用限购 */
+async function closePendingExperienceCoachBookingsForPhone(phone) {
+  const phoneNorm = String(phone || '').trim()
+  if (!phoneNorm) return
+  const res = await db
+    .collection('db_booking')
+    .where({
+      phone: phoneNorm,
+      bookingSubtype: 'coach_course',
+    })
+    .get()
+  const now = Date.now()
+  const tasks = []
+  ;(res.data || []).forEach((doc) => {
+    const lk = String(doc.lessonKey || '').trim()
+    if (!isExperienceLessonKeyHours(lk)) return
+    if (String(doc.status || '') !== 'pending') return
+    if (!doc._id) return
+    tasks.push(
+      db.collection('db_booking').doc(doc._id).update({
+        data: {
+          status: 'closed_unpaid',
+          closedReason: 'abandoned_checkout',
+          updatedAt: now,
+        },
+      }),
+    )
+  })
+  await Promise.all(tasks)
+}
+
+/** 体验课约课：同一手机号只能有一笔「已付」体验课教练订单 */
+async function assertExperienceCoachBookingOnce(phone) {
+  const phoneNorm = String(phone || '').trim()
+  if (!phoneNorm) return { ok: false, errMsg: '缺少手机号' }
+  const res = await db
+    .collection('db_booking')
+    .where({
+      phone: phoneNorm,
+      bookingSubtype: 'coach_course',
+    })
+    .get()
+  const rows = res.data || []
+  for (let i = 0; i < rows.length; i += 1) {
+    const lk = String(rows[i].lessonKey || '').trim()
+    const st = String(rows[i].status || '')
+    if (!isExperienceLessonKeyHours(lk)) continue
+    if (st === 'paid' || st === 'payment_confirming') {
+      return { ok: false, errMsg: '体验课每个手机号只能参加一次' }
+    }
+  }
+  return { ok: true }
+}
+
 function venueIdInValues(venueIdRaw) {
   const s = String(venueIdRaw || '').trim()
   if (!s) return []
@@ -87,6 +145,52 @@ function orderDateInValues(orderDateRaw, normalized) {
   if (normalized) set.add(normalized)
   if (raw) set.add(raw)
   return [...set]
+}
+
+/**
+ * 与 payCallback 一致：体验课报名成功后写入会员 db_user 的体验课教练信息
+ */
+async function setUserExperienceCoachFromHoldIds(phone, coachHoldIds) {
+  const phoneNorm = String(phone || '').trim()
+  if (!phoneNorm || !Array.isArray(coachHoldIds) || !coachHoldIds[0]) return
+  let holdDoc
+  try {
+    const d = await db.collection('db_coach_slot_hold').doc(String(coachHoldIds[0]).trim()).get()
+    holdDoc = d.data
+  } catch (e) {
+    console.error('setUserExperienceCoachFromHoldIds read hold', e)
+    return
+  }
+  if (!holdDoc) return
+  if (String(holdDoc.lessonType || '').trim() !== 'experience') return
+  const coachOpenid = holdDoc._openid != null ? String(holdDoc._openid).trim() : ''
+  let coachId = coachOpenid
+  const coachName = holdDoc.coachName != null ? String(holdDoc.coachName).trim() : ''
+  if (coachOpenid) {
+    try {
+      const u = await db.collection('db_user').where({ _openid: coachOpenid }).limit(1).get()
+      if (u.data && u.data[0] && u.data[0]._id) {
+        coachId = String(u.data[0]._id)
+      }
+    } catch (e) {
+      console.error('setUserExperienceCoachFromHoldIds coach user', e)
+    }
+  }
+  const ts = Date.now()
+  try {
+    const userHit = await db.collection('db_user').where({ phone: phoneNorm }).limit(1).get()
+    if (!userHit.data || !userHit.data[0] || !userHit.data[0]._id) return
+    await db.collection('db_user').doc(userHit.data[0]._id).update({
+      data: {
+        experienceCourseCoachId: coachId,
+        experienceCourseCoachName: coachName,
+        updatedAt: ts,
+      },
+    })
+    console.log('db_user 已写入体验课教练', phoneNorm, coachId, coachName)
+  } catch (e) {
+    console.error('setUserExperienceCoachFromHoldIds update user', e)
+  }
 }
 
 /**
@@ -119,6 +223,14 @@ exports.main = async (event) => {
   const lessonKeyClient = String(snapshot.lessonKey || '').trim()
   if (!lessonKeyClient) {
     return { ok: false, errMsg: '缺少课程类型' }
+  }
+
+  if (isExperienceLessonKeyHours(lessonKeyClient)) {
+    await closePendingExperienceCoachBookingsForPhone(phone)
+    const expOnce = await assertExperienceCoachBookingOnce(phone)
+    if (!expOnce.ok) {
+      return { ok: false, errMsg: expOnce.errMsg || '体验课限购' }
+    }
   }
 
   const requiredHours = holdIds.length
@@ -278,6 +390,10 @@ exports.main = async (event) => {
         updatedAt: now,
       },
     })
+
+    if (holdIds.length > 0 && isExperienceLessonKeyHours(lessonKeyClient)) {
+      await setUserExperienceCoachFromHoldIds(phone, holdIds)
+    }
 
     const postBook = await db
       .collection('db_booking')

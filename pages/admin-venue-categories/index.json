@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "用途管理",
+  "usingComponents": {
+    "header": "/components/header/header"
+  }
+}

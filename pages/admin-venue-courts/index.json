@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "场地管理",
+  "usingComponents": {
+    "header": "/components/header/header"
+  }
+}

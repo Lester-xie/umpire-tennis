@@ -1,0 +1,60 @@
+<view class="admin-sub-page">
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="用途管理" />
+  </view>
+  <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
+    <view wx:if="{{loading}}" class="muted">加载中…</view>
+    <block wx:else>
+      <view class="venue-name-hint" wx:if="{{name}}">场馆：{{name}}</view>
+
+      <view class="field">
+        <text class="field-label">课程用途与会员场次价</text>
+        <text class="field-hint">与教练占场、会员约课默认单价一致：体验课/正课按 1V1、1V2 标价；团课、畅打为单场价（元/次）。名称需与前台选项一致（如 体验课、正课、团课、畅打）。</text>
+
+        <block wx:for="{{categoryRows}}" wx:for-index="idx" wx:key="idx">
+          <view class="cat-card">
+            <view class="cat-card-head">
+              <text class="cat-num">用途 {{idx + 1}}</text>
+              <view wx:if="{{categoryRows.length > 1}}" class="court-remove" data-idx="{{idx}}" bindtap="onRemoveRow">删除</view>
+            </view>
+            <text class="cat-sublab">名称 *</text>
+            <input
+              class="cat-in"
+              placeholder="如：体验课、正课、团课、畅打"
+              value="{{item.name}}"
+              data-idx="{{idx}}"
+              bindinput="onCatName"
+            />
+
+            <text class="cat-sublab">计价方式</text>
+            <picker mode="selector" range="{{kindLabels}}" value="{{item.kind === 'single' ? 1 : 0}}" data-idx="{{idx}}" bindchange="onKindChange">
+              <view class="cat-picker">{{item.kind === 'single' ? kindLabels[1] : kindLabels[0]}}</view>
+            </picker>
+
+            <block wx:if="{{item.kind !== 'single'}}">
+              <view class="cat-price-row">
+                <text class="cat-mini-label">1V1（元/次）</text>
+                <input class="cat-in cat-in--short" type="digit" placeholder="必填" value="{{item.p1}}" data-idx="{{idx}}" bindinput="onP1" />
+              </view>
+              <view class="cat-price-row">
+                <text class="cat-mini-label">1V2（元/次）</text>
+                <input class="cat-in cat-in--short" type="digit" placeholder="必填" value="{{item.p2}}" data-idx="{{idx}}" bindinput="onP2" />
+              </view>
+            </block>
+            <block wx:else>
+              <view class="cat-price-row">
+                <text class="cat-mini-label">单场价（元/次）</text>
+                <input class="cat-in cat-in--short" type="digit" placeholder="必填" value="{{item.ps}}" data-idx="{{idx}}" bindinput="onPs" />
+              </view>
+            </block>
+          </view>
+        </block>
+
+        <view class="add-court" bindtap="onAddRow">+ 添加一条用途</view>
+      </view>
+
+      <button class="submit-btn" bindtap="onSave">保存</button>
+    </block>
+    <view class="footer-space"></view>
+  </scroll-view>
+</view>

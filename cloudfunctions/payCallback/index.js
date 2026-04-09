@@ -51,6 +51,10 @@ function clampCoachCapacityFromModes(lessonType, pairMode, groupMode, cap) {
   return Math.min(99, n)
 }
 
+function isExperienceLessonKeyCb(lk) {
+  return String(lk || '').trim().toLowerCase().startsWith('experience:')
+}
+
 function venueIdInValuesCb(venueIdRaw) {
   const s = String(venueIdRaw || '').trim()
   if (!s) return []
@@ -103,6 +107,53 @@ async function emitBookingRealtimeSignal({ venueId, orderDate }) {
       updatedAt: now,
     },
   })
+}
+
+/**
+ * 用户报名体验教练课后，在 db_user 记录所跟教练（首格占用上的 lessonType=experience）
+ * experienceCourseCoachId：优先教练 db_user._id，若无则教练 openid
+ */
+async function setUserExperienceCoachFromHoldIds(phone, coachHoldIds) {
+  const phoneNorm = String(phone || '').trim()
+  if (!phoneNorm || !Array.isArray(coachHoldIds) || !coachHoldIds[0]) return
+  let holdDoc
+  try {
+    const d = await db.collection('db_coach_slot_hold').doc(String(coachHoldIds[0]).trim()).get()
+    holdDoc = d.data
+  } catch (e) {
+    console.error('setUserExperienceCoachFromHoldIds read hold', e)
+    return
+  }
+  if (!holdDoc) return
+  if (String(holdDoc.lessonType || '').trim() !== 'experience') return
+  const coachOpenid = holdDoc._openid != null ? String(holdDoc._openid).trim() : ''
+  let coachId = coachOpenid
+  const coachName = holdDoc.coachName != null ? String(holdDoc.coachName).trim() : ''
+  if (coachOpenid) {
+    try {
+      const u = await db.collection('db_user').where({ _openid: coachOpenid }).limit(1).get()
+      if (u.data && u.data[0] && u.data[0]._id) {
+        coachId = String(u.data[0]._id)
+      }
+    } catch (e) {
+      console.error('setUserExperienceCoachFromHoldIds coach user', e)
+    }
+  }
+  const now = Date.now()
+  try {
+    const userHit = await db.collection('db_user').where({ phone: phoneNorm }).limit(1).get()
+    if (!userHit.data || !userHit.data[0] || !userHit.data[0]._id) return
+    await db.collection('db_user').doc(userHit.data[0]._id).update({
+      data: {
+        experienceCourseCoachId: coachId,
+        experienceCourseCoachName: coachName,
+        updatedAt: now,
+      },
+    })
+    console.log('db_user 已写入体验课教练', phoneNorm, coachId, coachName)
+  } catch (e) {
+    console.error('setUserExperienceCoachFromHoldIds update user', e)
+  }
 }
 
 async function getCoachSessionLimitForHoldIds(holdIds) {
@@ -370,6 +421,13 @@ async function markBookingPaid({ outTradeNo, transactionId, timeEnd }) {
   })
   console.log('db_booking 已标记已支付', _id, outTradeNo)
 
+  if (
+    coachHoldIds.length > 0 &&
+    isExperienceLessonKeyCb(String(booking.lessonKey || ''))
+  ) {
+    await setUserExperienceCoachFromHoldIds(String(booking.phone || '').trim(), coachHoldIds)
+  }
+
   if (coachHoldIds.length > 0 && sessionGate.shouldReleaseHolds) {
     await releaseCoachHolds(coachHoldIds, now)
   }
@@ -395,6 +453,28 @@ async function markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, 
   if (!phone || !lessonKey || !venueId || grantHours <= 0) {
     console.error('markCoursePurchasePaid: 无效课时数据', outTradeNo)
     return
+  }
+
+  if (isExperienceLessonKeyCb(lessonKey)) {
+    const paidDup = await coll.where({ phone, status: 'paid' }).get()
+    const hasOtherPaidExp = (paidDup.data || []).some(
+      (d) =>
+        isExperienceLessonKeyCb(d.lessonKey) &&
+        String(d.outTradeNo || '') !== String(outTradeNo || ''),
+    )
+    if (hasOtherPaidExp) {
+      const closeRes = await coll.where({ outTradeNo, status: 'pending' }).update({
+        data: {
+          status: 'closed_duplicate',
+          closedReason: 'experience_one_per_phone',
+          updatedAt: now,
+        },
+      })
+      if (closeRes.stats && closeRes.stats.updated >= 1) {
+        console.error('体验课重复支付，已关闭订单待人工退款', outTradeNo, phone)
+      }
+      return
+    }
   }
 
   const lockRes = await coll.where({ outTradeNo, status: 'pending' }).update({

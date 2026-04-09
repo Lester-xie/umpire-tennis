@@ -76,6 +76,18 @@ function clampCoachCapacityFromModes(lessonType, pairMode, groupMode, cap) {
   return Math.min(99, n);
 }
 
+function sanitizeMemberPricePerSlotYuanForUpdate(raw) {
+  if (raw === undefined) return { skip: true };
+  if (raw === null || raw === '') {
+    return { skip: false, errMsg: '请填写会员支付单价' };
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0 || n > 999999) {
+    return { skip: false, errMsg: '会员支付单价须为有效正数' };
+  }
+  return { skip: false, value: Math.round(n * 100) / 100 };
+}
+
 function normalizeOrderDate(raw) {
   const s = String(raw || '').trim();
   const parts = s.split('-');
@@ -119,7 +131,7 @@ async function emitBookingRealtimeSignal({ venueId, orderDate }) {
 
 /**
  * 批量更新本人多条教练占用：课程类型 / 规模（与 coachHoldSlots 字段一致）
- * event: { holdIds: string[], lessonType, pairMode?, groupMode? }
+ * event: { holdIds: string[], lessonType, pairMode?, groupMode?, memberPricePerSlotYuan?: number|null }
  */
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext();
@@ -182,6 +194,10 @@ exports.main = async (event) => {
     return { ok: false, errMsg: '人数参数无效' };
   }
   capacityLimit = clampCoachCapacityFromModes(lessonType, pairMode, groupMode, capacityLimit);
+  const mpUpd = sanitizeMemberPricePerSlotYuanForUpdate(event.memberPricePerSlotYuan);
+  if (!mpUpd.skip && mpUpd.errMsg) {
+    return { ok: false, errMsg: mpUpd.errMsg };
+  }
   const coachName =
     user.name != null && String(user.name).trim() !== '' ? String(user.name).trim() : '';
   const now = Date.now();
@@ -217,9 +233,16 @@ exports.main = async (event) => {
       if (lessonType === 'group' || lessonType === 'open_play') {
         patch.minParticipants = ge.minParticipants;
         patch.refundHoursBeforeStart = ge.refundHoursBeforeStart;
+      } else if (lessonType === 'experience' || lessonType === 'regular') {
+        patch.minParticipants = _.remove();
+        patch.refundHoursBeforeStart = ge.refundHoursBeforeStart;
       } else {
         patch.minParticipants = _.remove();
         patch.refundHoursBeforeStart = _.remove();
+      }
+      if (!mpUpd.skip) {
+        patch.memberPricePerSlotYuan = mpUpd.value;
+        patch.memberPricePerSessionYuan = mpUpd.value;
       }
       await db.collection('db_coach_slot_hold').doc(holdId).update({
         data: patch,

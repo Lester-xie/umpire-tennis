@@ -405,7 +405,7 @@ Page({
   },
 
   /**
-   * 与组合支付一致：先按 courtId、slotIndex 排序，前若干小时走课时，其余按各格 venueSlotPrice 累计为微信金额。
+   * 教练课：各格 venueSlotPrice 仅首格为场次价、其余为 0，故合计为场次总价；组合支付按课时数切分。
    */
   computeCoachSlotPrices(selectedSlots, courts) {
     const slots = (selectedSlots || [])
@@ -658,7 +658,7 @@ Page({
     return `${year}${formatNumber(month)}${formatNumber(day)}${formatNumber(hours)}${formatNumber(minutes)}${formatNumber(seconds)}${formatRandom(random)}`;
   },
 
-  /** 教练占用格：用 venueSlotPrice 计价（与会员订场单价一致） */
+  /** 教练占用格：venueSlotPrice 为场次计价（合并块仅首格有价，见 coachSessionVenuePrice） */
   processCoachCourseOrderItems(selectedSlots, courts) {
     const orderMap = {};
     (selectedSlots || []).forEach((slot) => {
@@ -899,15 +899,8 @@ Page({
 
     const courtOk = await this.validateCourtAvailabilityBeforePay();
     if (!courtOk) return;
-
-    let totalFee = 1;
-    if (isCoachWx) {
-      const cashYuan =
-        this.data.payMethod === 'mixed'
-          ? Number(this.data.comboCashYuan)
-          : Number(totalPrice);
-      totalFee = Math.max(1, Math.round(cashYuan * 100));
-    }
+    /** 当前页所有微信统一下单金额固定 1 分（totalFee 单位：分） */
+    const totalFee = 1;
 
     const payPayload = {
       totalFee,
@@ -1017,11 +1010,18 @@ Page({
           success: () => {
             if (orderType === 'court') {
               try {
-                wx.setStorageSync(BOOKING_SUCCESS_STORAGE_KEY, {
-                  successKind: 'court',
+                const payload = {
                   campusName: this.data.campusName,
                   orderItems: this.data.orderItems,
-                });
+                };
+                if (this.data.isCoachCourseOrder) {
+                  payload.successKind = 'coachCourse';
+                  payload.coachCapacityLabel = String(this.data.coachCapacityLabel || '').trim();
+                  payload.coachName = String(this.data.coachName || '').trim();
+                } else {
+                  payload.successKind = 'court';
+                }
+                wx.setStorageSync(BOOKING_SUCCESS_STORAGE_KEY, payload);
               } catch (e) {
                 console.error('写入订场成功缓存失败', e);
               }
@@ -1270,9 +1270,11 @@ Page({
       }
       try {
         wx.setStorageSync(BOOKING_SUCCESS_STORAGE_KEY, {
-          successKind: 'court',
+          successKind: 'coachCourse',
           campusName: this.data.campusName,
           orderItems: this.data.orderItems,
+          coachCapacityLabel: String(this.data.coachCapacityLabel || '').trim(),
+          coachName: String(this.data.coachName || '').trim(),
         });
       } catch (e) {
         console.error('写入订场成功缓存失败', e);

@@ -1,4 +1,12 @@
-const { listCoursePurchases, getCourses } = require('../../api/tennisDb');
+const {
+  listCoursePurchases,
+  getCourses,
+  getMyBookings,
+  listAllMemberCourseHours,
+  refundExperienceCoursePurchase,
+} = require('../../api/tennisDb');
+const { normalizeVenueId } = require('../../utils/venueId');
+const { hasExperienceCoachParticipation } = require('../../utils/experienceParticipation');
 const { formatGoodsOrderTime } = require('../../utils/profileHistoryHelpers');
 const { ALL_CATEGORY_ID } = require('../../utils/constants');
 const {
@@ -16,6 +24,23 @@ function thumbUrlFromCourseDoc(course) {
       : '';
   if (d) return d;
   return courseImageSource(course) || DEFAULT_GOODS_IMAGE;
+}
+
+function isExperienceLessonKey(lk) {
+  return String(lk || '').trim().toLowerCase().startsWith('experience:');
+}
+
+function hoursSumForVenueLesson(hoursRows, venueId, lessonKey) {
+  const vid = normalizeVenueId(venueId);
+  const lk = String(lessonKey || '').trim();
+  if (!vid || !lk) return 0;
+  let sum = 0;
+  (hoursRows || []).forEach((r) => {
+    if (normalizeVenueId(r.venueId) !== vid) return;
+    if (String(r.lessonKey || '').trim() !== lk) return;
+    sum += Number(r.hours) || 0;
+  });
+  return sum;
 }
 
 function pickCourse(map, courseId) {
@@ -116,11 +141,24 @@ Page({
     let goodsOrders = [];
     this.beginLoading('加载订单中');
     try {
-      const cloudRes = await listCoursePurchases();
+      const [cloudRes, bookingsRes, hoursRes] = await Promise.all([
+        listCoursePurchases(),
+        getMyBookings({ includePending: true }),
+        listAllMemberCourseHours(),
+      ]);
       const raw =
         cloudRes && cloudRes.result && Array.isArray(cloudRes.result.data)
           ? cloudRes.result.data
           : [];
+      const bookingList =
+        bookingsRes && bookingsRes.result && Array.isArray(bookingsRes.result.data)
+          ? bookingsRes.result.data
+          : [];
+      const hoursRows =
+        hoursRes && hoursRes.result && Array.isArray(hoursRes.result.data)
+          ? hoursRes.result.data
+          : [];
+      const hasParticipatedExperience = hasExperienceCoachParticipation(bookingList);
       let courseRows = [];
       try {
         const coursePack = await getCourses(ALL_CATEGORY_ID);
@@ -145,6 +183,15 @@ Page({
             : grantHours > 0
               ? `课程课时 ${grantHours} 小时`
               : '课程订单';
+        const lessonKey = String(row.lessonKey || '').trim();
+        const venueIdNorm = normalizeVenueId(row.venueId);
+        const hoursRem = hoursSumForVenueLesson(hoursRows, row.venueId, lessonKey);
+        const showRefundExperience =
+          hasParticipatedExperience &&
+          isExperienceLessonKey(lessonKey) &&
+          hoursRem > 0 &&
+          String(row.status || '') === 'paid' &&
+          String(row.refundStatus || '') !== 'success';
         return {
           orderNumber: String(row.outTradeNo || row._id || ''),
           totalPrice: yuan,
@@ -153,6 +200,9 @@ Page({
             image: thumbUrls[i] || DEFAULT_GOODS_IMAGE,
             desc,
           },
+          showRefundExperience,
+          refundVenueId: venueIdNorm,
+          refundLessonKey: lessonKey,
         };
       });
     } catch (e) {
@@ -181,5 +231,39 @@ Page({
     if (this._loadingTaskCount === 0) {
       this.setData({ lottieLoadingVisible: false });
     }
+  },
+
+  onRefundExperienceTap(e) {
+    const ds = e.currentTarget.dataset || {};
+    const venueId = String(ds.venueid || '').trim();
+    const lessonKey = String(ds.lessonkey || '').trim();
+    if (!venueId || !lessonKey) return;
+    wx.showModal({
+      title: '确认退款',
+      content:
+        '仅适用于已参加过体验课但仍有余课时的情形。将按剩余课时比例原路退回微信，成功后对应课时将从账户扣除。是否继续？',
+      confirmText: '确定退款',
+      success: async (res) => {
+        if (!res.confirm) return;
+        this.beginLoading('处理中');
+        try {
+          const cloudRes = await refundExperienceCoursePurchase({ venueId, lessonKey });
+          const r = cloudRes && cloudRes.result ? cloudRes.result : {};
+          if (!r.ok) {
+            wx.showToast({ title: r.errMsg || '退款失败', icon: 'none' });
+            return;
+          }
+          const fen = Math.floor(Number(r.refundFee) || 0);
+          const yuan = (fen / 100).toFixed(2);
+          wx.showToast({ title: `已退款 ${yuan} 元`, icon: 'success' });
+          await this.loadGoodsOrders();
+        } catch (err) {
+          console.error('refundExperience', err);
+          wx.showToast({ title: '请求失败', icon: 'none' });
+        } finally {
+          this.endLoading();
+        }
+      },
+    });
   },
 });

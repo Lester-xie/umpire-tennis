@@ -1,0 +1,9 @@
+{
+  "name": "refundExperienceCoursePurchase",
+  "version": "1.0.0",
+  "description": "体验课课时包原路退款",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

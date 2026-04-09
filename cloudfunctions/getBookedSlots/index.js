@@ -290,6 +290,14 @@ exports.main = async (event) => {
         doc.refundHoursBeforeStart != null && String(doc.refundHoursBeforeStart).trim() !== ''
           ? Math.floor(Number(doc.refundHoursBeforeStart))
           : null
+      const mpRaw =
+        doc.memberPricePerSessionYuan != null && String(doc.memberPricePerSessionYuan).trim() !== ''
+          ? doc.memberPricePerSessionYuan
+          : doc.memberPricePerSlotYuan;
+      const mpYuan =
+        mpRaw != null && String(mpRaw).trim() !== '' ? Number(mpRaw) : null;
+      const mpRounded =
+        Number.isFinite(mpYuan) && mpYuan > 0 ? Math.round(mpYuan * 100) / 100 : null;
       coachHoldMeta[k] = {
         holdId,
         sessionHoldIds,
@@ -306,15 +314,38 @@ exports.main = async (event) => {
         participants,
         viewerAlreadyJoined,
         fromReleasedSession: false,
+        /** 会员应付场次价（元）；与占用连续小时数无关 */
+        memberPricePerSessionYuan: mpRounded,
+        /** 兼容旧字段名，含义同 memberPricePerSessionYuan */
+        memberPricePerSlotYuan: mpRounded,
       }
     })
 
-    /** 已满员释放占用后：仍用已付教练课订单生成格子展示与名单（营销） */
-    Object.keys(sessionsPaid).forEach((sk) => {
+    /** 已满员释放占用后：仍用已付教练课订单生成格子展示与名单（营销）；教练名从占用文档读（释放后 doc 仍在） */
+    const paidSkList = Object.keys(sessionsPaid)
+    for (let psi = 0; psi < paidSkList.length; psi += 1) {
+      const sk = paidSkList[psi]
       const bucket = sessionsPaid[sk]
       const keysArr = sk.split('|').filter(Boolean)
-      if (keysArr.length === 0) return
-      if (keysArr.some((k) => coachHoldMeta[k] && !coachHoldMeta[k].fromReleasedSession)) return
+      if (keysArr.length === 0) continue
+      if (keysArr.some((k) => coachHoldMeta[k] && !coachHoldMeta[k].fromReleasedSession)) continue
+
+      let coachNameResolved = ''
+      const holdIdCandidates = Array.isArray(bucket.sessionHoldIds) ? bucket.sessionHoldIds : []
+      for (let hci = 0; hci < holdIdCandidates.length; hci += 1) {
+        const hid = String(holdIdCandidates[hci] || '').trim()
+        if (!hid) continue
+        try {
+          const hdr = await db.collection('db_coach_slot_hold').doc(hid).get()
+          const nm = hdr.data && hdr.data.coachName != null ? String(hdr.data.coachName).trim() : ''
+          if (nm) {
+            coachNameResolved = nm
+            break
+          }
+        } catch (e) {
+          /* ignore */
+        }
+      }
 
       const participants = [...bucket.byPhone.values()].map((p) => {
         const ph = String(p.phone || '').trim()
@@ -338,7 +369,7 @@ exports.main = async (event) => {
         holdId: '',
         sessionHoldIds: Array.isArray(bucket.sessionHoldIds) ? [...bucket.sessionHoldIds] : [],
         capacityLabel,
-        coachName: '',
+        coachName: coachNameResolved,
         lessonType: 'experience',
         pairMode: '1v1',
         groupMode: '',
@@ -354,7 +385,7 @@ exports.main = async (event) => {
           coachHoldMeta[k] = { ...synthetic }
         }
       })
-    })
+    }
 
     return { keys: [...keySet], coachHoldMeta }
   } catch (err) {

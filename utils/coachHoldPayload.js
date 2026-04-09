@@ -14,6 +14,7 @@ function buildCoachHoldSlotsPayload({
   minParticipants,
   maxParticipants,
   refundHoursBeforeStart,
+  memberPricePerSlotYuan,
 }) {
   const base = {
     venueId: selectedVenueId,
@@ -30,6 +31,11 @@ function buildCoachHoldSlotsPayload({
     base.minParticipants = minParticipants;
     base.maxParticipants = maxParticipants;
     base.refundHoursBeforeStart = refundHoursBeforeStart;
+  } else if (lessonType === 'experience' || lessonType === 'regular') {
+    base.refundHoursBeforeStart = refundHoursBeforeStart;
+  }
+  if (memberPricePerSlotYuan != null && Number.isFinite(Number(memberPricePerSlotYuan))) {
+    base.memberPricePerSlotYuan = Number(memberPricePerSlotYuan);
   }
   return base;
 }
@@ -44,6 +50,7 @@ function buildUpdateCoachHoldsPayload({
   minParticipants,
   maxParticipants,
   refundHoursBeforeStart,
+  memberPricePerSlotYuan,
 }) {
   const base = {
     holdIds,
@@ -57,6 +64,11 @@ function buildUpdateCoachHoldsPayload({
     base.minParticipants = minParticipants;
     base.maxParticipants = maxParticipants;
     base.refundHoursBeforeStart = refundHoursBeforeStart;
+  } else if (lessonType === 'experience' || lessonType === 'regular') {
+    base.refundHoursBeforeStart = refundHoursBeforeStart;
+  }
+  if (memberPricePerSlotYuan !== undefined) {
+    base.memberPricePerSlotYuan = memberPricePerSlotYuan;
   }
   return base;
 }

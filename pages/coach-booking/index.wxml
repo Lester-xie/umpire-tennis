@@ -71,7 +71,7 @@
                       bindtap="handleSlotClick"
                     >
                       <view class="slot-text">
-                        <text class="slot-price">¥ {{slot.price}}</text>
+                        <text class="slot-price">预约</text>
                       </view>
                       <view class="ripple-effect" wx:if="{{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slotIndex}}"></view>
                     </view>
@@ -96,6 +96,8 @@
                           data-minparticipants="{{slot.coachMinParticipants}}"
                           data-maxparticipants="{{slot.prefillMaxParticipants}}"
                           data-refundhours="{{slot.prefillRefundHours}}"
+                          data-courtid="{{item.id}}"
+                          data-slotindex="{{slotIndex}}"
                         >
                           <text class="slot-coach-purpose">{{slot.coachPurpose}}</text>
                           <text class="slot-coach-name" wx:if="{{slot.prefillCoachName}}">{{str.truncate(slot.prefillCoachName, 4)}}</text>
@@ -118,9 +120,6 @@
       </scroll-view>
     </view>
     <view class="content-footer" wx:if="{{selectedSlots.length > 0}}">
-      <view class="content-footer-left">
-        参考合计：¥ {{totalPrice}}
-      </view>
       <view class="content-footer-right">
         <view class="content-footer-right-button" bindtap="handleNextToPurpose">
           <text class="content-footer-right-button-text">下一步</text>
@@ -142,10 +141,14 @@
       </view>
     </block>
     <block wx:if="{{isManagerUser && (lessonType === 'experience' || lessonType === 'regular' || lessonType === 'group')}}">
-      <view class="purpose-section-label">指定教练</view>
-      <picker mode="selector" range="{{coachPickerLabels}}" value="{{coachPickerIndex}}" bindchange="onCoachPickerChange">
-        <view class="purpose-coach-pick">{{coachPickerLabels.length ? coachPickerLabels[coachPickerIndex] : '加载教练列表…'}}</view>
-      </picker>
+      <view class="purpose-section-label">指定教练（可选）</view>
+      <block wx:if="{{coachPickerLabels.length}}">
+        <picker mode="selector" range="{{coachPickerLabels}}" value="{{coachPickerIndex}}" bindchange="onCoachPickerChange">
+          <view class="purpose-coach-pick">{{coachPickerLabels[coachPickerIndex]}}</view>
+        </picker>
+      </block>
+      <view wx:else class="purpose-coach-pick purpose-coach-pick--empty" bindtap="onCoachPickEmptyTap">暂无可选教练 · 点击重试</view>
+      <view class="purpose-open-hint">未选择时占用记在本人管理员账号下</view>
     </block>
     <view wx:if="{{isManagerUser && lessonType === 'open_play'}}" class="purpose-open-hint">畅打可不指定教练，占用记在本人管理员账号下</view>
     <block wx:if="{{lessonType === 'experience' || lessonType === 'regular'}}">
@@ -160,6 +163,19 @@
           bindtap="selectPurposeScale"
         >{{item.name}}</view>
       </view>
+    </block>
+    <block wx:if="{{lessonType === 'experience' || lessonType === 'regular'}}">
+      <view class="purpose-section-label">退课规则</view>
+      <view class="purpose-enroll-grid">
+        <view class="purpose-enroll-row">
+          <text class="purpose-enroll-label">开课前（小时）</text>
+          <view class="purpose-enroll-field">
+            <input class="purpose-enroll-input purpose-enroll-input--narrow" type="number" value="{{refundHoursBeforeStart}}" bindinput="onRefundHoursInput" />
+            <text class="purpose-enroll-unit">小时</text>
+          </view>
+        </view>
+      </view>
+      <view class="purpose-enroll-hint">距首场开始不足该时间不可取消；默认 6 小时</view>
     </block>
     <block wx:if="{{lessonType === 'group' || lessonType === 'open_play'}}">
       <view class="purpose-section-label">人数与规则</view>
@@ -182,6 +198,14 @@
       </view>
       <view class="purpose-enroll-hint">该时间前可退课；到达该时刻若已付人数仍少于最少人数，将自动取消并退款</view>
     </block>
+    <view class="purpose-section-label">会员支付（元/次）</view>
+    <input
+      class="purpose-member-price-input"
+      type="digit"
+      value="{{purposeMemberPriceYuan}}"
+      placeholder="{{purposeMemberPricePlaceholder}}"
+      bindinput="onPurposeMemberPriceInput"
+    />
     <view class="purpose-hint">{{ purposeSheetMode === 'edit' ? '保存后会员在订场页将看到更新后的用途说明' : '确定后该时段将对会员显示为已占用，不可再订' }}</view>
     <view class="purpose-sheet-actions">
       <view class="purpose-btn purpose-btn--ghost" bindtap="closePurposeSheet">取消</view>

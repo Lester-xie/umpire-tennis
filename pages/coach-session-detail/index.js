@@ -1,4 +1,75 @@
-const { getBookedSlots } = require('../../api/tennisDb');
+const { getBookedSlots, getMyBookings, cancelMemberBooking } = require('../../api/tennisDb');
+const { hasExperienceCoachParticipation } = require('../../utils/experienceParticipation');
+
+function isExperienceLessonType(lt) {
+  return String(lt || '').trim().toLowerCase() === 'experience';
+}
+
+function sessionKeyFromHoldIds(ids) {
+  return [...(ids || [])]
+    .map((id) => String(id || '').trim())
+    .filter(Boolean)
+    .sort()
+    .join('|');
+}
+
+/** 与云函数一致：便于订单日期、场馆 id 与 db 中写法不一致时仍能匹配 */
+function normalizeOrderDateLocal(raw) {
+  const s = String(raw || '').trim();
+  const parts = s.split(/[-/]/);
+  if (parts.length >= 3) {
+    const y = parseInt(parts[0], 10);
+    const mo = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    if (Number.isFinite(y) && Number.isFinite(mo) && Number.isFinite(d)) {
+      return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    }
+  }
+  return s;
+}
+
+function venueIdLooseEqual(a, b) {
+  const sa = a == null ? '' : String(a).trim();
+  const sb = b == null ? '' : String(b).trim();
+  if (sa === sb) return true;
+  const na = Number(sa);
+  const nb = Number(sb);
+  return Number.isFinite(na) && Number.isFinite(nb) && na === nb;
+}
+
+/** 场次格点指纹（与占用 id 无关，支付后占用可能释放重建，holdIds 会变） */
+function sessionKeyFromBookedSlots(slots) {
+  return [...(slots || [])]
+    .map((s) => `${Number(s.courtId)}-${Number(s.slotIndex)}`)
+    .filter((k) => /^\d+-\d+$/.test(k))
+    .sort()
+    .join('|');
+}
+
+/** 当前场次对应的教练课订单 id（用于取消报名） */
+function findCoachCourseBookingIdForSession(bookings, venueId, orderDate, holdIds, bookedSlotsPage) {
+  const wantSkHolds = sessionKeyFromHoldIds(holdIds);
+  const wantSkSlots = sessionKeyFromBookedSlots(bookedSlotsPage);
+  const odNorm = normalizeOrderDateLocal(orderDate);
+  const list = Array.isArray(bookings) ? bookings : [];
+  for (let i = 0; i < list.length; i += 1) {
+    const b = list[i];
+    if (String(b.bookingSubtype || '') !== 'coach_course') continue;
+    const st = String(b.status || '');
+    if (!['paid', 'pending', 'payment_confirming'].includes(st)) continue;
+    if (!venueIdLooseEqual(b.venueId, venueId)) continue;
+    if (normalizeOrderDateLocal(b.orderDate) !== odNorm) continue;
+    const skH = sessionKeyFromHoldIds(b.coachHoldIds);
+    const skS = sessionKeyFromBookedSlots(b.bookedSlots);
+    if (wantSkHolds && skH === wantSkHolds) {
+      return b._id != null ? String(b._id) : '';
+    }
+    if (wantSkSlots && skS === wantSkSlots) {
+      return b._id != null ? String(b._id) : '';
+    }
+  }
+  return '';
+}
 
 Page({
   data: {
@@ -20,6 +91,8 @@ Page({
     viewerAlreadyJoined: false,
     slotPast: false,
     canBook: false,
+    canCancelEnrollment: false,
+    myCoachBookingId: '',
     holdIds: [],
     bookedSlots: [],
     lessonType: 'experience',
@@ -29,6 +102,9 @@ Page({
     orderDate: '',
     courts: [],
     lottieLoadingVisible: false,
+    /** 体验课：当前手机号是否曾报名有效体验教练课 */
+    experienceParticipatedBefore: false,
+    experienceParticipationReady: false,
   },
   _loadingTaskCount: 0,
 
@@ -62,7 +138,8 @@ Page({
       ? windowInfo.screenHeight - windowInfo.safeArea.bottom
       : 0;
     const footerBarRpx = 16 + 88 + 16;
-    const footerReserve = this.data.canBook ? rpxToPx(footerBarRpx) + safeBottom : 0;
+    const showFooterBar = this.data.canBook || this.data.canCancelEnrollment;
+    const footerReserve = showFooterBar ? rpxToPx(footerBarRpx) + safeBottom : 0;
     return Math.max(windowHeight - headerH - footerReserve, 300);
   },
 
@@ -124,7 +201,15 @@ Page({
     }
   },
 
+  onShow() {
+    /** 支付成功返回、从后台切回时刷新名单与订单匹配，避免仍依赖旧 holdIds */
+    if (this._coachSessionDetailHasLoadedOnce) {
+      this.loadDetail();
+    }
+  },
+
   onUnload() {
+    this._coachSessionDetailHasLoadedOnce = false;
     this._loadingTaskCount = 0;
     this.setData({ lottieLoadingVisible: false });
   },
@@ -155,12 +240,17 @@ Page({
   },
 
   async loadDetail() {
-    const { venueId, orderDate, bookedSlots } = this.data;
+    const { venueId, orderDate, bookedSlots, lessonType } = this.data;
     const first = bookedSlots[0];
     const key = `${Number(first.courtId)}-${Number(first.slotIndex)}`;
     this.beginLoading('加载中');
     try {
-      const res = await getBookedSlots({ venueId, orderDate });
+      const phone = String(wx.getStorageSync('user_phone') || '').trim();
+      const slotReq = getBookedSlots({ venueId, orderDate });
+      const bookingReq = phone
+        ? getMyBookings({ includePending: true })
+        : Promise.resolve({ result: { data: [] } });
+      const [res, bookRes] = await Promise.all([slotReq, bookingReq]);
       const r = res && res.result ? res.result : {};
       const metaMap =
         r.coachHoldMeta && typeof r.coachHoldMeta === 'object' && !Array.isArray(r.coachHoldMeta)
@@ -175,7 +265,22 @@ Page({
       const fromReleased = !!m.fromReleasedSession;
       const holdIdCloud = m.holdId != null ? String(m.holdId).trim() : '';
       const slotPast = this.data.slotPast;
+      const bookings = (bookRes && bookRes.result && bookRes.result.data) || [];
+      const myCoachBookingId = findCoachCourseBookingIdForSession(
+        bookings,
+        venueId,
+        orderDate,
+        this.data.holdIds,
+        bookedSlots,
+      );
+      /** 以订单匹配为准；占用释放后 holdIds 可能与订单不一致，不能依赖 viewerAlreadyJoined */
+      const canCancelEnrollment = !!myCoachBookingId && !slotPast;
+      const experienceParticipatedBefore =
+        isExperienceLessonType(lessonType) && hasExperienceCoachParticipation(bookings);
+      const experienceParticipationReady = true;
+      const experienceBlocked = isExperienceLessonType(lessonType) && experienceParticipatedBefore;
       const canBook =
+        !experienceBlocked &&
         !slotPast &&
         !sessionFull &&
         !viewerAlreadyJoined &&
@@ -200,6 +305,10 @@ Page({
           capacityLimit,
           sessionFull,
           viewerAlreadyJoined,
+          myCoachBookingId,
+          canCancelEnrollment,
+          experienceParticipatedBefore,
+          experienceParticipationReady,
           canBook,
           coachName,
           capacityLabel,
@@ -209,9 +318,14 @@ Page({
           this.setData({ contentHeight: this.computeScrollHeight(h) });
         },
       );
+      this._coachSessionDetailHasLoadedOnce = true;
     } catch (e) {
       console.error('loadDetail', e);
-      this.setData({ loading: false, errMsg: '加载失败，请稍后重试' });
+      this.setData({
+        loading: false,
+        errMsg: '加载失败，请稍后重试',
+        experienceParticipationReady: true,
+      });
     } finally {
       this.endLoading();
     }
@@ -229,6 +343,36 @@ Page({
     if (this._loadingTaskCount === 0) {
       this.setData({ lottieLoadingVisible: false });
     }
+  },
+
+  onCancelEnrollmentTap() {
+    if (!this.data.canCancelEnrollment || !this.data.myCoachBookingId) return;
+    wx.showModal({
+      title: '取消报名',
+      content:
+        '确定取消该报名？已支付的金额将原路退回微信，已使用的课时将退回账户。距场次开始不足 6 小时时无法在线取消。',
+      confirmText: '确定取消',
+      confirmColor: '#c62828',
+      success: async (res) => {
+        if (!res.confirm) return;
+        this.beginLoading('处理中');
+        try {
+          const cloudRes = await cancelMemberBooking({ bookingId: this.data.myCoachBookingId });
+          const r = (cloudRes && cloudRes.result) || {};
+          this.endLoading();
+          if (!r.ok) {
+            wx.showToast({ title: r.errMsg || '取消失败', icon: 'none' });
+            return;
+          }
+          wx.showToast({ title: '已取消', icon: 'success' });
+          await this.loadDetail();
+        } catch (err) {
+          this.endLoading();
+          console.error('cancelMemberBooking', err);
+          wx.showToast({ title: '网络异常', icon: 'none' });
+        }
+      },
+    });
   },
 
   onBookTap() {
