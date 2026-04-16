@@ -3,6 +3,128 @@ const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
+const _ = db.command;
+
+/** 锁场：日期归一化 */
+function normalizeOrderDateForLock(raw) {
+  const s = String(raw || '').trim();
+  const parts = s.split('-');
+  if (parts.length !== 3) return s;
+  const y = parseInt(parts[0], 10);
+  const mo = parseInt(parts[1], 10);
+  const d = parseInt(parts[2], 10);
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return s;
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+function venueIdInValuesForLock(venueIdRaw) {
+  const s = String(venueIdRaw || '').trim();
+  if (!s) return [];
+  const out = new Set([s]);
+  const n = Number(s);
+  if (Number.isFinite(n)) out.add(n);
+  return [...out];
+}
+
+function orderDateInValuesForLock(orderDateRaw, normalized) {
+  const raw = String(orderDateRaw || '').trim();
+  const set = new Set();
+  if (normalized) set.add(normalized);
+  if (raw) set.add(raw);
+  return [...set];
+}
+
+async function emitBookingRealtimeSignalForLock({ venueId, orderDate }) {
+  const venueIdNorm = venueId != null ? String(venueId).trim() : '';
+  const orderDateNorm = normalizeOrderDateForLock(orderDate);
+  if (!venueIdNorm || !orderDateNorm) return;
+  const now = Date.now();
+  const coll = db.collection('db_booking_realtime_signal');
+  const hit = await coll
+    .where({ venueId: venueIdNorm, orderDate: orderDateNorm })
+    .limit(1)
+    .get();
+  if (hit.data && hit.data[0] && hit.data[0]._id) {
+    await coll.doc(hit.data[0]._id).update({
+      data: {
+        eventType: 'coach_hold_changed',
+        updatedAt: now,
+      },
+    });
+    return;
+  }
+  await coll.add({
+    data: {
+      venueId: venueIdNorm,
+      orderDate: orderDateNorm,
+      eventType: 'coach_hold_changed',
+      createdAt: now,
+      updatedAt: now,
+    },
+  });
+}
+
+async function collectOccupiedKeysForLock(venueIdRaw, orderDateRaw) {
+  const orderDateNorm = normalizeOrderDateForLock(orderDateRaw);
+  const venueIds = venueIdInValuesForLock(venueIdRaw);
+  const dateKeys = orderDateInValuesForLock(orderDateRaw, orderDateNorm);
+  const keySet = new Set();
+
+  if (venueIds.length === 0 || !orderDateNorm) return keySet;
+
+  const bookingRes = await db
+    .collection('db_booking')
+    .where({
+      venueId: _.in(venueIds),
+      orderDate: _.in(dateKeys),
+    })
+    .get();
+  (bookingRes.data || []).forEach((doc) => {
+    if (normalizeOrderDateForLock(doc.orderDate) !== orderDateNorm) return;
+    if (doc.status !== 'paid') return;
+    (doc.bookedSlots || []).forEach((s) => {
+      if (s == null || s.courtId == null || s.slotIndex == null) return;
+      const cid = Number(s.courtId);
+      const idx = Number(s.slotIndex);
+      if (!Number.isFinite(cid) || !Number.isFinite(idx)) return;
+      keySet.add(`${cid}-${idx}`);
+    });
+  });
+
+  const holdRes = await db
+    .collection('db_coach_slot_hold')
+    .where({
+      venueId: _.in(venueIds),
+      orderDate: _.in(dateKeys),
+      status: 'active',
+    })
+    .get();
+  (holdRes.data || []).forEach((doc) => {
+    if (normalizeOrderDateForLock(doc.orderDate) !== orderDateNorm) return;
+    const cid = Number(doc.courtId);
+    const idx = Number(doc.slotIndex);
+    if (!Number.isFinite(cid) || !Number.isFinite(idx)) return;
+    keySet.add(`${cid}-${idx}`);
+  });
+
+  return keySet;
+}
+
+async function writeVenueLockAudit({ adminOpenid, adminPhone, detail }) {
+  try {
+    await db.collection('db_admin_audit').add({
+      data: {
+        adminOpenid: adminOpenid || '',
+        adminPhone: adminPhone != null ? String(adminPhone).trim() : '',
+        action: 'venueSlotLock',
+        detail: detail && typeof detail === 'object' ? detail : {},
+        createdAt: Date.now(),
+      },
+    });
+  } catch (e) {
+    console.warn('db_admin_audit write failed', e);
+  }
+}
 
 function isStaffUser(u) {
   return !!(u && u.isManager);
@@ -142,9 +264,10 @@ function normalizeVenuePayload(body) {
 }
 
 /**
- * event.action: list | get | create | update | remove
+ * event.action: list | get | create | update | remove | venueSlotLock
  * get/create/update/remove 时 event.venueId 为文档 _id
  * create/update 时 event.payload 为场馆字段对象
+ * venueSlotLock: 管理员锁场，event 含 venueId、orderDate、slots[{courtId,slotIndex}]、venueName?
  */
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext();
@@ -236,6 +359,110 @@ exports.main = async (event) => {
       console.error('adminVenue remove', e);
       return { ok: false, errMsg: e.message || '删除失败' };
     }
+  }
+
+  if (action === 'venueSlotLock') {
+    const ev = event || {};
+    const venueId = ev.venueId != null ? String(ev.venueId).trim() : '';
+    const orderDateRaw = ev.orderDate != null ? String(ev.orderDate).trim() : '';
+    const orderDate = normalizeOrderDateForLock(orderDateRaw) || orderDateRaw;
+    const slots = Array.isArray(ev.slots) ? ev.slots : [];
+    const venueName =
+      ev.venueName != null && String(ev.venueName).trim() !== ''
+        ? String(ev.venueName).trim()
+        : '';
+
+    if (!venueId || !orderDate || slots.length === 0) {
+      return { ok: false, errMsg: '参数不完整' };
+    }
+
+    const normalized = slots
+      .map((s) => ({
+        courtId: Number(s.courtId),
+        slotIndex: Number(s.slotIndex),
+      }))
+      .filter((s) => Number.isFinite(s.courtId) && Number.isFinite(s.slotIndex));
+
+    if (normalized.length === 0) {
+      return { ok: false, errMsg: '请选择有效时段' };
+    }
+
+    let occupied;
+    try {
+      occupied = await collectOccupiedKeysForLock(venueId, orderDate);
+    } catch (e) {
+      console.error('collectOccupiedKeysForLock', e);
+      return { ok: false, errMsg: '查询占用失败' };
+    }
+
+    for (let i = 0; i < normalized.length; i += 1) {
+      const k = `${normalized[i].courtId}-${normalized[i].slotIndex}`;
+      if (occupied.has(k)) {
+        return { ok: false, errMsg: '部分时段已被占用，请刷新后重选' };
+      }
+    }
+
+    const now = Date.now();
+    const adminOpenid = openid;
+    const phone = admin.phone != null ? String(admin.phone).trim() : '';
+    const coachName =
+      admin.name != null && String(admin.name).trim() !== '' ? String(admin.name).trim() : '';
+    const sessionSlotKeys = normalized
+      .map((s) => `${s.courtId}-${s.slotIndex}`)
+      .sort()
+      .join('|');
+    const memberPriceYuan = 1;
+
+    try {
+      for (let i = 0; i < normalized.length; i += 1) {
+        const s = normalized[i];
+        const holdData = {
+          _openid: adminOpenid,
+          phone,
+          coachName,
+          venueId,
+          venueName,
+          orderDate,
+          courtId: s.courtId,
+          slotIndex: s.slotIndex,
+          lessonType: 'venue_lock',
+          pairMode: '1v1',
+          groupMode: '',
+          capacityLabel: '已占用',
+          capacityLimit: 1,
+          sessionSlotKeys,
+          status: 'active',
+          createdAt: now,
+          adminVenueLock: true,
+          memberPricePerSlotYuan: memberPriceYuan,
+          memberPricePerSessionYuan: memberPriceYuan,
+        };
+        await db.collection('db_coach_slot_hold').add({
+          data: holdData,
+        });
+      }
+    } catch (err) {
+      console.error('adminVenue venueSlotLock add failed', err);
+      return { ok: false, errMsg: err.message || '写入失败，请重试' };
+    }
+
+    try {
+      await emitBookingRealtimeSignalForLock({ venueId, orderDate });
+    } catch (e) {
+      console.error('emitBookingRealtimeSignal venueSlotLock failed', e);
+    }
+
+    await writeVenueLockAudit({
+      adminOpenid,
+      adminPhone: admin.phone,
+      detail: {
+        venueId,
+        orderDate,
+        slotCount: normalized.length,
+      },
+    });
+
+    return { ok: true };
   }
 
   return { ok: false, errMsg: '未知操作' };

@@ -84,7 +84,10 @@
                         class="time-slot-cell {{slot.past ? 'slot-past' : ''}} {{slot.booked ? 'slot-occupied' : ''}} {{slot.bookedByCoach ? 'slot-coach-hold' : ''}}"
                         style="{{slot.slotStyle}}"
                       >
-                        <block wx:if="{{slot.bookedByCoach}}">
+                        <block wx:if="{{slot.venueLock}}">
+                          <text class="slot-booked">已占用</text>
+                        </block>
+                        <block wx:elif="{{slot.bookedByCoach}}">
                           <view
                             class="slot-coach-inner"
                             catchtap="handleCoachHoldCellTap"

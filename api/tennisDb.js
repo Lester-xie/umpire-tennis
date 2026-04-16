@@ -380,6 +380,21 @@ function adminCoachHoldForCoach(payload) {
   });
 }
 
+/** 管理员：锁场（venue_lock，会员侧显示已占用；走 adminVenue 云函数，避免单独部署） */
+function adminVenueSlotLock(payload) {
+  const p = payload || {};
+  return wx.cloud.callFunction({
+    name: 'adminVenue',
+    data: {
+      action: 'venueSlotLock',
+      venueId: p.venueId,
+      orderDate: p.orderDate,
+      venueName: p.venueName,
+      slots: p.slots,
+    },
+  });
+}
+
 /** 管理员：按月交易汇总 */
 function adminOrderStatsByMonth(payload) {
   return wx.cloud.callFunction({
@@ -422,6 +437,7 @@ module.exports = {
   adminGetUserByPhone,
   adminUpdateCourse,
   adminCoachHoldForCoach,
+  adminVenueSlotLock,
   adminOrderStatsByMonth,
   adminVenue,
 };

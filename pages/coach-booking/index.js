@@ -3,6 +3,7 @@ const {
   getUserByPhone,
   coachHoldSlots,
   adminCoachHoldForCoach,
+  adminVenueSlotLock,
   listCoachHolds,
   cancelCoachHold,
   updateCoachHolds,
@@ -110,6 +111,9 @@ Page({
     contentHeight: 400, // content 高度
     selectedSlots: [], // 选中的时间段 [{courtId, slotIndex}]
     selectedSlotsMap: {}, // 选中状态映射 {courtId-slotIndex: true}
+    /** 管理员多选解锁：已锁定格 [{ courtId, slotIndex, holdIds: string[] }] */
+    selectedUnlockSlots: [],
+    selectedUnlockSlotsMap: {},
     rippleSlot: null, // 当前显示波纹动画的时间段 {courtId, slotIndex}
     totalPrice: 0, // 总价
     selectedVenueName: '', // 当前选定的球场名称
@@ -348,6 +352,8 @@ Page({
     this.setData({
       selectedSlots: [],
       selectedSlotsMap: {},
+      selectedUnlockSlots: [],
+      selectedUnlockSlotsMap: {},
       totalPrice: 0,
       rippleSlot: null,
     });
@@ -363,6 +369,8 @@ Page({
     this.setData({
       selectedSlots: [],
       selectedSlotsMap: {},
+      selectedUnlockSlots: [],
+      selectedUnlockSlotsMap: {},
       totalPrice: 0,
       rippleSlot: null,
     });
@@ -722,6 +730,193 @@ Page({
     });
   },
 
+  async handleLockVenueSlots() {
+    if (!this.data.isManagerUser) return;
+    if (!this.data.selectedVenueId) {
+      wx.showModal({
+        title: '未选择场馆',
+        content: '请先到选场馆页选择要占用的场馆。',
+        confirmText: '去选场馆',
+        confirmColor: '#134E35',
+        success: (res) => {
+          if (res.confirm) {
+            wx.navigateTo({ url: '/pages/location/index?from=booking' });
+          }
+        },
+      });
+      return;
+    }
+    const selectedSlots = this.data.selectedSlots || [];
+    if (selectedSlots.length === 0) {
+      wx.showToast({ title: '请选择时间段', icon: 'none' });
+      return;
+    }
+    const app = getApp();
+    const venue = app && app.globalData && app.globalData.selectedVenue;
+    const venueName = venue && venue.name ? String(venue.name).trim() : '';
+    wx.showModal({
+      title: '锁场',
+      content: `确定锁定已选 ${selectedSlots.length} 个时段？会员将无法预订，界面显示为已占用。`,
+      confirmText: '锁定',
+      confirmColor: '#134E35',
+      success: async (res) => {
+        if (!res.confirm) return;
+        this.beginLoading('锁定中...');
+        try {
+          const cloudRes = await adminVenueSlotLock({
+            venueId: this.data.selectedVenueId,
+            orderDate: this.data.selectedDate,
+            venueName,
+            slots: selectedSlots,
+          });
+          const r = (cloudRes && cloudRes.result) || {};
+          this.endLoading();
+          if (!r.ok) {
+            wx.showToast({ title: r.errMsg || '锁定失败', icon: 'none' });
+            return;
+          }
+          wx.showToast({ title: '已锁定', icon: 'success' });
+          this.setData({
+            selectedSlots: [],
+            selectedSlotsMap: {},
+            selectedUnlockSlots: [],
+            selectedUnlockSlotsMap: {},
+            totalPrice: 0,
+            rippleSlot: null,
+          });
+          this.loadSlotPricesAndRender();
+        } catch (e) {
+          this.endLoading();
+          console.error('handleLockVenueSlots', e);
+          wx.showToast({ title: '网络异常', icon: 'none' });
+        }
+      },
+    });
+  },
+
+  handleVenueLockSlotClick(e) {
+    if (!this.data.isManagerUser) return;
+    const { courtid, slotindex, holdids } = e.currentTarget.dataset;
+    if (!courtid || slotindex === undefined) return;
+    const raw = holdids != null ? String(holdids) : '';
+    const holdIds = raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (holdIds.length === 0) {
+      wx.showToast({ title: '无法识别占用', icon: 'none' });
+      return;
+    }
+    const courtId = parseInt(courtid, 10);
+    const slotIndex = parseInt(slotindex, 10);
+    if (!Number.isFinite(courtId) || !Number.isFinite(slotIndex)) return;
+
+    const court = this.data.courts.find((c) => c.id === courtId);
+    const slot = court && court.slots[slotIndex];
+    if (!slot || !slot.venueLock || slot.past) return;
+
+    if (this.slotRippleTimer) {
+      clearTimeout(this.slotRippleTimer);
+      this.slotRippleTimer = null;
+    }
+
+    const slotKey = `${courtId}-${slotIndex}`;
+    const isSelected = this.data.selectedUnlockSlots.some(
+      (s) => s.courtId === courtId && s.slotIndex === slotIndex
+    );
+
+    let newUnlock = [...this.data.selectedUnlockSlots];
+    let newUnlockMap = { ...this.data.selectedUnlockSlotsMap };
+
+    const resetBook =
+      this.data.selectedSlots.length > 0
+        ? { selectedSlots: [], selectedSlotsMap: {}, totalPrice: 0 }
+        : {};
+
+    if (isSelected) {
+      newUnlock = newUnlock.filter((s) => !(s.courtId === courtId && s.slotIndex === slotIndex));
+      delete newUnlockMap[slotKey];
+    } else {
+      newUnlock.push({ courtId, slotIndex, holdIds });
+      newUnlockMap[slotKey] = true;
+    }
+
+    const patch = {
+      selectedUnlockSlots: newUnlock,
+      selectedUnlockSlotsMap: newUnlockMap,
+      rippleSlot: null,
+      ...resetBook,
+    };
+
+    this.setData(patch, () => {
+      const playRipple = () => {
+        this.setData({
+          rippleSlot: { courtId, slotIndex },
+        });
+        this.slotRippleTimer = setTimeout(() => {
+          this.setData({ rippleSlot: null });
+          this.slotRippleTimer = null;
+        }, 600);
+      };
+      if (typeof requestAnimationFrame !== 'undefined') {
+        requestAnimationFrame(playRipple);
+      } else {
+        setTimeout(playRipple, 16);
+      }
+    });
+  },
+
+  handleUnlockVenueSlots() {
+    if (!this.data.isManagerUser) return;
+    const list = this.data.selectedUnlockSlots || [];
+    if (list.length === 0) {
+      wx.showToast({ title: '请选择要解锁的时段', icon: 'none' });
+      return;
+    }
+    const idSet = new Set();
+    list.forEach((row) => {
+      (row.holdIds || []).forEach((id) => {
+        const h = String(id || '').trim();
+        if (h) idSet.add(h);
+      });
+    });
+    const holdIdsFlat = [...idSet];
+    if (holdIdsFlat.length === 0) {
+      wx.showToast({ title: '无法识别占用', icon: 'none' });
+      return;
+    }
+    wx.showModal({
+      title: '解锁场地',
+      content: `确定解除已选 ${list.length} 个时段的锁定？`,
+      confirmText: '解锁',
+      confirmColor: '#134E35',
+      success: async (res) => {
+        if (!res.confirm) return;
+        this.beginLoading('处理中...');
+        try {
+          const cloudRes = await cancelCoachHold({ holdIds: holdIdsFlat });
+          const r = (cloudRes && cloudRes.result) || {};
+          this.endLoading();
+          if (!r.ok) {
+            wx.showToast({ title: r.errMsg || '解锁失败', icon: 'none' });
+            return;
+          }
+          wx.showToast({ title: '已解锁', icon: 'success' });
+          this.setData({
+            selectedUnlockSlots: [],
+            selectedUnlockSlotsMap: {},
+            rippleSlot: null,
+          });
+          this.loadSlotPricesAndRender();
+        } catch (err) {
+          this.endLoading();
+          console.error('handleUnlockVenueSlots', err);
+          wx.showToast({ title: '网络异常', icon: 'none' });
+        }
+      },
+    });
+  },
+
   confirmCancelCoachHolds(holdidsStr) {
     const raw = String(holdidsStr || '')
       .split(',')
@@ -898,6 +1093,8 @@ Page({
       selectedDate,
       selectedSlots: [],
       selectedSlotsMap: {},
+      selectedUnlockSlots: [],
+      selectedUnlockSlotsMap: {},
       totalPrice: 0,
     });
     this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
@@ -950,12 +1147,18 @@ Page({
 
     const totalPrice = this.calculateTotalPrice(newSelectedSlots);
 
+    const resetUnlock =
+      (this.data.selectedUnlockSlots || []).length > 0
+        ? { selectedUnlockSlots: [], selectedUnlockSlotsMap: {} }
+        : {};
+
     this.setData(
       {
         selectedSlots: newSelectedSlots,
         selectedSlotsMap: newSelectedSlotsMap,
         totalPrice,
         rippleSlot: null,
+        ...resetUnlock,
       },
       () => {
         if (typeof requestAnimationFrame !== 'undefined') {
@@ -1252,6 +1455,8 @@ Page({
         purposeMemberPricePlaceholder: '必填，元/次',
         selectedSlots: [],
         selectedSlotsMap: {},
+        selectedUnlockSlots: [],
+        selectedUnlockSlotsMap: {},
         totalPrice: 0,
         rippleSlot: null,
       });

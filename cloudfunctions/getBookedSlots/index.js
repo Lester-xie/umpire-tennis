@@ -38,6 +38,7 @@ function orderDateInValues(orderDateRaw, normalized) {
 
 function defaultCapacityLimit(lessonType, pairMode, groupMode) {
   const lt = String(lessonType || '').trim()
+  if (lt === 'venue_lock') return 1
   if (lt === 'group') {
     const gm = String(groupMode || '').trim().toLowerCase()
     if (gm.includes('1v2')) return 1
@@ -255,10 +256,13 @@ exports.main = async (event) => {
       const k = `${cid}-${idx}`
       keySet.add(k)
       const holdId = doc._id != null ? String(doc._id) : ''
+      const ltHold = doc.lessonType != null ? String(doc.lessonType).trim() : ''
       const capacityLabel =
-        doc.capacityLabel != null && String(doc.capacityLabel).trim() !== ''
-          ? String(doc.capacityLabel).trim()
-          : '教练占用'
+        ltHold === 'venue_lock'
+          ? '已占用'
+          : doc.capacityLabel != null && String(doc.capacityLabel).trim() !== ''
+            ? String(doc.capacityLabel).trim()
+            : '教练占用'
       let cap = Math.floor(Number(doc.capacityLimit))
       if (!Number.isFinite(cap) || cap < 1) {
         cap = defaultCapacityLimit(doc.lessonType, doc.pairMode, doc.groupMode)
@@ -303,7 +307,7 @@ exports.main = async (event) => {
         sessionHoldIds,
         capacityLabel,
         coachName: doc.coachName != null ? String(doc.coachName).trim() : '',
-        lessonType: doc.lessonType != null ? String(doc.lessonType).trim() : 'experience',
+        lessonType: ltHold === 'venue_lock' ? 'venue_lock' : doc.lessonType != null ? String(doc.lessonType).trim() : 'experience',
         pairMode: doc.pairMode != null ? String(doc.pairMode).trim() : '1v1',
         groupMode: doc.groupMode != null ? String(doc.groupMode).trim() : '',
         capacityLimit: cap,

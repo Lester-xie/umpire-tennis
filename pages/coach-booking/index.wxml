@@ -2,7 +2,7 @@
 <view class="container">
   <lottie-loading visible="{{lottieLoadingVisible}}" />
   <header showBackButton="{{true}}" title="预约场地" />
-  <view class="content" style="height: {{contentHeight}}px; padding-bottom: {{selectedSlots.length > 0 ? '140rpx' : '40rpx'}};">
+  <view class="content" style="height: {{contentHeight}}px; padding-bottom: {{selectedSlots.length > 0 || (isManagerUser && selectedUnlockSlots.length > 0) ? '140rpx' : '40rpx'}};">
     <view
       class="content-header"
       hover-class="content-header-title--hover"
@@ -76,12 +76,29 @@
                       <view class="ripple-effect" wx:if="{{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slotIndex}}"></view>
                     </view>
                     <view 
+                      wx:elif="{{!slot.coachMergeSkip && !slot.available && slot.venueLock && isManagerUser && !slot.past}}"
+                      class="time-slot-cell available slot-venue-lock-selectable {{selectedUnlockSlotsMap[item.id + '-' + slotIndex] ? 'active' : ''}} {{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slotIndex ? 'ripple' : ''}}"
+                      style="{{slot.slotStyle}}"
+                      data-courtid="{{item.id}}"
+                      data-slotindex="{{slotIndex}}"
+                      data-holdids="{{slot.coachHoldIdsStr}}"
+                      bindtap="handleVenueLockSlotClick"
+                    >
+                      <view class="slot-text">
+                        <text class="slot-price">已锁定</text>
+                      </view>
+                      <view class="ripple-effect" wx:if="{{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slotIndex}}"></view>
+                    </view>
+                    <view 
                       wx:elif="{{!slot.coachMergeSkip && !slot.available}}"
                       class="time-slot-cell {{slot.past ? 'slot-past' : ''}} {{slot.booked ? 'slot-occupied' : ''}} {{slot.bookedByCoach ? 'slot-coach-hold' : ''}}"
                       style="{{slot.slotStyle}}"
                     >
                       <block wx:if="{{slot.past}}">
                         <text class="slot-booked">不可预定</text>
+                      </block>
+                      <block wx:elif="{{slot.venueLock}}">
+                        <text class="slot-booked">已占用</text>
                       </block>
                       <block wx:elif="{{slot.bookedByCoach}}">
                         <view
@@ -119,10 +136,26 @@
         </view>
       </scroll-view>
     </view>
-    <view class="content-footer" wx:if="{{selectedSlots.length > 0}}">
-      <view class="content-footer-right">
-        <view class="content-footer-right-button" bindtap="handleNextToPurpose">
-          <text class="content-footer-right-button-text">下一步</text>
+    <view class="content-footer" wx:if="{{selectedSlots.length > 0 || (isManagerUser && selectedUnlockSlots.length > 0)}}">
+      <view class="content-footer-actions">
+        <view
+          wx:if="{{isManagerUser && selectedSlots.length > 0}}"
+          class="content-footer-lock-button"
+          bindtap="handleLockVenueSlots"
+        >
+          <text class="content-footer-lock-button-text">锁场</text>
+        </view>
+        <view
+          wx:if="{{isManagerUser && selectedUnlockSlots.length > 0}}"
+          class="content-footer-lock-button"
+          bindtap="handleUnlockVenueSlots"
+        >
+          <text class="content-footer-lock-button-text">解锁</text>
+        </view>
+        <view class="content-footer-right">
+          <view wx:if="{{selectedSlots.length > 0}}" class="content-footer-right-button" bindtap="handleNextToPurpose">
+            <text class="content-footer-right-button-text">下一步</text>
+          </view>
         </view>
       </view>
     </view>

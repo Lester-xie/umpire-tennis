@@ -370,8 +370,41 @@
   border-radius: 0 0 28rpx 28rpx;
   box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.05);
 }
+.content-footer-actions {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+}
+.content-footer-lock-button {
+  flex-shrink: 0;
+  border-radius: 40rpx;
+  padding: 16rpx 32rpx;
+  min-width: 140rpx;
+  text-align: center;
+  border: 2rpx solid #134e35;
+  background: #fff;
+  box-sizing: border-box;
+}
+.content-footer-lock-button:active {
+  opacity: 0.85;
+}
+.content-footer-lock-button-text {
+  font-size: 26rpx;
+  color: #134e35;
+  font-weight: 600;
+}
 .content-footer-right {
   flex-shrink: 0;
+  margin-left: auto;
+}
+/* 管理员多选解锁：与可订格相同 active/ripple，未选中时略灰表示已占用 */
+.time-slot-cell.available.slot-venue-lock-selectable:not(.active) {
+  background-color: #f0f0f0;
+  border-color: #d0d0d0;
+}
+.time-slot-cell.available.slot-venue-lock-selectable:not(.active) .slot-price {
+  color: #666;
 }
 .content-footer-right-button {
   background: linear-gradient(135deg, #134E35 0%, #1a6b4a 100%);

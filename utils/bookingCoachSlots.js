@@ -25,7 +25,9 @@ function applyCoachHoldMergeAndLayout(slots, courtId, {
     slots[i].coachSpan = 1;
     slots[i].coachMergeSkip = false;
     slots[i].coachTimeRange = '';
-    slots[i].coachHoldIdsStr = '';
+    if (!slots[i].venueLock) {
+      slots[i].coachHoldIdsStr = '';
+    }
     slots[i].canManageCoachHold = false;
     slots[i].coachSessionReleased = false;
     slots[i].prefillLessonType = 'experience';
@@ -158,7 +160,8 @@ function buildCourtSlotsRow({
     const key = `${courtId}-${i}`;
     const isBookedByOrder = bookedSet.has(key);
     const coachMeta = metaMap[key];
-    const bookedByCoach = !!(isBookedByOrder && coachMeta);
+    const isVenueLock = !!(coachMeta && coachMeta.lessonType === 'venue_lock');
+    const bookedByCoach = !!(isBookedByOrder && coachMeta && !isVenueLock);
     const coachPurpose = bookedByCoach ? coachMeta.capacityLabel || '教练占用' : '';
     const coachName =
       bookedByCoach && coachMeta.coachName ? String(coachMeta.coachName).trim() : '';
@@ -177,19 +180,33 @@ function buildCourtSlotsRow({
     const isAvailable = isAvailableTime && slotPrice != null && !isBookedByOrder;
     const past = !isAvailableTime;
 
+    let lockHoldIdsStr = '';
+    if (isVenueLock && coachMeta) {
+      const idSet = new Set();
+      if (coachMeta.holdId) idSet.add(String(coachMeta.holdId));
+      if (Array.isArray(coachMeta.sessionHoldIds)) {
+        coachMeta.sessionHoldIds.forEach((x) => {
+          const h = String(x || '').trim();
+          if (h) idSet.add(h);
+        });
+      }
+      lockHoldIdsStr = [...idSet].join(',');
+    }
+
     slots.push({
       available: isAvailable,
       price: isAvailable ? slotPrice : null,
       venueSlotPrice: venueSlotPriceForOrder,
       booked: isBookedByOrder,
       bookedByCoach,
+      venueLock: isVenueLock,
       coachPurpose,
       past,
       coachSpan: 1,
       coachMergeSkip: false,
       slotStyle: '',
       coachTimeRange: '',
-      coachHoldIdsStr: '',
+      coachHoldIdsStr: isVenueLock ? lockHoldIdsStr : '',
       canManageCoachHold: false,
       coachSessionReleased: false,
       prefillLessonType: 'experience',

@@ -121,6 +121,44 @@
   padding-right: 16rpx;
 }
 
+.commission-block {
+  padding: 0 24rpx 24rpx;
+  margin-bottom: 16rpx;
+  margin-top: -8rpx;
+}
+
+.commission-label {
+  display: block;
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 12rpx;
+}
+
+.commission-field {
+  display: flex;
+  align-items: center;
+  background: #f7f9fc;
+  border-radius: 12rpx;
+  border: 1rpx solid #e8ecf4;
+  padding: 16rpx 20rpx;
+  box-sizing: border-box;
+}
+
+.commission-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 30rpx;
+  color: #1a1a1a;
+}
+
+.commission-suffix {
+  flex-shrink: 0;
+  margin-left: 8rpx;
+  font-size: 30rpx;
+  color: #333;
+  font-weight: 500;
+}
+
 .submit-btn {
   margin-top: 32rpx;
   background: #134e35;
