@@ -45,9 +45,9 @@ exports.main = async (event) => {
         avatar: row.avatar != null ? String(row.avatar) : '',
         isVip: !!row.isVip,
         isCoach: !!row.isCoach,
-        commissionPersent:
-          row.commissionPersent != null && row.commissionPersent !== ''
-            ? Number(row.commissionPersent)
+        commissionPercent:
+          row.commissionPercent != null && row.commissionPercent !== ''
+            ? Number(row.commissionPercent)
             : null,
       },
     };

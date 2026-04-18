@@ -3,7 +3,7 @@ const { resolveImageUrlForDisplay } = require('../../utils/cloudImage');
 
 /** DB 存小数比例（如 0.05 = 5%） */
 function formatCommissionInputFromUser(d) {
-  const cp = d && d.commissionPersent;
+  const cp = d && d.commissionPercent;
   if (cp === undefined || cp === null || cp === '') return '5';
   const n = Number(cp);
   if (!Number.isFinite(n) || n < 0 || n > 1) return '5';
@@ -21,7 +21,7 @@ Page({
     avatarDisplayUrl: DEFAULT_USER_AVATAR,
     isCoach: false,
     isVip: false,
-    /** 教练分成：输入 0–100（如 5 表示 5%）；DB 存 commissionPersent 小数（0.05） */
+    /** 教练分成：输入 0–100（如 5 表示 5%）；DB 存 commissionPercent 小数（0.05） */
     coachCommissionInput: '5',
   },
 
@@ -138,7 +138,7 @@ Page({
       wx.showToast({ title: '手机号已变更，请重新查询', icon: 'none' });
       return;
     }
-    let commissionPersent;
+    let commissionPercent;
     if (this.data.isCoach) {
       const raw = String(this.data.coachCommissionInput || '').trim();
       const n = Number(raw === '' ? '5' : raw);
@@ -146,7 +146,7 @@ Page({
         wx.showToast({ title: '分成比例请输入 0–100 的数字', icon: 'none' });
         return;
       }
-      commissionPersent = n;
+      commissionPercent = n;
     }
     wx.showLoading({ title: '保存中', mask: true });
     try {
@@ -154,7 +154,7 @@ Page({
         targetPhone: queriedPhone,
         isCoach: this.data.isCoach,
         isVip: this.data.isVip,
-        ...(this.data.isCoach ? { commissionPersent } : {}),
+        ...(this.data.isCoach ? { commissionPercent } : {}),
       });
       wx.hideLoading();
       const r = (res && res.result) || {};

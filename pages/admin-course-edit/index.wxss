@@ -163,6 +163,41 @@
   border: 2rpx dashed #134e35;
 }
 
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 0 0;
+}
+
+.switch-label {
+  font-size: 28rpx;
+  color: #333;
+  flex: 1;
+  padding-right: 16rpx;
+}
+
+.split-price-block {
+  margin-top: 20rpx;
+  padding-top: 8rpx;
+}
+
+.split-price-label {
+  display: block;
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 12rpx;
+}
+
+.split-price-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 20rpx 24rpx;
+  border-radius: 12rpx;
+  border: 1rpx solid #e0e0e0;
+  background: #f8faf9;
+}
+
 .submit-btn {
   margin-top: 16rpx;
   background: #134e35;

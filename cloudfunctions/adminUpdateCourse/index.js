@@ -17,6 +17,8 @@ const ALLOWED = new Set([
   'courseHours',
   'category',
   'type',
+  'fixedSplit',
+  'fixedSplitPrice',
 ]);
 
 function isStaffUser(u) {
@@ -75,6 +77,16 @@ exports.main = async (event) => {
 
   if (data.typeMap != null && typeof data.typeMap !== 'object') {
     return { ok: false, errMsg: 'typeMap 须为对象' };
+  }
+
+  if (data.fixedSplit === true) {
+    const p = Number(data.fixedSplitPrice);
+    if (!Number.isFinite(p) || p <= 0) {
+      return { ok: false, errMsg: '固定分成时请填写大于 0 的分成价格' };
+    }
+    data.fixedSplitPrice = Math.round(p * 100) / 100;
+  } else if (data.fixedSplit === false) {
+    data.fixedSplitPrice = null;
   }
 
   try {

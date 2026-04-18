@@ -19,6 +19,8 @@ Page({
     venueNames: [],
     venueIndex: 0,
     typeMapRows: defaultTypeMapRows(),
+    fixedSplit: false,
+    fixedSplitPriceInput: '',
   },
 
   onLoad(options) {
@@ -103,6 +105,11 @@ Page({
           ? String(d.displayImage).trim()
           : '';
       const img = disp || courseImageSource(d) || '';
+      const fs = !!d.fixedSplit;
+      const fsp =
+        d.fixedSplitPrice != null && d.fixedSplitPrice !== ''
+          ? String(d.fixedSplitPrice)
+          : '';
       this.setData({
         loading: false,
         name: d.name != null ? String(d.name) : '',
@@ -110,6 +117,8 @@ Page({
         image: img,
         venueId: d.venueId != null ? String(d.venueId) : '',
         typeMapRows,
+        fixedSplit: fs,
+        fixedSplitPriceInput: fs ? fsp : '',
       });
       await this.refreshCourseCoverDisplay();
       await this.refreshVenuePicker(d.venueId);
@@ -160,6 +169,14 @@ Page({
     const opt = (this.data.venueOptions || [])[idx];
     if (!opt) return;
     this.setData({ venueIndex: idx, venueId: opt.id });
+  },
+
+  onFixedSplitChange(e) {
+    this.setData({ fixedSplit: !!(e.detail && e.detail.value) });
+  },
+
+  onFixedSplitPriceInput(e) {
+    this.setData({ fixedSplitPriceInput: e.detail.value });
   },
 
   onFormatKeyInput(e) {
@@ -236,6 +253,18 @@ Page({
       return;
     }
 
+    const fixedSplit = !!this.data.fixedSplit;
+    let fixedSplitPrice = null;
+    if (fixedSplit) {
+      const raw = String(this.data.fixedSplitPriceInput || '').trim();
+      const p = Number(raw);
+      if (!Number.isFinite(p) || p <= 0) {
+        wx.showToast({ title: '固定分成时请填写大于 0 的分成价格', icon: 'none' });
+        return;
+      }
+      fixedSplitPrice = Math.round(p * 100) / 100;
+    }
+
     const imgStr = String(this.data.image || '').trim();
 
     wx.showLoading({ title: '保存中', mask: true });
@@ -250,6 +279,8 @@ Page({
           image: imgStr,
           picture: imgStr,
           displayImage: imgStr,
+          fixedSplit,
+          fixedSplitPrice,
         },
       });
       wx.hideLoading();
