@@ -1,5 +1,5 @@
 /**
- * 教练约场「场地用途」弹层：规模选项优先来自 db_venue.category_list（与会员价同一套配置）。
+ * 教练约场「场地用途」弹层：规模选项优先来自 db_venue.categoryList（与会员价同一套配置）。
  * scaleList 为对象时：{ 1V1: 元, 1V2: 元 }；团课/畅打为单场价 row.price。
  * 未配置或无法解析时使用 DEFAULT_* 兜底。
  */

@@ -33,10 +33,9 @@ async function writeAudit({ adminOpenid, adminPhone, action, detail }) {
 }
 
 /**
- * event: { targetPhone, isCoach?, isVip?, commissionPercent? }
+ * event: { targetPhone, isCoach?, isVip? }
  * isManager 仅允许在云数据库 db_user 中手动维护，本接口忽略该字段。
  * 仅当 isCoach / isVip 为 boolean 时更新该项。
- * isCoach 为 true 时写入 commissionPersent：存小数比例（5%→0.05），event 传 0–100 的百分点，缺省 5→0.05；为 false 时不改该字段。
  */
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext();
@@ -64,19 +63,6 @@ exports.main = async (event) => {
       data[k] = event[k];
     }
   });
-
-  if (event && typeof event.isCoach === 'boolean' && event.isCoach) {
-    let cp = event.commissionPercent;
-    if (cp === undefined || cp === null || cp === '') {
-      data.commissionPercent = 0.05;
-    } else {
-      const n = Number(cp);
-      if (!Number.isFinite(n) || n < 0 || n > 100) {
-        return { ok: false, errMsg: '分成比例须为 0–100 的数字' };
-      }
-      data.commissionPercent = Number((n / 100).toFixed(6));
-    }
-  }
 
   if (Object.keys(data).length <= 1) {
     return { ok: false, errMsg: '未指定要修改的字段' };

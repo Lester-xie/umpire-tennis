@@ -149,7 +149,7 @@ Page({
     minParticipants: 3,
     maxParticipants: 12,
     refundHoursBeforeStart: 6,
-    /** 会员应付场次价（元）；与占用 1 格或多格无关；场馆 category_list 有配置时自动填入；必填 */
+    /** 会员应付场次价（元）；与占用 1 格或多格无关；场馆 categoryList 有配置时自动填入；必填 */
     purposeMemberPriceYuan: '',
     purposeMemberPricePlaceholder: '必填，元/次',
   },

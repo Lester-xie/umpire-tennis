@@ -287,10 +287,22 @@ Page({
         !!holdIdCloud &&
         !fromReleased;
 
-      const coachName =
-        m.coachName != null && String(m.coachName).trim() !== ''
-          ? String(m.coachName).trim()
-          : this.data.coachName;
+      let coachName = ''
+      for (let bi = 0; bi < (bookedSlots || []).length; bi += 1) {
+        const bs = bookedSlots[bi]
+        if (!bs || bs.courtId == null || bs.slotIndex == null) continue
+        const kk = `${Number(bs.courtId)}-${Number(bs.slotIndex)}`
+        const mm = metaMap[kk] || {}
+        const cn = mm.coachName != null && String(mm.coachName).trim() !== '' ? String(mm.coachName).trim() : ''
+        if (cn) {
+          coachName = cn
+          break
+        }
+      }
+      if (!coachName) {
+        const cn0 = m.coachName != null && String(m.coachName).trim() !== '' ? String(m.coachName).trim() : ''
+        coachName = cn0 || String(this.data.coachName || '').trim()
+      }
 
       const capacityLabel =
         m.capacityLabel != null && String(m.capacityLabel).trim() !== ''

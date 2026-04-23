@@ -1,5 +1,5 @@
 /**
- * db_venue.category_list（或 categoryList）：教练课用途与会员默认「场次」价（与占用时长无关）
+ * db_venue.categoryList：教练课用途与会员默认「场次」价（与占用时长无关）；旧数据可能为 category_list，读时兼容
  * 项示例：{ name: '体验课', scaleList: { 1V1: 118, 1V2: 188 } }
  * 或：{ name: '团课', price: 85 }
  */
@@ -14,10 +14,10 @@ const LESSON_TYPE_TO_NAME = {
 function extractCategoryList(venue) {
   if (!venue || typeof venue !== 'object') return [];
   const raw =
-    venue.category_list != null
-      ? venue.category_list
-      : venue.categoryList != null
-        ? venue.categoryList
+    venue.categoryList != null
+      ? venue.categoryList
+      : venue.category_list != null
+        ? venue.category_list
         : null;
   return Array.isArray(raw) ? raw : [];
 }

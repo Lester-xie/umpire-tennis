@@ -42,20 +42,6 @@
           <text class="switch-label">教练</text>
           <switch checked="{{isCoach}}" bindchange="onToggleCoach" color="#134E35" />
         </view>
-        <view class="commission-block" wx:if="{{isCoach}}">
-          <text class="commission-label">上课分成比例</text>
-          <view class="commission-field">
-            <input
-              class="commission-input"
-              type="digit"
-              maxlength="6"
-              placeholder="5"
-              value="{{coachCommissionInput}}"
-              bindinput="onCoachCommissionInput"
-            />
-            <text class="commission-suffix">%</text>
-          </view>
-        </view>
         <view class="switch-row">
           <text class="switch-label">VIP</text>
           <switch checked="{{isVip}}" bindchange="onToggleVip" color="#134E35" />

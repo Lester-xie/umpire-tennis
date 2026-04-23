@@ -36,6 +36,8 @@ function mergeBookedSlotsAndCoachHolds(bookedResult, holdRows, venueId, normDate
     keySet.add(`${cid}-${idx}`);
     const k = `${cid}-${idx}`;
     const cur = coachHoldMeta[k] || {};
+    const fromCur = cur.coachName != null && String(cur.coachName).trim() !== '' ? String(cur.coachName).trim() : '';
+    const fromRow = row.coachName != null && String(row.coachName).trim() !== '' ? String(row.coachName).trim() : '';
     coachHoldMeta[k] = {
       ...cur,
       holdId: String(row._id),
@@ -47,10 +49,8 @@ function mergeBookedSlotsAndCoachHolds(bookedResult, holdRows, venueId, normDate
         (row.capacityLabel && String(row.capacityLabel).trim()) ||
         cur.capacityLabel ||
         '教练占用',
-      coachName:
-        (row.coachName != null && String(row.coachName).trim()) ||
-        (cur.coachName != null && String(cur.coachName).trim()) ||
-        '',
+      /** 以 getBookedSlots（cur）为准，避免与「仅当前用户」的 list 合并时误用本账号名称 */
+      coachName: fromCur || fromRow,
       lessonType: row.lessonType,
       pairMode: row.pairMode,
       groupMode: row.groupMode,

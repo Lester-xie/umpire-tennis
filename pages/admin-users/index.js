@@ -1,15 +1,6 @@
 const { DEFAULT_USER_AVATAR, adminGetUserByPhone, adminSetUserRoles } = require('../../api/tennisDb');
 const { resolveImageUrlForDisplay } = require('../../utils/cloudImage');
 
-/** DB 存小数比例（如 0.05 = 5%） */
-function formatCommissionInputFromUser(d) {
-  const cp = d && d.commissionPercent;
-  if (cp === undefined || cp === null || cp === '') return '5';
-  const n = Number(cp);
-  if (!Number.isFinite(n) || n < 0 || n > 1) return '5';
-  return String(n * 100);
-}
-
 Page({
   data: {
     scrollHeight: 400,
@@ -21,8 +12,6 @@ Page({
     avatarDisplayUrl: DEFAULT_USER_AVATAR,
     isCoach: false,
     isVip: false,
-    /** 教练分成：输入 0–100（如 5 表示 5%）；DB 存 commissionPercent 小数（0.05） */
-    coachCommissionInput: '5',
   },
 
   onReady() {
@@ -56,28 +45,11 @@ Page({
       avatarDisplayUrl: DEFAULT_USER_AVATAR,
       isCoach: false,
       isVip: false,
-      coachCommissionInput: '5',
     });
   },
 
   onToggleCoach(e) {
-    const isCoach = !!e.detail.value;
-    const patch = { isCoach };
-    if (isCoach && !String(this.data.coachCommissionInput || '').trim()) {
-      patch.coachCommissionInput = '5';
-    }
-    this.setData(patch);
-  },
-
-  onCoachCommissionInput(e) {
-    const raw = String((e.detail && e.detail.value) != null ? e.detail.value : '');
-    const cleaned = raw.replace(/[^\d.]/g, '');
-    const parts = cleaned.split('.');
-    let v = parts[0] || '';
-    if (parts.length > 1) {
-      v = `${v}.${parts.slice(1).join('').replace(/\./g, '')}`;
-    }
-    this.setData({ coachCommissionInput: v });
+    this.setData({ isCoach: !!e.detail.value });
   },
 
   onToggleVip(e) {
@@ -118,7 +90,6 @@ Page({
         avatarDisplayUrl,
         isCoach: !!d.isCoach,
         isVip: !!d.isVip,
-        coachCommissionInput: formatCommissionInputFromUser(d),
       });
     } catch (e) {
       console.error(e);
@@ -138,23 +109,12 @@ Page({
       wx.showToast({ title: '手机号已变更，请重新查询', icon: 'none' });
       return;
     }
-    let commissionPercent;
-    if (this.data.isCoach) {
-      const raw = String(this.data.coachCommissionInput || '').trim();
-      const n = Number(raw === '' ? '5' : raw);
-      if (!Number.isFinite(n) || n < 0 || n > 100) {
-        wx.showToast({ title: '分成比例请输入 0–100 的数字', icon: 'none' });
-        return;
-      }
-      commissionPercent = n;
-    }
     wx.showLoading({ title: '保存中', mask: true });
     try {
       const res = await adminSetUserRoles({
         targetPhone: queriedPhone,
         isCoach: this.data.isCoach,
         isVip: this.data.isVip,
-        ...(this.data.isCoach ? { commissionPercent } : {}),
       });
       wx.hideLoading();
       const r = (res && res.result) || {};

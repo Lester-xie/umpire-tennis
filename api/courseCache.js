@@ -31,7 +31,7 @@ function filterByCategory(rows, filterCategoryId) {
 }
 
 /**
- * 仅拉取 db_course；课型与场馆用途以 db_course / db_venue.category_list 为准。
+ * 仅拉取 db_course；课型与场馆用途以 db_course / db_venue.categoryList 为准。
  * @returns {Promise<{ data: object[] }>}
  */
 function getCourses(filterCategoryId, options = {}) {

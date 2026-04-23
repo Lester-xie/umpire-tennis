@@ -35,6 +35,133 @@
       <view wx:if="{{stats.truncated}}" class="warn">单月订单超过 1000 条时统计可能不完整，请在云控制台用聚合校准。</view>
     </view>
 
-    <view class="hint">按支付成功时间 paidAt 所在自然月统计；仅含 status 为 paid 的订单。</view>
+    <view wx:if="{{coachList.length > 0}}" class="coach-section">
+      <text class="section-title">教练课（本月，已付）</text>
+      <text class="section-sub">节数/金额按「该课的占用记录」中的教练计（会员 A 上教练 B 的课 → 计在 B 名下）；与订单里的会员手机号无关。已开通教练表中的账号会合并展示；未匹配时单独一行。金额按订单 totalPrice（元）。点选可查看详情。</text>
+      <view
+        wx:for="{{coachList}}"
+        wx:for-item="row"
+        wx:for-index="ci"
+        wx:key="ci"
+        class="coach-row {{selectedCoachIndex === ci ? 'coach-row--on' : ''}}"
+        data-index="{{ci}}"
+        bindtap="onSelectCoach"
+      >
+        <view class="coach-row-main">
+          <text class="coach-name">{{row.displayName}}</text>
+          <text class="coach-phone" wx:if="{{row.phone}}">{{row.phone}}</text>
+        </view>
+        <text class="coach-chev">查看</text>
+      </view>
+
+      <view wx:if="{{selectedCoachIndex >= 0 && coachList[selectedCoachIndex]}}" class="coach-detail-card">
+        <text class="detail-title">{{coachList[selectedCoachIndex].displayName}} · 详情</text>
+        <view class="detail-block" wx:if="{{coachList[selectedCoachIndex].stats.experience}}">
+          <view class="detail-line detail-line--head">
+            <text>体验课</text>
+            <text class="detail-sum">{{coachList[selectedCoachIndex].stats.experience.amountYuan}} 元</text>
+          </view>
+          <view class="detail-line">
+            <text class="detail-muted">节数</text>
+            <text>{{coachList[selectedCoachIndex].stats.experience.count}}</text>
+          </view>
+        </view>
+        <view class="detail-block" wx:if="{{coachList[selectedCoachIndex].stats.regular1v1}}">
+          <view class="detail-line detail-line--head">
+            <text>正课 · 1V1</text>
+            <text class="detail-sum">{{coachList[selectedCoachIndex].stats.regular1v1.amountYuan}} 元</text>
+          </view>
+          <view class="detail-line">
+            <text class="detail-muted">节数</text>
+            <text>{{coachList[selectedCoachIndex].stats.regular1v1.count}}</text>
+          </view>
+        </view>
+        <view class="detail-block" wx:if="{{coachList[selectedCoachIndex].stats.regular1v2}}">
+          <view class="detail-line detail-line--head">
+            <text>正课 · 1V2</text>
+            <text class="detail-sum">{{coachList[selectedCoachIndex].stats.regular1v2.amountYuan}} 元</text>
+          </view>
+          <view class="detail-line">
+            <text class="detail-muted">节数</text>
+            <text>{{coachList[selectedCoachIndex].stats.regular1v2.count}}</text>
+          </view>
+        </view>
+        <view
+          class="detail-block"
+          wx:if="{{coachList[selectedCoachIndex].stats.regularOther && coachList[selectedCoachIndex].stats.regularOther.count > 0}}"
+        >
+          <view class="detail-line detail-line--head">
+            <text>正课 · 其他规格</text>
+            <text class="detail-sum">{{coachList[selectedCoachIndex].stats.regularOther.amountYuan}} 元</text>
+          </view>
+          <view class="detail-line">
+            <text class="detail-muted">节数</text>
+            <text>{{coachList[selectedCoachIndex].stats.regularOther.count}}</text>
+          </view>
+        </view>
+        <view
+          class="detail-block"
+          wx:if="{{coachList[selectedCoachIndex].stats.other && coachList[selectedCoachIndex].stats.other.count > 0}}"
+        >
+          <view class="detail-line detail-line--head">
+            <text>团课 / 畅打等</text>
+            <text class="detail-sum">{{coachList[selectedCoachIndex].stats.other.amountYuan}} 元</text>
+          </view>
+          <view class="detail-line">
+            <text class="detail-muted">节数</text>
+            <text>{{coachList[selectedCoachIndex].stats.other.count}}</text>
+          </view>
+        </view>
+        <view
+          class="detail-block"
+          wx:if="{{coachList[selectedCoachIndex].stats.packageReward && coachList[selectedCoachIndex].stats.packageReward.count > 0}}"
+        >
+          <view class="detail-line detail-line--head">
+            <text>课包奖励金</text>
+            <text class="detail-sum">{{coachList[selectedCoachIndex].stats.packageReward.amountYuan}} 元</text>
+          </view>
+          <view class="detail-line detail-line--tappable" catchtap="onOpenPackageRewardDetail">
+            <text class="detail-muted">次数 · 点击查看详情</text>
+            <text class="detail-tap-chev">{{coachList[selectedCoachIndex].stats.packageReward.count}} ›</text>
+          </view>
+        </view>
+      </view>
+      <view wx:if="{{coachStatsTruncated}}" class="warn">本月教练课订单超过 1000 条，统计可能不全。</view>
+      <view wx:if="{{coursePurchaseTruncated}}" class="warn">本月课包订单超过 1000 条，课包相关统计可能不全。</view>
+    </view>
+
+    <view wx:elif="{{stats}}" class="coach-empty">暂无「教练」角色用户，或请先查询有数据的月份。</view>
+
+    <view class="hint">按支付成功时间 paidAt 所在自然月统计；仅含 status 为 paid 的订单。教练课与课包订单每类最多拉取 1000 条。教练课金额取订单中的标价 totalPrice，纯课时支付订单金额可能为 0。课包奖励金为当月付款且 ≥10h 正课包、且会员已绑定体验课成单教练时计入该教练。</view>
   </scroll-view>
+
+  <view wx:if="{{packageRewardModalVisible}}" class="pr-modal-mask" bindtap="onClosePackageRewardModal">
+    <view class="pr-modal" catchtap="onPackageRewardModalNop">
+      <view class="pr-modal-hd">课包奖励金 · 明细</view>
+      <scroll-view
+        scroll-y="true"
+        class="pr-modal-scroll"
+        show-scrollbar="{{true}}"
+        enable-flex="{{true}}"
+      >
+        <view
+          wx:for="{{packageRewardModalList}}"
+          wx:for-item="it"
+          wx:for-index="pri"
+          wx:key="pri"
+          class="pr-modal-item"
+        >
+          <view class="pr-modal-row pr-modal-user">
+            <text class="pr-modal-name" wx:if="{{it.userName}}">{{it.userName}}</text>
+            <text class="pr-modal-phone">{{it.phone}}</text>
+          </view>
+          <view class="pr-modal-row pr-modal-spec">「{{it.specLabel}}」· {{it.grantHours}} 小时</view>
+          <view class="pr-modal-row pr-modal-pay">实付 {{it.amountYuan}} 元 · {{it.paidAtText}}</view>
+        </view>
+      </scroll-view>
+      <view class="pr-modal-ft">
+        <button class="pr-modal-btn" type="default" size="mini" bindtap="onClosePackageRewardModal">关闭</button>
+      </view>
+    </view>
+  </view>
 </view>

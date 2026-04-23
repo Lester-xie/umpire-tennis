@@ -54,25 +54,6 @@
       </view>
 
       <view class="field">
-        <text class="field-label">分成方式</text>
-        <text class="field-hint">开启「固定分成」时需填写金额（元）；关闭时无需填写，可按教练账号上的分成比例结算。</text>
-        <view class="switch-row">
-          <text class="switch-label">固定分成</text>
-          <switch checked="{{fixedSplit}}" bindchange="onFixedSplitChange" color="#134E35" />
-        </view>
-        <view wx:if="{{fixedSplit}}" class="split-price-block">
-          <text class="split-price-label">分成价格（元）</text>
-          <input
-            class="field-input split-price-input"
-            type="digit"
-            placeholder="大于 0 的金额"
-            value="{{fixedSplitPriceInput}}"
-            bindinput="onFixedSplitPriceInput"
-          />
-        </view>
-      </view>
-
-      <view class="field">
         <text class="field-label">价格规格 typeMap</text>
         <text class="field-hint">每种「上课形式」下可配置多个「课时/节数」与单价（元）。内层键一般为数字节数，如 1、10。</text>
 

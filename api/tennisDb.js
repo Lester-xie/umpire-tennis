@@ -22,7 +22,7 @@ const DEFAULT_USER_AVATAR = '/assets/images/default-avatar.jpg';
  * - longitude
  * - （可选）image
  * - courtList: [{ name, priceList, vipPriceList?, specialPrice? }] — 各 14 段；周末一口价 specialPrice 仅非 VIP 订场生效
- * - category_list（或 categoryList）: 教练课用途与会员默认「场次」价，见 utils/venueCategoryList.js
+ * - categoryList: 教练课用途与会员默认「场次」价，见 utils/venueCategoryList.js（旧库可能仍为 category_list，读时兼容）
  */
 function getVenues() {
   const db = getDb();
@@ -39,14 +39,15 @@ function normalizeVenueDoc(v, idx) {
   const image =
     v.image ||
     (i % 2 === 0 ? '/assets/images/court1.jpg' : '/assets/images/court2.jpg');
-  const categoryList =
-    v.category_list != null
-      ? v.category_list
-      : v.categoryList != null
-        ? v.categoryList
+  const mergedCategoryList =
+    v.categoryList != null
+      ? v.categoryList
+      : v.category_list != null
+        ? v.category_list
         : [];
+  const { category_list, ...restVenue } = v;
   return {
-    ...v,
+    ...restVenue,
     id,
     name: v.name != null ? String(v.name) : '',
     address: v.address != null ? String(v.address) : '',
@@ -54,7 +55,7 @@ function normalizeVenueDoc(v, idx) {
     longitude: v.longitude,
     image,
     courtList: Array.isArray(v.courtList) ? v.courtList : [],
-    category_list: Array.isArray(categoryList) ? categoryList : [],
+    categoryList: Array.isArray(mergedCategoryList) ? mergedCategoryList : [],
   };
 }
 
@@ -403,6 +404,14 @@ function adminOrderStatsByMonth(payload) {
   });
 }
 
+/** 管理员：按自然月统计各教练教练课（体验 / 正课 1v1·1v2）节数与金额 */
+function adminCoachMonthStats(payload) {
+  return wx.cloud.callFunction({
+    name: 'adminCoachMonthStats',
+    data: payload || {},
+  });
+}
+
 /** 管理员：场馆/场地 CRUD，event.action: list | get | create | update | remove */
 function adminVenue(payload) {
   return wx.cloud.callFunction({
@@ -439,6 +448,7 @@ module.exports = {
   adminCoachHoldForCoach,
   adminVenueSlotLock,
   adminOrderStatsByMonth,
+  adminCoachMonthStats,
   adminVenue,
 };
 

@@ -1,0 +1,9 @@
+{
+  "name": "adminCoachMonthStats",
+  "version": "1.0.0",
+  "description": "管理员：按自然月统计各教练教练课（体验/正课 1v1 1v2）节数与金额",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

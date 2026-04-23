@@ -190,7 +190,7 @@ function normalizeCourtList(raw) {
   return { ok: true, courtList: out };
 }
 
-/** category_list：教练课用途与会员默认场次价；未传 categoryList 时不覆盖库内原值 */
+/** categoryList：教练课用途与会员默认场次价；未传 categoryList 时不覆盖库内原值 */
 function normalizeCategoryList(raw) {
   if (raw === undefined) {
     return { ok: true, omit: true, list: null };
@@ -258,7 +258,7 @@ function normalizeVenuePayload(body) {
     data.image = image;
   }
   if (!catNorm.omit && catNorm.list != null) {
-    data.category_list = catNorm.list;
+    data.categoryList = catNorm.list;
   }
   return { ok: true, data };
 }

@@ -1,4 +1,4 @@
-const { adminOrderStatsByMonth } = require('../../api/tennisDb');
+const { adminOrderStatsByMonth, adminCoachMonthStats } = require('../../api/tennisDb');
 
 function padMonth(d) {
   const y = d.getFullYear();
@@ -19,6 +19,12 @@ Page({
     bookingYuan: '0.00',
     purchaseYuan: '0.00',
     totalYuan: '0.00',
+    coachList: [],
+    coachStatsTruncated: false,
+    coursePurchaseTruncated: false,
+    selectedCoachIndex: -1,
+    packageRewardModalVisible: false,
+    packageRewardModalList: [],
   },
 
   onLoad() {
@@ -67,23 +73,89 @@ Page({
     }
     wx.showLoading({ title: '统计中', mask: true });
     try {
-      const res = await adminOrderStatsByMonth({ year, month });
+      const resOrder = await adminOrderStatsByMonth({ year, month });
       wx.hideLoading();
-      const r = (res && res.result) || {};
+      const r = (resOrder && resOrder.result) || {};
       if (!r.ok || !r.data) {
         wx.showToast({ title: r.errMsg || '失败', icon: 'none' });
+        this.setData({
+          coachList: [],
+          selectedCoachIndex: -1,
+          coachStatsTruncated: false,
+          coursePurchaseTruncated: false,
+          packageRewardModalVisible: false,
+          packageRewardModalList: [],
+        });
         return;
       }
       const d = r.data;
+      let coachList = [];
+      let coachStatsTruncated = false;
+      let coursePurchaseTruncated = false;
+      try {
+        const resCoach = await adminCoachMonthStats({ year, month });
+        const rc = (resCoach && resCoach.result) || {};
+        if (rc.ok && rc.data) {
+          coachList = Array.isArray(rc.data.coaches) ? rc.data.coaches : [];
+          coachStatsTruncated = !!rc.data.coachBookingTruncated;
+          coursePurchaseTruncated = !!rc.data.coursePurchaseTruncated;
+        } else if (rc.errMsg) {
+          wx.showToast({ title: rc.errMsg, icon: 'none' });
+        }
+      } catch (e) {
+        console.warn('adminCoachMonthStats', e);
+        wx.showToast({ title: '教练统计失败，请部署云函数 adminCoachMonthStats', icon: 'none' });
+      }
       this.setData({
         stats: d,
         bookingYuan: fenToYuanStr(d.bookingAmountFen),
         purchaseYuan: fenToYuanStr(d.coursePurchaseAmountFen),
         totalYuan: fenToYuanStr(d.totalAmountFen),
+        coachList,
+        coachStatsTruncated,
+        coursePurchaseTruncated,
+        selectedCoachIndex: coachList.length > 0 ? 0 : -1,
+        packageRewardModalVisible: false,
+        packageRewardModalList: [],
       });
     } catch (e) {
       wx.hideLoading();
       wx.showToast({ title: '请求失败', icon: 'none' });
     }
+  },
+
+  onSelectCoach(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    if (!Number.isFinite(idx) || idx < 0) return;
+    this.setData({ selectedCoachIndex: idx });
+  },
+
+  formatDateTime(ts) {
+    const t = new Date(Number(ts));
+    if (Number.isNaN(t.getTime())) return '—';
+    const p = (n) => (n < 10 ? '0' + n : String(n));
+    return `${t.getFullYear()}-${p(t.getMonth() + 1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}`;
+  },
+
+  onOpenPackageRewardDetail() {
+    const i = this.data.selectedCoachIndex;
+    const row = this.data.coachList[i];
+    const arr = row && Array.isArray(row.packageRewardDetails) ? row.packageRewardDetails : [];
+    if (arr.length === 0) {
+      wx.showToast({ title: '暂无明细，请重新部署云函数后查询', icon: 'none' });
+      return;
+    }
+    const sorted = arr.slice().sort((a, b) => (Number(b.paidAt) || 0) - (Number(a.paidAt) || 0));
+    const list = sorted.map((d) => {
+      const paidAtText = d.paidAt ? this.formatDateTime(d.paidAt) : '—';
+      return { ...d, paidAtText };
+    });
+    this.setData({ packageRewardModalVisible: true, packageRewardModalList: list });
+  },
+
+  onPackageRewardModalNop() {},
+
+  onClosePackageRewardModal() {
+    this.setData({ packageRewardModalVisible: false, packageRewardModalList: [] });
   },
 });
