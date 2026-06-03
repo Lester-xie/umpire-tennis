@@ -1,0 +1,120 @@
+<view class="verify-page">
+  <lottie-loading visible="{{lottieLoadingVisible}}" />
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="团购验券" />
+  </view>
+  <scroll-view
+    class="content-scroll"
+    scroll-y="true"
+    enhanced="{{true}}"
+    show-scrollbar="{{false}}"
+    style="margin-top: {{headerHeight}}px; height: {{contentHeight}}px;"
+  >
+    <view class="content-wrapper">
+      <view class="intro-block">
+        <text class="intro-venue">昂湃网球学练馆</text>
+        <text class="intro-desc">美团 / 抖音团购券验券后，课时入账当前登录账号</text>
+      </view>
+
+      <block wx:if="{{!isLoggedIn}}">
+        <view class="verify-card verify-card--empty">
+          <view class="empty-icon-wrap"></view>
+          <text class="empty-title">登录后即可验券</text>
+          <text class="empty-desc">需授权手机号，验券结果将入账您的账户</text>
+          <button class="btn btn--primary btn--block" bindtap="onPhoneLogin">去账户页登录</button>
+        </view>
+      </block>
+
+      <block wx:else>
+        <view class="verify-card">
+          <view class="form-block">
+            <text class="form-label">购买平台</text>
+            <view class="platform-tabs">
+              <view
+                class="platform-tab {{platform === 1 ? 'platform-tab--on' : ''}}"
+                data-platform="1"
+                bindtap="onSelectPlatform"
+              >
+                <text class="platform-tab__name">美团</text>
+              </view>
+              <view
+                class="platform-tab {{platform === 2 ? 'platform-tab--on' : ''}}"
+                data-platform="2"
+                bindtap="onSelectPlatform"
+              >
+                <text class="platform-tab__name">抖音</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="form-divider"></view>
+
+          <view class="form-block">
+            <text class="form-label">{{platformLabel}}券码</text>
+            <view class="code-box">
+              <input
+                class="code-box__input"
+                placeholder="输入或粘贴券码"
+                placeholder-class="code-box__placeholder"
+                value="{{receiptCode}}"
+                bindinput="onReceiptInput"
+              />
+              <view class="code-box__scan" bindtap="onScanCode">
+                <text class="code-box__scan-text">扫码</text>
+              </view>
+            </view>
+          </view>
+
+          <view wx:if="{{preview}}" class="ticket-preview">
+            <view class="ticket-preview__head">
+              <text class="ticket-preview__platform">{{platformLabel}}</text>
+              <text class="ticket-preview__tag">待确认验券</text>
+            </view>
+            <text class="ticket-preview__name">{{preview.ticketName || '—'}}</text>
+            <view class="ticket-preview__grant" wx:if="{{preview.grantHours > 0}}">
+              <view class="ticket-preview__grant-item">
+                <text class="ticket-preview__grant-num">{{preview.grantHours}}</text>
+                <text class="ticket-preview__grant-unit">小时</text>
+              </view>
+              <view class="ticket-preview__grant-meta">
+                <text class="ticket-preview__grant-label">预计入账</text>
+                <text class="ticket-preview__grant-type">{{preview.grantLabel}}</text>
+              </view>
+            </view>
+          </view>
+
+          <view
+            wx:elif="{{resultMsg}}"
+            class="alert {{resultOk ? 'alert--ok' : 'alert--err'}}"
+          >
+            <text class="alert__text">{{resultMsg}}</text>
+          </view>
+
+          <view class="btn-group">
+            <button
+              class="btn btn--ghost btn--block"
+              loading="{{preparing}}"
+              disabled="{{preparing || consuming}}"
+              bindtap="onPrepare"
+            >
+              查询券信息
+            </button>
+            <button
+              wx:if="{{canConsume}}"
+              class="btn btn--primary btn--block"
+              loading="{{consuming}}"
+              disabled="{{consuming || preparing}}"
+              bindtap="onConsume"
+            >
+              确认验券并入账
+            </button>
+          </view>
+        </view>
+
+        <text class="footnote">验券成功后，可在「我的课时」查看余额</text>
+      </block>
+
+      <view class="footer-space" style="height: {{placeholderHeight}}px;"></view>
+    </view>
+  </scroll-view>
+</view>

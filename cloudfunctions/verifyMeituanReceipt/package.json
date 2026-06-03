@@ -1,0 +1,9 @@
+{
+  "name": "verifyMeituanReceipt",
+  "version": "1.0.0",
+  "description": "会员自助美团团购验券核销并入账昂湃学练馆课时/订场次数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

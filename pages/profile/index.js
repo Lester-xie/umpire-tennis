@@ -244,6 +244,14 @@ Page({
     wx.navigateTo({ url: '/pages/profile-goods-orders/index' });
   },
 
+  goMeituanVerify() {
+    if (!this.data.isLoggedIn) {
+      wx.showToast({ title: '请先登录', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({ url: '/pages/profile-meituan-verify/index' });
+  },
+
   // 授权手机号注册：成功后再执行 wx.login，并跳转完善资料
   async onPhoneRegister(e) {
     const { errMsg, encryptedData, iv } = e.detail || {};

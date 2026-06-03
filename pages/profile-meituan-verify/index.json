@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "团购验券",
+  "usingComponents": {
+    "header": "/components/header/header",
+    "lottie-loading": "/components/lottie-loading/index"
+  }
+}

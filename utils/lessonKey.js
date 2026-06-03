@@ -26,7 +26,7 @@ function formatLessonKeyDisplay(key) {
   if (idx < 0) return k;
   const type = k.slice(0, idx);
   const mode = k.slice(idx + 1);
-  const typeMap = { experience: '体验课', regular: '正课', group: '团课', open_play: '畅打' };
+  const typeMap = { experience: '体验课', regular: '正课', group: '团课', open_play: '畅打', court: '订场' };
   const t = typeMap[type] || type;
   if (type === 'group') {
     if (!mode) return '团课';
@@ -37,6 +37,10 @@ function formatLessonKeyDisplay(key) {
     if (!mode) return '畅打';
     if (mode === 'group36') return '畅打（3-6人）';
     return `畅打（${mode}）`;
+  }
+  if (type === 'court') {
+    if (mode === 'ball_machine') return '发球机订场';
+    return mode ? `订场 ${mode}` : '订场';
   }
   const modeUpper = String(mode || '').toUpperCase();
   return `${t} ${modeUpper}`.trim();

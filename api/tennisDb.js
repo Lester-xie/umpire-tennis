@@ -412,6 +412,33 @@ function adminCoachMonthStats(payload) {
   });
 }
 
+/** 会员自助：团购验券准备（platform: 1 美团，2 抖音） */
+function verifyMeituanReceiptPrepare(payload) {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'verifyMeituanReceipt',
+    data: { action: 'prepare', phone, ...(payload || {}) },
+  });
+}
+
+/** 会员自助：团购核销并入账当前账号 */
+function verifyMeituanReceiptConsume(payload) {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'verifyMeituanReceipt',
+    data: { action: 'consume', phone, ...(payload || {}) },
+  });
+}
+
+/** 会员：门店在售团购（美团/抖音，进入验券页预拉取） */
+function listTicketShopDeals(payload) {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'verifyMeituanReceipt',
+    data: { action: 'listShopDeals', phone, ...(payload || {}) },
+  });
+}
+
 /** 管理员：场馆/场地 CRUD，event.action: list | get | create | update | remove */
 function adminVenue(payload) {
   return wx.cloud.callFunction({
@@ -449,6 +476,9 @@ module.exports = {
   adminVenueSlotLock,
   adminOrderStatsByMonth,
   adminCoachMonthStats,
+  verifyMeituanReceiptPrepare,
+  verifyMeituanReceiptConsume,
+  listTicketShopDeals,
   adminVenue,
 };
 

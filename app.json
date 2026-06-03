@@ -21,7 +21,8 @@
     "pages/admin-venue-categories/index",
     "pages/admin-courses/index",
     "pages/admin-course-edit/index",
-    "pages/admin-stats/index"
+    "pages/admin-stats/index",
+    "pages/profile-meituan-verify/index"
   ],
   "window": {
     "backgroundTextStyle": "light",
