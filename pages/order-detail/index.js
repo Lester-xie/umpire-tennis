@@ -15,10 +15,18 @@ const {
   DEFAULT_USER_AVATAR,
   listMemberCourseHours,
   completeCoachBookingWithHours,
+  completeCourtBookingWithVouchers,
   getBookedSlots,
+  requestWechatPay,
 } = require('../../api/tennisDb');
 const { buildLessonKey, formatLessonKeyDisplay } = require('../../utils/lessonKey');
 const { lessonKeyFromTypeMapFormat, splitCourseDescriptionLines } = require('../../utils/courseCatalog');
+const {
+  buildFlatCourtSlots,
+  getUncoveredSlotPrices,
+  findMatchingSlot,
+  recalcVoucherPayment,
+} = require('../../utils/bookingVoucherMatch');
 
 function enrichGoodItemDisplay(g) {
   if (!g) return null;
@@ -118,6 +126,11 @@ Page({
     goodsSessionKeys: [],
     selectedGoodsFormat: '',
     selectedGoodsSession: '',
+    /** 普通订场：每格价格（用于团购券匹配） */
+    courtSlotPrices: [],
+    bookingVouchers: [],
+    voucherDeductionYuan: 0,
+    cashDueYuan: 0,
   },
   _loadingTaskCount: 0,
 
@@ -233,6 +246,18 @@ Page({
         slotIndex: Number(s.slotIndex),
       }))
       .filter((s) => Number.isFinite(s.courtId) && Number.isFinite(s.slotIndex));
+    const courtSlotPrices = buildFlatCourtSlots(bookedSlots, courts, (idx) =>
+      this.getTimeSlotTime(idx),
+      {
+        courtList:
+          (() => {
+            const app = getApp();
+            const venue = app && app.globalData && app.globalData.selectedVenue;
+            return venue && Array.isArray(venue.courtList) ? venue.courtList : [];
+          })(),
+        selectedDate,
+      },
+    );
 
     this.setData({
       orderDate: selectedDate,
@@ -242,6 +267,10 @@ Page({
       bookedSlots,
       totalPrice: totalPrice,
       venueId: venueId,
+      courtSlotPrices,
+      bookingVouchers: [],
+      voucherDeductionYuan: 0,
+      cashDueYuan: totalPrice,
     });
     this.syncCampusName();
   },
@@ -330,6 +359,96 @@ Page({
         lessonKey,
       },
     });
+  },
+
+  recalcBookingVoucherTotals(bookingVouchers) {
+    const pay = recalcVoucherPayment(this.data.totalPrice, bookingVouchers);
+    this.setData({
+      bookingVouchers,
+      voucherDeductionYuan: pay.voucherDeductionYuan,
+      cashDueYuan: pay.cashDueYuan,
+    });
+  },
+
+  onAddBookingVoucher() {
+    if (this.data.orderType !== 'court' || this.data.isCoachCourseOrder) return;
+    const app = getApp();
+    if (!app || !app.checkLogin()) {
+      wx.showModal({
+        title: '请先登录',
+        content: '添加团购券需先登录并授权手机号',
+        confirmText: '去登录',
+        cancelText: '取消',
+        success: (res) => {
+          if (res.confirm) {
+            wx.switchTab({ url: '/pages/profile/index' });
+          }
+        },
+      });
+      return;
+    }
+    const uncovered = getUncoveredSlotPrices(
+      this.data.courtSlotPrices,
+      this.data.bookingVouchers,
+    );
+    if (!uncovered.length) {
+      wx.showToast({ title: '所有时段已添加团购券', icon: 'none' });
+      return;
+    }
+    if (this.data.bookingVouchers.length >= this.data.bookedSlots.length) {
+      wx.showToast({ title: '每张券仅可抵扣1小时', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({
+      url: '/pages/order-voucher-verify/index',
+      events: {
+        voucherAdded: (data) => this.applyBookingVoucher(data),
+      },
+      success: (res) => {
+        res.eventChannel.emit('initData', {
+          allowedPrices: uncovered,
+          usedReceiptCodes: (this.data.bookingVouchers || []).map((v) => ({
+            platform: v.platform,
+            receiptCode: v.receiptCode,
+          })),
+        });
+      },
+    });
+  },
+
+  applyBookingVoucher(data) {
+    if (!data) return;
+    const slot = findMatchingSlot(
+      this.data.courtSlotPrices,
+      this.data.bookingVouchers,
+      data.priceYuan,
+    );
+    if (!slot) {
+      wx.showToast({ title: '该券无可用时段', icon: 'none' });
+      return;
+    }
+    const voucher = {
+      platform: data.platform,
+      platformLabel: data.platformLabel || (data.platform === 2 ? '抖音' : '美团'),
+      receiptCode: data.receiptCode,
+      receiptCodeDisplay: data.receiptCodeDisplay || data.receiptCode,
+      ticketName: data.ticketName || '',
+      priceYuan: data.priceYuan,
+      dealId: data.dealId != null ? String(data.dealId) : '',
+      dealGroupId: data.dealGroupId != null ? String(data.dealGroupId) : '',
+      ticketInfo: data.ticketInfo || '',
+      slotKey: slot.slotKey,
+      timeLabel: slot.timeLabel,
+    };
+    this.recalcBookingVoucherTotals([...(this.data.bookingVouchers || []), voucher]);
+  },
+
+  onRemoveBookingVoucher(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    if (!Number.isFinite(idx) || idx < 0) return;
+    const list = [...(this.data.bookingVouchers || [])];
+    list.splice(idx, 1);
+    this.recalcBookingVoucherTotals(list);
   },
 
   syncCampusName() {
@@ -820,39 +939,6 @@ Page({
     return orderItems.reduce((total, item) => total + item.totalPrice, 0);
   },
 
-  // 拉起支付前做一次实时占用校验（普通场地单）
-  async validateCourtAvailabilityBeforePay() {
-    if (this.data.orderType !== 'court' || this.data.isCoachCourseOrder) return true;
-    const venueId = String(this.data.venueId || '').trim();
-    const orderDate = String(this.data.orderDate || '').trim();
-    const slots = Array.isArray(this.data.bookedSlots) ? this.data.bookedSlots : [];
-    if (!venueId || !orderDate || slots.length === 0) {
-      wx.showToast({ title: '订单数据异常，请返回重试', icon: 'none' });
-      return false;
-    }
-    this.beginLoading('校验中');
-    try {
-      const res = await getBookedSlots({ venueId, orderDate });
-      const result = res && res.result ? res.result : {};
-      const keys = Array.isArray(result.keys) ? result.keys : [];
-      const occupied = new Set(keys);
-      const conflict = slots.some(
-        (s) => occupied.has(`${Number(s.courtId)}-${Number(s.slotIndex)}`)
-      );
-      if (conflict) {
-        wx.showToast({ title: '时段已被预订，请返回重选', icon: 'none' });
-        return false;
-      }
-      return true;
-    } catch (e) {
-      console.error('validateCourtAvailabilityBeforePay', e);
-      wx.showToast({ title: '校验失败，请重试', icon: 'none' });
-      return false;
-    } finally {
-      this.endLoading();
-    }
-  },
-
   onUnload() {
     this._loadingTaskCount = 0;
     this.setData({ lottieLoadingVisible: false });
@@ -875,8 +961,24 @@ Page({
   // 拉起微信支付；订场成功后跳转订场成功页并清空预订页已选时段
   async saveOrderToDB() {
     const { orderType, totalPrice } = this.data;
-    const yuan = Number(totalPrice);
-    if (!Number.isFinite(yuan) || yuan <= 0) {
+    const isCourtPlain =
+      orderType === 'court' && !this.data.isCoachCourseOrder;
+    if (isCourtPlain && (this.data.bookingVouchers || []).length > 0) {
+      const cashDue = Number(this.data.cashDueYuan);
+      if (!Number.isFinite(cashDue) || cashDue < 0) {
+        wx.showToast({ title: '订单金额无效', icon: 'none' });
+        return;
+      }
+      if (cashDue <= 0.009) {
+        await this.submitCourtBookingWithVouchersOnly();
+        return;
+      }
+    }
+    const payYuan =
+      isCourtPlain && (this.data.bookingVouchers || []).length > 0
+        ? Number(this.data.cashDueYuan)
+        : Number(totalPrice);
+    if (!Number.isFinite(payYuan) || payYuan <= 0) {
       wx.showToast({ title: '订单金额无效', icon: 'none' });
       return;
     }
@@ -897,8 +999,7 @@ Page({
       }
     }
 
-    const courtOk = await this.validateCourtAvailabilityBeforePay();
-    if (!courtOk) return;
+    /** 普通订场占用校验由 pay / completeCourtBookingWithVouchers 云函数负责，不在支付前调 getBookedSlots */
     /** 当前页所有微信统一下单金额固定 1 分（totalFee 单位：分） */
     const totalFee = 1;
 
@@ -986,86 +1087,90 @@ Page({
         memberDisplayName: this.data.isCoachCourseOrder
           ? String(wx.getStorageSync(STORAGE_KEYS.userNickname) || '').trim().slice(0, 40)
           : '',
+        bookingVouchers: isCourtPlain ? this.data.bookingVouchers || [] : [],
+        voucherDeductionYuan: isCourtPlain ? Number(this.data.voucherDeductionYuan) || 0 : 0,
+        cashDueYuan: isCourtPlain ? Number(this.data.cashDueYuan) || 0 : Number(this.data.totalPrice),
       };
     }
 
     this.beginLoading('支付中...');
-    wx.cloud.callFunction({
-      name: 'pay',
-      data: payPayload,
-      success: (res) => {
-        this.endLoading();
-        const result = res.result || {};
-        const payment = result.payment;
-        if (result.returnCode !== 'SUCCESS' || !payment) {
-          console.error('unifiedOrder 失败', result);
+    try {
+      const res = await requestWechatPay(payPayload);
+      this.endLoading();
+      const result = (res && res.result) || {};
+      const payment = result.payment;
+      if (result.returnCode !== 'SUCCESS' || !payment) {
+        console.error('unifiedOrder 失败', result);
+        wx.showToast({
+          title: result.returnMsg || '下单失败',
+          icon: 'none',
+        });
+        return;
+      }
+      wx.requestPayment({
+        ...payment,
+        success: () => {
+          if (orderType === 'court') {
+            try {
+              const payload = {
+                campusName: this.data.campusName,
+                orderItems: this.data.orderItems,
+              };
+              if (this.data.isCoachCourseOrder) {
+                payload.successKind = 'coachCourse';
+                payload.coachCapacityLabel = String(this.data.coachCapacityLabel || '').trim();
+                payload.coachName = String(this.data.coachName || '').trim();
+              } else {
+                payload.successKind = 'court';
+              }
+              wx.setStorageSync(BOOKING_SUCCESS_STORAGE_KEY, payload);
+            } catch (e) {
+              console.error('写入订场成功缓存失败', e);
+            }
+            const app = getApp();
+            if (app && app.globalData) {
+              app.globalData.shouldClearBookingData = true;
+            }
+            wx.redirectTo({ url: '/pages/booking-success/index' });
+            return;
+          }
+          if (orderType === 'goods') {
+            const g = this.data.goodItem;
+            const gh = Math.floor(Number(g && g.grantHours) || 0);
+            try {
+              wx.setStorageSync(BOOKING_SUCCESS_STORAGE_KEY, {
+                successKind: 'coursePurchase',
+                campusName: this.data.campusName || (g && g.venueName) || '',
+                goodDesc: (g && g.desc) || '',
+                grantHours: gh,
+                lessonLabel: formatLessonKeyDisplay(String((g && g.lessonKey) || '')),
+              });
+            } catch (e) {
+              console.error('写入买课成功缓存失败', e);
+            }
+            wx.redirectTo({ url: '/pages/booking-success/index' });
+            return;
+          }
+          wx.showToast({ title: '支付成功', icon: 'success' });
+        },
+        fail: (err) => {
+          console.error('pay fail', err);
           wx.showToast({
-            title: result.returnMsg || '下单失败',
+            title: err.errMsg && err.errMsg.indexOf('cancel') >= 0 ? '已取消支付' : '支付未完成',
             icon: 'none',
           });
-          return;
-        }
-        wx.requestPayment({
-          ...payment,
-          success: () => {
-            if (orderType === 'court') {
-              try {
-                const payload = {
-                  campusName: this.data.campusName,
-                  orderItems: this.data.orderItems,
-                };
-                if (this.data.isCoachCourseOrder) {
-                  payload.successKind = 'coachCourse';
-                  payload.coachCapacityLabel = String(this.data.coachCapacityLabel || '').trim();
-                  payload.coachName = String(this.data.coachName || '').trim();
-                } else {
-                  payload.successKind = 'court';
-                }
-                wx.setStorageSync(BOOKING_SUCCESS_STORAGE_KEY, payload);
-              } catch (e) {
-                console.error('写入订场成功缓存失败', e);
-              }
-              const app = getApp();
-              if (app && app.globalData) {
-                app.globalData.shouldClearBookingData = true;
-              }
-              wx.redirectTo({ url: '/pages/booking-success/index' });
-              return;
-            }
-            if (orderType === 'goods') {
-              const g = this.data.goodItem;
-              const gh = Math.floor(Number(g && g.grantHours) || 0);
-              try {
-                wx.setStorageSync(BOOKING_SUCCESS_STORAGE_KEY, {
-                  successKind: 'coursePurchase',
-                  campusName: this.data.campusName || (g && g.venueName) || '',
-                  goodDesc: (g && g.desc) || '',
-                  grantHours: gh,
-                  lessonLabel: formatLessonKeyDisplay(String((g && g.lessonKey) || '')),
-                });
-              } catch (e) {
-                console.error('写入买课成功缓存失败', e);
-              }
-              wx.redirectTo({ url: '/pages/booking-success/index' });
-              return;
-            }
-            wx.showToast({ title: '支付成功', icon: 'success' });
-          },
-          fail: (err) => {
-            console.error('pay fail', err);
-            wx.showToast({
-              title: err.errMsg && err.errMsg.indexOf('cancel') >= 0 ? '已取消支付' : '支付未完成',
-              icon: 'none',
-            });
-          },
-        });
-      },
-      fail: (err) => {
-        this.endLoading();
-        console.error('callFunction pay', err);
-        wx.showToast({ title: '网络异常，请重试', icon: 'none' });
-      },
-    });
+        },
+      });
+    } catch (err) {
+      this.endLoading();
+      console.error('requestWechatPay', err);
+      const raw = (err && (err.errMsg || err.message)) ? String(err.errMsg || err.message) : '';
+      const isTimeout = /timeout|超时|time limit/i.test(raw);
+      wx.showToast({
+        title: isTimeout ? '下单超时，请重试' : '网络异常，请重试',
+        icon: 'none',
+      });
+    }
   },
 
   handleClosePhoneAuthModal() {
@@ -1219,6 +1324,68 @@ Page({
     }
 
     await this.saveOrderToDB();
+  },
+
+  async submitCourtBookingWithVouchersOnly() {
+    const phone = String(wx.getStorageSync(STORAGE_KEYS.userPhone) || '').trim();
+    if (!phone) {
+      wx.showToast({ title: '请先登录并授权手机号', icon: 'none' });
+      return;
+    }
+    const snapshot = {
+      orderNumber: this.data.orderNumber,
+      campusName: this.data.campusName,
+      venueId: this.data.venueId,
+      orderDate: this.data.orderDate,
+      formattedDate: this.data.formattedDate,
+      orderItems: this.data.orderItems,
+      bookedSlots: this.data.bookedSlots || [],
+      totalPrice: this.data.totalPrice,
+      slotPrices: this.data.courtSlotPrices || [],
+    };
+    this.beginLoading('提交中...');
+    try {
+      const cloudRes = await completeCourtBookingWithVouchers({
+        phone,
+        snapshot,
+        vouchers: this.data.bookingVouchers || [],
+      });
+      this.endLoading();
+      const r = cloudRes && cloudRes.result ? cloudRes.result : {};
+      if (!r.ok) {
+        if (r.data && r.data.outTradeNo) {
+          wx.showToast({ title: r.errMsg || '提交异常，请联系客服', icon: 'none', duration: 3000 });
+          return;
+        }
+        wx.showToast({ title: r.errMsg || '提交失败', icon: 'none' });
+        return;
+      }
+      try {
+        wx.setStorageSync(BOOKING_SUCCESS_STORAGE_KEY, {
+          successKind: 'court',
+          campusName: this.data.campusName,
+          orderItems: this.data.orderItems,
+        });
+      } catch (e) {
+        console.error('写入订场成功缓存失败', e);
+      }
+      const app = getApp();
+      if (app && app.globalData) {
+        app.globalData.shouldClearBookingData = true;
+      }
+      wx.redirectTo({ url: '/pages/booking-success/index' });
+    } catch (e) {
+      this.endLoading();
+      console.error('completeCourtBookingWithVouchers', e);
+      const raw = (e && (e.errMsg || e.message)) ? String(e.errMsg || e.message) : '请求失败';
+      const isTimeout = /timeout|超时|time limit/i.test(raw);
+      wx.showModal({
+        title: '提交失败',
+        content: isTimeout ? '提交超时，请重试' : raw,
+        showCancel: false,
+        confirmText: '知道了',
+      });
+    }
   },
 
   async submitCoachCourseWithHours() {

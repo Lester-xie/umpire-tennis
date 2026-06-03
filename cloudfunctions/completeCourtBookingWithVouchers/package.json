@@ -1,0 +1,9 @@
+{
+  "name": "completeCourtBookingWithVouchers",
+  "version": "1.0.0",
+  "description": "使用团购券完成订场（全券支付）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

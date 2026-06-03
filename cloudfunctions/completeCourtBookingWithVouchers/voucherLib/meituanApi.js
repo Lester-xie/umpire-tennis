@@ -8,10 +8,6 @@ const DEFAULT_CONSUME_PATH = '/api/hexiao/v2/ddzh-tuangou-receipt-consume';
 
 const DEFAULT_QUERY_DEALS_PATH = '/api/hexiao/v2/ddzh-tuangou-deal-queryshopdeal';
 
-/** 门店团购列表短时缓存，避免每次验券都多打一次 queryshopdeal */
-const SHOP_DEALS_CACHE_TTL_MS = 5 * 60 * 1000;
-const shopDealsCacheByPlatform = new Map();
-
 function hexiaoBaseConfig() {
   const base = String(process.env.MEITUAN_API_BASE || process.env.MEITUAN_API_BASE_URL || DEFAULT_BASE).trim();
   const preparePath = String(process.env.MEITUAN_PREPARE_PATH || DEFAULT_PREPARE_PATH).trim();
@@ -250,16 +246,6 @@ async function queryShopDeals(platform) {
   const cfgCheck = assertHexiaoConfigured(platform);
   if (!cfgCheck.ok) return cfgCheck;
   const config = cfgCheck.config;
-  const pf = config.platform;
-  const cached = shopDealsCacheByPlatform.get(pf);
-  if (cached && Date.now() - cached.at < SHOP_DEALS_CACHE_TTL_MS) {
-    return {
-      ok: true,
-      platform: pf,
-      deals: cached.deals,
-      traceId: '',
-    };
-  }
   try {
     const res = await callHexiao(
       config.queryDealsPath,
@@ -277,7 +263,6 @@ async function queryShopDeals(platform) {
     const deals = (Array.isArray(rawList) ? rawList : [])
       .map(normalizeShopDealRow)
       .filter(Boolean);
-    shopDealsCacheByPlatform.set(pf, { at: Date.now(), deals });
     return {
       ok: true,
       platform: config.platform,

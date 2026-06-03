@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "添加团购券",
+  "usingComponents": {
+    "header": "/components/header/header"
+  }
+}

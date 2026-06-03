@@ -54,7 +54,11 @@ App({
   initCloud() {
     try {
       if (wx.cloud && wx.cloud.init) {
-        wx.cloud.init();
+        wx.cloud.init({
+          // 真机须绑定环境；模拟器会用 IDE 当前选中环境，未指定时真机易 callFunction 失败
+          env: wx.cloud.DYNAMIC_CURRENT_ENV,
+          traceUser: true,
+        });
       }
     } catch (e) {
       console.warn('wx.cloud.init failed', e);

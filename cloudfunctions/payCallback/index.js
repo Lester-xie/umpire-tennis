@@ -407,7 +407,11 @@ async function markBookingPaid({ outTradeNo, transactionId, timeEnd }) {
   }
 
   const deductH = Math.floor(Number(booking.coachCourseHoursDeduct) || 0)
-  const payMethodFinal = deductH > 0 ? 'mixed' : 'wechat'
+  const hasVouchers = Array.isArray(booking.bookingVouchers) && booking.bookingVouchers.length > 0
+  let payMethodFinal = deductH > 0 ? 'mixed' : 'wechat'
+  if (hasVouchers) {
+    payMethodFinal = deductH > 0 ? 'mixed' : 'voucher_mixed'
+  }
 
   await coll.doc(_id).update({
     data: {
@@ -420,6 +424,53 @@ async function markBookingPaid({ outTradeNo, transactionId, timeEnd }) {
     },
   })
   console.log('db_booking 已标记已支付', _id, outTradeNo)
+
+  if (hasVouchers) {
+    try {
+      const consumeRes = await cloud.callFunction({
+        name: 'verifyMeituanReceipt',
+        data: {
+          action: 'consumeForBookingBatch',
+          phone: String(booking.phone || '').trim(),
+          outTradeNo,
+          vouchers: booking.bookingVouchers,
+          fromPayCallback: true,
+          memberOpenid:
+            booking.memberOpenid != null ? String(booking.memberOpenid).trim() : '',
+          fromSiblingFunction: true,
+        },
+        config: { timeout: 60000 },
+      })
+      const cr = consumeRes && consumeRes.result
+      if (!cr || !cr.ok) {
+        console.error('markBookingPaid voucher consume failed', outTradeNo, cr)
+        await coll.doc(_id).update({
+          data: {
+            voucherConsumeStatus: 'failed',
+            voucherConsumeErrMsg: String((cr && cr.errMsg) || '核销失败'),
+            updatedAt: now,
+          },
+        })
+      } else {
+        await coll.doc(_id).update({
+          data: {
+            voucherConsumeStatus: 'done',
+            voucherConsumeErrMsg: '',
+            updatedAt: now,
+          },
+        })
+      }
+    } catch (e) {
+      console.error('markBookingPaid voucher consume error', outTradeNo, e)
+      await coll.doc(_id).update({
+        data: {
+          voucherConsumeStatus: 'failed',
+          voucherConsumeErrMsg: e.message || '核销异常',
+          updatedAt: now,
+        },
+      })
+    }
+  }
 
   if (
     coachHoldIds.length > 0 &&

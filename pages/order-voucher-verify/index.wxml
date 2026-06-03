@@ -1,0 +1,65 @@
+<view class="voucher-page">
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="添加团购券" />
+  </view>
+  <scroll-view class="scroll" scroll-y="{{true}}" style="padding-top: {{headerHeight}}px;">
+    <view class="wrap">
+      <view class="intro">
+        <text class="intro-title">1小时发球机团购券</text>
+        <text class="intro-desc">每张券抵扣1小时，面值须与所选时段价格一致</text>
+      </view>
+
+      <block wx:if="{{!isLoggedIn}}">
+        <view class="card card--empty">
+          <text class="empty-title">请先登录</text>
+          <text class="empty-desc">添加团购券需登录并授权手机号</text>
+          <button class="submit-btn" bindtap="onGoLogin">去账户页登录</button>
+        </view>
+      </block>
+
+      <view class="card" wx:else>
+        <view class="form-block">
+          <text class="form-label">购买平台</text>
+          <view class="platform-tabs">
+            <view
+              class="platform-tab {{platform === 1 ? 'platform-tab--on' : ''}}"
+              data-platform="1"
+              bindtap="onSelectPlatform"
+            >美团</view>
+            <view
+              class="platform-tab {{platform === 2 ? 'platform-tab--on' : ''}}"
+              data-platform="2"
+              bindtap="onSelectPlatform"
+            >抖音</view>
+          </view>
+        </view>
+
+        <view class="form-block">
+          <text class="form-label">团购券码</text>
+          <view class="code-box">
+            <input
+              class="code-input"
+              placeholder="输入或粘贴券码"
+              value="{{receiptCode}}"
+              bindinput="onReceiptInput"
+            />
+            <view class="scan-btn" bindtap="onScanCode">扫码</view>
+          </view>
+        </view>
+
+        <view wx:if="{{resultMsg}}" class="alert {{resultOk ? 'alert--ok' : 'alert--err'}}">
+          <text>{{resultMsg}}</text>
+        </view>
+
+        <button
+          class="submit-btn {{canConfirm ? '' : 'submit-btn--disabled'}}"
+          loading="{{preparing}}"
+          disabled="{{!canConfirm || preparing}}"
+          bindtap="onConfirm"
+        >
+          确认添加
+        </button>
+      </view>
+    </view>
+  </scroll-view>
+</view>

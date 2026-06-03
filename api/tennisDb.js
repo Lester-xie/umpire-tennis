@@ -302,6 +302,7 @@ function getBookedSlots({ venueId, orderDate } = {}) {
   return wx.cloud.callFunction({
     name: 'getBookedSlots',
     data: { venueId, orderDate },
+    config: { timeout: 60000 },
   });
 }
 
@@ -421,12 +422,51 @@ function verifyMeituanReceiptPrepare(payload) {
   });
 }
 
+/** 订场支付：验券准备（仅 1 小时发球机券） */
+function verifyMeituanReceiptPrepareForBooking(payload) {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'verifyMeituanReceipt',
+    data: { action: 'prepareForBooking', phone, ...(payload || {}) },
+    config: { timeout: 60000 },
+  });
+}
+
+/** 微信支付统一下单（订场 / 买课等） */
+function requestWechatPay(payload) {
+  return wx.cloud.callFunction({
+    name: 'pay',
+    data: payload || {},
+    config: { timeout: 60000 },
+  });
+}
+
+/** 订场支付：全券支付完成订场 */
+function completeCourtBookingWithVouchers(payload) {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'completeCourtBookingWithVouchers',
+    data: { phone, ...(payload || {}) },
+    config: { timeout: 60000 },
+  });
+}
+
 /** 会员自助：团购核销并入账当前账号 */
 function verifyMeituanReceiptConsume(payload) {
   const phone = String(wx.getStorageSync('user_phone') || '').trim();
   return wx.cloud.callFunction({
     name: 'verifyMeituanReceipt',
     data: { action: 'consume', phone, ...(payload || {}) },
+    config: { timeout: 60000 },
+  });
+}
+
+/** 核销失败后查询本地是否已成功入账（网络超时恢复） */
+function verifyMeituanReceiptCheckStatus(payload) {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'verifyMeituanReceipt',
+    data: { action: 'checkReceiptStatus', phone, ...(payload || {}) },
   });
 }
 
@@ -436,6 +476,7 @@ function listTicketShopDeals(payload) {
   return wx.cloud.callFunction({
     name: 'verifyMeituanReceipt',
     data: { action: 'listShopDeals', phone, ...(payload || {}) },
+    config: { timeout: 60000 },
   });
 }
 
@@ -477,8 +518,12 @@ module.exports = {
   adminOrderStatsByMonth,
   adminCoachMonthStats,
   verifyMeituanReceiptPrepare,
+  verifyMeituanReceiptPrepareForBooking,
   verifyMeituanReceiptConsume,
+  verifyMeituanReceiptCheckStatus,
   listTicketShopDeals,
+  completeCourtBookingWithVouchers,
+  requestWechatPay,
   adminVenue,
 };
 

@@ -523,6 +523,7 @@ exports.main = async (event, context) => {
       await db.collection('db_booking').add({
         data: {
           phone: bookingPhone,
+          memberOpenid: openid || '',
           outTradeNo,
           totalFee,
           status: 'pending',
@@ -536,6 +537,14 @@ exports.main = async (event, context) => {
             ? event.booking.bookedSlots
             : [],
           totalPrice: Number(event.booking.totalPrice) || totalFee / 100,
+          bookingVouchers: Array.isArray(event.booking.bookingVouchers)
+            ? event.booking.bookingVouchers
+            : [],
+          voucherDeductionYuan: Number(event.booking.voucherDeductionYuan) || 0,
+          cashDueYuan:
+            event.booking.cashDueYuan != null
+              ? Number(event.booking.cashDueYuan)
+              : Number(event.booking.totalPrice) || totalFee / 100,
           coachHoldIds,
           bookingSubtype,
           coachCourseHoursDeduct,
@@ -548,7 +557,11 @@ exports.main = async (event, context) => {
             event.booking.memberDisplayName != null
               ? String(event.booking.memberDisplayName).trim().slice(0, 40)
               : '',
-          paymentMethod: 'wechat_pending',
+          paymentMethod:
+            Array.isArray(event.booking.bookingVouchers) &&
+            event.booking.bookingVouchers.length > 0
+              ? 'voucher_mixed'
+              : 'wechat_pending',
           createdAt: Date.now(),
         },
       });

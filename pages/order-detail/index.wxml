@@ -166,6 +166,42 @@
               <text class="fee-label">场地费用</text>
               <text class="fee-value">¥ {{totalPrice}}</text>
             </view>
+
+            <view
+              class="voucher-panel"
+              wx:if="{{!isCoachCourseOrder && courtSlotPrices.length > 0}}"
+            >
+              <view class="voucher-panel-head">
+                <text class="voucher-panel-title">团购券抵扣</text>
+                <text class="voucher-panel-tip">仅支持1小时发球机券，每张抵扣1小时</text>
+              </view>
+              <view class="voucher-list" wx:if="{{bookingVouchers.length > 0}}">
+                <view class="voucher-row" wx:for="{{bookingVouchers}}" wx:key="slotKey">
+                  <view class="voucher-row-main">
+                    <text class="voucher-row-platform">{{item.platformLabel}}</text>
+                    <text class="voucher-row-name">{{item.ticketName || item.receiptCode}}</text>
+                    <text class="voucher-row-meta">抵扣 ¥{{item.priceYuan}}</text>
+                  </view>
+                  <text class="voucher-row-remove" data-index="{{index}}" bindtap="onRemoveBookingVoucher">移除</text>
+                </view>
+              </view>
+              <view
+                class="voucher-add"
+                bindtap="onAddBookingVoucher"
+                wx:if="{{bookingVouchers.length < bookedSlots.length}}"
+              >
+                <text class="voucher-add-text">+ 添加团购券</text>
+              </view>
+            </view>
+
+            <view class="fee-item" wx:if="{{!isCoachCourseOrder && voucherDeductionYuan > 0}}">
+              <text class="fee-label">团购券抵扣</text>
+              <text class="fee-value fee-value--deduct">- ¥ {{voucherDeductionYuan}}</text>
+            </view>
+            <view class="fee-item" wx:if="{{!isCoachCourseOrder && bookingVouchers.length > 0 && cashDueYuan > 0}}">
+              <text class="fee-label">微信支付</text>
+              <text class="fee-value">¥ {{cashDueYuan}}</text>
+            </view>
             <block wx:if="{{isCoachCourseOrder && payMethod === 'mixed'}}">
               <view class="fee-item">
                 <text class="fee-label">课时抵扣</text>
@@ -184,6 +220,8 @@
               <text class="fee-label">合计</text>
               <text class="fee-value" wx:if="{{isCoachCourseOrder && payMethod === 'course_hours'}}">课时 {{requiredCourseHours}} 小时</text>
               <text class="fee-value" wx:elif="{{isCoachCourseOrder && payMethod === 'mixed'}}">课时 {{coachHoursDeductForPay}} 小时 + ¥ {{comboCashYuan}}</text>
+              <text class="fee-value" wx:elif="{{!isCoachCourseOrder && bookingVouchers.length > 0 && cashDueYuan <= 0}}">团购券全额抵扣</text>
+              <text class="fee-value" wx:elif="{{!isCoachCourseOrder && bookingVouchers.length > 0}}">券 ¥{{voucherDeductionYuan}} + 微信 ¥{{cashDueYuan}}</text>
               <text class="fee-value" wx:else>¥ {{totalPrice}}</text>
             </view>
           </view>
@@ -198,6 +236,8 @@
     <view class="footer-left">
       <text class="footer-total" wx:if="{{orderType === 'court' && isCoachCourseOrder && payMethod === 'course_hours'}}">使用课时 {{requiredCourseHours}} 小时</text>
       <text class="footer-total" wx:elif="{{orderType === 'court' && isCoachCourseOrder && payMethod === 'mixed'}}">课时 {{coachHoursDeductForPay}} 小时 + 微信 ¥{{comboCashYuan}}</text>
+      <text class="footer-total" wx:elif="{{orderType === 'court' && !isCoachCourseOrder && bookingVouchers.length > 0 && cashDueYuan <= 0}}">团购券全额抵扣</text>
+      <text class="footer-total" wx:elif="{{orderType === 'court' && !isCoachCourseOrder && bookingVouchers.length > 0}}">微信应付 ¥{{cashDueYuan}}</text>
       <text class="footer-total" wx:else>合计：¥ {{totalPrice}}</text>
     </view>
     <view class="footer-right">

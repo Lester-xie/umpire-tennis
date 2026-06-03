@@ -22,7 +22,8 @@
     "pages/admin-courses/index",
     "pages/admin-course-edit/index",
     "pages/admin-stats/index",
-    "pages/profile-meituan-verify/index"
+    "pages/profile-meituan-verify/index",
+    "pages/order-voucher-verify/index"
   ],
   "window": {
     "backgroundTextStyle": "light",

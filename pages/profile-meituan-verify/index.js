@@ -1,6 +1,7 @@
 const {
   verifyMeituanReceiptPrepare,
   verifyMeituanReceiptConsume,
+  verifyMeituanReceiptCheckStatus,
   listTicketShopDeals,
 } = require('../../api/tennisDb');
 
@@ -174,16 +175,40 @@ Page({
           ticketName,
           dealId: r.data.dealId != null ? String(r.data.dealId) : '',
           dealGroupId: r.data.dealGroupId != null ? String(r.data.dealGroupId) : '',
+          ticketInfo: r.data.ticketInfo != null ? String(r.data.ticketInfo) : '',
         },
         canConsume: true,
         resultOk: true,
         resultMsg: '',
       });
     } catch (e) {
-      wx.showToast({ title: '请求失败', icon: 'none' });
+      console.error('verifyMeituanReceiptPrepare', e);
+      const msg = (e && (e.errMsg || e.message)) ? String(e.errMsg || e.message) : '请求失败';
+      wx.showToast({ title: msg.length > 24 ? `${msg.slice(0, 24)}…` : msg, icon: 'none' });
     } finally {
       this.setData({ preparing: false });
     }
+  },
+
+  async tryRecoverConsumeSuccess(receiptCode, platform) {
+    try {
+      const res = await verifyMeituanReceiptCheckStatus({ receiptCode, platform });
+      const r = (res && res.result) || {};
+      if (r.duplicate && r.data) {
+        this.setData({
+          resultOk: true,
+          resultMsg: `验券已成功！已入账 ${r.data.grantLabel} ${r.data.grantHours} 小时，可在「我的课时」查看`,
+          canConsume: false,
+          preview: null,
+          prepareCache: null,
+          receiptCode: '',
+        });
+        return true;
+      }
+    } catch (e) {
+      console.error('tryRecoverConsumeSuccess', e);
+    }
+    return false;
   },
 
   async onConsume() {
@@ -206,6 +231,7 @@ Page({
         ticketName: cache.ticketName,
         dealId: cache.dealId,
         dealGroupId: cache.dealGroupId,
+        ticketInfo: cache.ticketInfo,
       });
       const r = (res && res.result) || {};
       if (r.duplicate && r.data) {
@@ -217,20 +243,29 @@ Page({
         return;
       }
       if (!r.ok || !r.data) {
+        const recovered = await this.tryRecoverConsumeSuccess(receiptCode, platform);
+        if (recovered) return;
         wx.showToast({ title: r.errMsg || '验券失败', icon: 'none' });
         return;
       }
       const g = r.data.grant || {};
+      const pending = r.data.grantPending;
       this.setData({
         resultOk: true,
         canConsume: false,
         preview: null,
         prepareCache: null,
-        resultMsg: `验券成功！已入账 ${g.label || '课时'} ${g.grantHours} 小时，可在「我的课时」查看`,
+        resultMsg: pending
+          ? `验券成功，课时入账异常：${pending}，请联系客服`
+          : `验券成功！已入账 ${g.label || '课时'} ${g.grantHours} 小时，可在「我的课时」查看`,
         receiptCode: '',
       });
     } catch (e) {
-      wx.showToast({ title: '请求失败', icon: 'none' });
+      console.error('verifyMeituanReceiptConsume', e);
+      const recovered = await this.tryRecoverConsumeSuccess(receiptCode, platform);
+      if (recovered) return;
+      const msg = (e && (e.errMsg || e.message)) ? String(e.errMsg || e.message) : '请求失败';
+      wx.showToast({ title: msg.length > 24 ? `${msg.slice(0, 24)}…` : msg, icon: 'none' });
     } finally {
       this.setData({ consuming: false });
     }
