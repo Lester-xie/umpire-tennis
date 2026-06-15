@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "我的储值",
+  "usingComponents": {
+    "header": "/components/header/header",
+    "lottie-loading": "/components/lottie-loading/index"
+  }
+}

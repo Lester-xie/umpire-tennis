@@ -152,12 +152,13 @@ exports.main = async (event, context) => {
   const phone = String((event && event.phone) || '').trim();
   const snapshot = event && event.snapshot && typeof event.snapshot === 'object' ? event.snapshot : null;
   const vouchers = Array.isArray(event && event.vouchers) ? event.vouchers : [];
+  const storedBalanceDeductYuan = roundYuan(event && event.storedBalanceDeductYuan);
 
   if (!openid || !phone || !snapshot) {
     return { ok: false, errMsg: '参数不完整' };
   }
-  if (!vouchers.length) {
-    return { ok: false, errMsg: '请添加团购券' };
+  if (!vouchers.length && storedBalanceDeductYuan <= 0) {
+    return { ok: false, errMsg: '请使用团购券或储值余额完成支付' };
   }
 
   const bookedSlots = Array.isArray(snapshot.bookedSlots) ? snapshot.bookedSlots : [];
@@ -190,8 +191,15 @@ exports.main = async (event, context) => {
     voucherSum += priceYuan;
   }
   voucherSum = roundYuan(voucherSum);
-  const cashDue = roundYuan(totalPrice - voucherSum);
-  if (cashDue > 0.009) {
+  const cashAfterVoucher = roundYuan(totalPrice - voucherSum);
+  if (storedBalanceDeductYuan > cashAfterVoucher + 0.011) {
+    return { ok: false, errMsg: '储值抵扣金额超出应付' };
+  }
+  const remain = roundYuan(totalPrice - voucherSum - storedBalanceDeductYuan);
+  if (remain > 0.009) {
+    return { ok: false, errMsg: '尚有未支付金额，请使用微信支付' };
+  }
+  if (storedBalanceDeductYuan <= 0 && cashAfterVoucher > 0.009) {
     return { ok: false, errMsg: '尚有未抵扣金额，请使用混合支付' };
   }
 
@@ -204,8 +212,29 @@ exports.main = async (event, context) => {
   }
   if (!gate.ok) return gate;
 
-  const outTradeNo = generateOutTradeNo();
+  const venueId = String(snapshot.venueId || '').trim();
   const now = Date.now();
+
+  if (storedBalanceDeductYuan > 0) {
+    const deductRes = await db
+      .collection('db_member_venue_balance')
+      .where({
+        phone,
+        venueId,
+        balanceYuan: _.gte(storedBalanceDeductYuan),
+      })
+      .update({
+        data: {
+          balanceYuan: _.inc(-storedBalanceDeductYuan),
+          updatedAt: now,
+        },
+      });
+    if (!deductRes.stats || deductRes.stats.updated < 1) {
+      return { ok: false, errMsg: '储值余额不足' };
+    }
+  }
+
+  const outTradeNo = generateOutTradeNo();
 
   try {
     await db.collection('db_booking').add({
@@ -224,11 +253,17 @@ exports.main = async (event, context) => {
         bookedSlots,
         totalPrice,
         voucherDeductionYuan: voucherSum,
+        storedBalanceDeductYuan,
         cashDueYuan: 0,
         bookingVouchers: vouchers,
         bookingSubtype: '',
-        paymentMethod: 'voucher',
-        voucherConsumeStatus: 'pending',
+        paymentMethod:
+          vouchers.length && storedBalanceDeductYuan > 0
+            ? 'voucher_balance'
+            : vouchers.length
+              ? 'voucher'
+              : 'balance',
+        voucherConsumeStatus: vouchers.length ? 'pending' : '',
         paidAt: now,
         createdAt: now,
         updatedAt: now,
@@ -239,13 +274,17 @@ exports.main = async (event, context) => {
     return { ok: false, errMsg: '订场失败，请重试' };
   }
 
-  const consumeRes = await runBookingVoucherConsume({
-    phone,
-    outTradeNo,
-    vouchers,
-    memberOpenid: openid,
-  });
-  await updateVoucherConsumeStatus(outTradeNo, consumeRes);
+  const consumeRes = vouchers.length
+    ? await runBookingVoucherConsume({
+        phone,
+        outTradeNo,
+        vouchers,
+        memberOpenid: openid,
+      })
+    : { ok: true };
+  if (vouchers.length) {
+    await updateVoucherConsumeStatus(outTradeNo, consumeRes);
+  }
   scheduleBookingRealtimeSignal(snapshot);
 
   if (!consumeRes.ok) {

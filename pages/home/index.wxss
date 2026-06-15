@@ -27,3 +27,38 @@
   min-height: 100%;
 }
 
+.stored-value-entry-container {
+  margin-top: 40rpx;
+}
+
+.stored-value-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 24rpx 0;
+  padding: 28rpx 32rpx;
+  gap: 24rpx;
+}
+
+.stored-value-entry-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.stored-value-entry-img {
+  width: 160rpx;
+  height: 120rpx;
+  flex-shrink: 0;
+}
+
+.stored-value-entry--hover {
+  opacity: 0.92;
+}
+
+.stored-value-entry-title {
+  display: block;
+  font-size: 42rpx;
+  font-weight: 700;
+  color: #134e35;
+}
+

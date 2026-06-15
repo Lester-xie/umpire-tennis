@@ -269,6 +269,24 @@ function listAllMemberCourseHours() {
   });
 }
 
+/** 会员各场馆储值余额 */
+function listAllMemberVenueBalances() {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'listMemberVenueBalance',
+    data: { phone, allVenues: true },
+  });
+}
+
+/** 会员单场馆储值余额 */
+function listMemberVenueBalance({ venueId } = {}) {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'listMemberVenueBalance',
+    data: { phone, venueId: String(venueId || '').trim() },
+  });
+}
+
 /**
  * 体验课课时包原路退款（须已登录且手机号与 openid 绑定）
  * @param {{ venueId: string, lessonKey: string }} payload
@@ -503,6 +521,8 @@ module.exports = {
   listCoursePurchases,
   listMemberCourseHours,
   listAllMemberCourseHours,
+  listAllMemberVenueBalances,
+  listMemberVenueBalance,
   refundExperienceCoursePurchase,
   completeCoachBookingWithHours,
   getBookedSlots,

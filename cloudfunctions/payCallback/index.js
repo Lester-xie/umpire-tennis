@@ -345,6 +345,39 @@ async function tryDeductCoachCourseHoursForBooking(booking, now) {
 }
 
 /**
+ * 普通订场组合支付：支付成功前先扣减订单中的储值余额，失败则不标记已付
+ */
+async function tryDeductStoredBalanceForBooking(booking, now) {
+  const deduct = Math.round(Number(booking.storedBalanceDeductYuan) * 100) / 100
+  if (deduct <= 0) return true
+  if (String(booking.bookingSubtype || '').trim() === 'coach_course') return true
+  const phone = String(booking.phone || '').trim()
+  const venueId = String(booking.venueId || '').trim()
+  if (!phone || !venueId) {
+    console.error('tryDeductStoredBalanceForBooking: 缺少字段', booking._id)
+    return false
+  }
+  const deductRes = await db
+    .collection('db_member_venue_balance')
+    .where({
+      phone,
+      venueId,
+      balanceYuan: _.gte(deduct),
+    })
+    .update({
+      data: {
+        balanceYuan: _.inc(-deduct),
+        updatedAt: now,
+      },
+    })
+  const ok = deductRes.stats && deductRes.stats.updated >= 1
+  if (!ok) {
+    console.error('组合支付扣储值失败', phone, venueId, deduct)
+  }
+  return ok
+}
+
+/**
  * 支付成功：将 db_booking 中对应 outTradeNo 的订场单更新为已支付
  */
 async function markBookingPaid({ outTradeNo, transactionId, timeEnd }) {
@@ -406,11 +439,24 @@ async function markBookingPaid({ outTradeNo, transactionId, timeEnd }) {
     return
   }
 
+  const balanceOk = await tryDeductStoredBalanceForBooking(booking, now)
+  if (!balanceOk) {
+    console.error('markBookingPaid: 储值扣减失败，回退 pending', outTradeNo)
+    await coll.doc(_id).update({
+      data: { status: 'pending', updatedAt: now },
+    })
+    return
+  }
+
   const deductH = Math.floor(Number(booking.coachCourseHoursDeduct) || 0)
   const hasVouchers = Array.isArray(booking.bookingVouchers) && booking.bookingVouchers.length > 0
+  const balanceDeduct = Math.round(Number(booking.storedBalanceDeductYuan) * 100) / 100
   let payMethodFinal = deductH > 0 ? 'mixed' : 'wechat'
   if (hasVouchers) {
-    payMethodFinal = deductH > 0 ? 'mixed' : 'voucher_mixed'
+    if (balanceDeduct > 0) payMethodFinal = deductH > 0 ? 'mixed' : 'voucher_balance_mixed'
+    else payMethodFinal = deductH > 0 ? 'mixed' : 'voucher_mixed'
+  } else if (balanceDeduct > 0) {
+    payMethodFinal = 'balance_mixed'
   }
 
   await coll.doc(_id).update({
@@ -585,6 +631,65 @@ async function markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, 
   }
 }
 
+/**
+ * 场馆储值卡支付成功：标记 db_stored_value_purchase 已付，并累加 db_member_venue_balance
+ */
+async function markStoredValuePurchasePaidAndGrantBalance({ outTradeNo, transactionId, timeEnd }) {
+  if (!outTradeNo) return;
+  const coll = db.collection('db_stored_value_purchase');
+  const exist = await coll.where({ outTradeNo }).limit(1).get();
+  if (!exist.data || exist.data.length === 0) {
+    return;
+  }
+  const row = exist.data[0];
+  const _id = row._id;
+  const st = String(row.status || '');
+  if (st === 'paid') {
+    console.log('markStoredValuePurchasePaid: 已处理，跳过', outTradeNo);
+    return;
+  }
+  const phone = String(row.phone || '').trim();
+  const venueId = String(row.venueId || '').trim();
+  const creditYuan = Math.round(Number(row.creditYuan) * 100) / 100;
+  if (!phone || !venueId || creditYuan <= 0) {
+    console.error('markStoredValuePurchasePaid: 参数无效', outTradeNo);
+    return;
+  }
+  const now = Date.now();
+  await coll.doc(_id).update({
+    data: {
+      status: 'paid',
+      transactionId: transactionId || '',
+      timeEnd: timeEnd || '',
+      paidAt: now,
+      updatedAt: now,
+    },
+  });
+  console.log('db_stored_value_purchase 已标记已支付', _id, outTradeNo);
+
+  const balColl = db.collection('db_member_venue_balance');
+  const balHit = await balColl.where({ phone, venueId }).limit(1).get();
+  if (balHit.data && balHit.data[0] && balHit.data[0]._id) {
+    await balColl.doc(balHit.data[0]._id).update({
+      data: {
+        balanceYuan: _.inc(creditYuan),
+        updatedAt: now,
+      },
+    });
+  } else {
+    await balColl.add({
+      data: {
+        phone,
+        venueId,
+        balanceYuan: creditYuan,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+  }
+  console.log('db_member_venue_balance 已入账', phone, venueId, creditYuan);
+}
+
 /** 会员微信支付成功后释放教练占用的连续时段 */
 async function releaseCoachHolds(holdIds, now) {
   for (let i = 0; i < holdIds.length; i += 1) {
@@ -637,7 +742,12 @@ exports.main = async (event, context) => {
           console.error('emitBookingRealtimeSignal after payCallback main failed', e)
         }
       } else {
-        await markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, timeEnd })
+        const svHit = await db.collection('db_stored_value_purchase').where({ outTradeNo }).limit(1).get();
+        if (svHit.data && svHit.data.length > 0) {
+          await markStoredValuePurchasePaidAndGrantBalance({ outTradeNo, transactionId, timeEnd });
+        } else {
+          await markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, timeEnd });
+        }
       }
     } catch (err) {
       console.error('写入 db_pay_order 集合失败', err);

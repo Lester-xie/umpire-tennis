@@ -18,6 +18,7 @@ const {
   completeCourtBookingWithVouchers,
   getBookedSlots,
   requestWechatPay,
+  listMemberVenueBalance,
 } = require('../../api/tennisDb');
 const { buildLessonKey, formatLessonKeyDisplay } = require('../../utils/lessonKey');
 const { lessonKeyFromTypeMapFormat, splitCourseDescriptionLines } = require('../../utils/courseCatalog');
@@ -26,7 +27,10 @@ const {
   getUncoveredSlotPrices,
   findMatchingSlot,
   recalcVoucherPayment,
+  recalcCourtPlainPayment,
+  defaultCourtPayMethod,
 } = require('../../utils/bookingVoucherMatch');
+const { roundYuan, formatYuanText } = require('../../utils/storedValuePlans');
 
 function enrichGoodItemDisplay(g) {
   if (!g) return null;
@@ -131,6 +135,15 @@ Page({
     bookingVouchers: [],
     voucherDeductionYuan: 0,
     cashDueYuan: 0,
+    /** 普通订场：本场馆储值余额 */
+    venueStoredBalanceYuan: 0,
+    venueStoredBalanceReady: false,
+    venueStoredBalanceHint: '',
+    /** 普通订场支付方式：wechat | stored_balance | mixed_balance */
+    courtPayMethod: 'wechat',
+    courtPayUserChose: false,
+    storedBalanceDeductYuan: 0,
+    wechatDueYuan: 0,
   },
   _loadingTaskCount: 0,
 
@@ -271,6 +284,7 @@ Page({
       bookingVouchers: [],
       voucherDeductionYuan: 0,
       cashDueYuan: totalPrice,
+      wechatDueYuan: totalPrice,
     });
     this.syncCampusName();
   },
@@ -367,6 +381,34 @@ Page({
       bookingVouchers,
       voucherDeductionYuan: pay.voucherDeductionYuan,
       cashDueYuan: pay.cashDueYuan,
+    }, () => this.recomputeCourtPayAmounts());
+  },
+
+  recomputeCourtPayAmounts() {
+    if (this.data.orderType !== 'court' || this.data.isCoachCourseOrder) return;
+    const pay = recalcCourtPlainPayment({
+      totalPriceYuan: this.data.totalPrice,
+      vouchers: this.data.bookingVouchers,
+      courtPayMethod: this.data.courtPayMethod,
+      storedBalanceYuan: this.data.venueStoredBalanceYuan,
+    });
+    this.setData({
+      voucherDeductionYuan: pay.voucherDeductionYuan,
+      cashDueYuan: pay.cashDueYuan,
+      storedBalanceDeductYuan: pay.storedBalanceDeductYuan,
+      wechatDueYuan: pay.wechatDueYuan,
+    }, () => this.updateFooterButtonText());
+  },
+
+  selectCourtPayMethod(e) {
+    const method = e.currentTarget.dataset.method;
+    if (method !== 'wechat' && method !== 'stored_balance' && method !== 'mixed_balance') return;
+    const bal = roundYuan(this.data.venueStoredBalanceYuan);
+    const due = roundYuan(this.data.cashDueYuan);
+    if (method === 'stored_balance' && bal < due) return;
+    if (method === 'mixed_balance' && !(bal > 0 && bal < due)) return;
+    this.setData({ courtPayMethod: method, courtPayUserChose: true }, () => {
+      this.recomputeCourtPayAmounts();
     });
   },
 
@@ -463,8 +505,54 @@ Page({
   onShow() {
     this.syncCampusName();
     this.loadCoachCourseHoursBalance();
+    this.loadVenueStoredBalance();
     this.loadCoachSessionRoster();
     this.updateFooterButtonText();
+  },
+
+  async loadVenueStoredBalance() {
+    if (this.data.orderType !== 'court' || this.data.isCoachCourseOrder || !this.data.venueId) return;
+    const app = getApp();
+    if (!app || !app.checkLogin()) {
+      this.setData({
+        venueStoredBalanceYuan: 0,
+        venueStoredBalanceReady: false,
+        venueStoredBalanceHint: '请登录后查看本场馆储值余额',
+        courtPayMethod: 'wechat',
+      }, () => this.recomputeCourtPayAmounts());
+      return;
+    }
+    try {
+      const res = await listMemberVenueBalance({ venueId: this.data.venueId });
+      const rows = (res && res.result && res.result.data) || [];
+      const row = rows[0];
+      const balance = roundYuan(row && row.balanceYuan);
+      const defaultMethod = () =>
+        defaultCourtPayMethod({
+          cashDueYuan: this.data.cashDueYuan || this.data.totalPrice,
+          storedBalanceYuan: balance,
+        });
+      let courtPayMethod = this.data.courtPayMethod;
+      if (!this.data.courtPayUserChose) {
+        courtPayMethod = defaultMethod();
+      } else if (courtPayMethod === 'stored_balance' && balance < roundYuan(this.data.cashDueYuan)) {
+        courtPayMethod = balance > 0 ? 'mixed_balance' : 'wechat';
+      } else if (courtPayMethod === 'mixed_balance' && !(balance > 0 && balance < roundYuan(this.data.cashDueYuan))) {
+        courtPayMethod = defaultMethod();
+      }
+      this.setData({
+        venueStoredBalanceYuan: balance,
+        venueStoredBalanceReady: true,
+        venueStoredBalanceHint: '',
+        courtPayMethod,
+      }, () => this.recomputeCourtPayAmounts());
+    } catch (e) {
+      console.error('loadVenueStoredBalance', e);
+      this.setData({
+        venueStoredBalanceReady: false,
+        venueStoredBalanceHint: '储值余额加载失败',
+      });
+    }
   },
 
   async loadCoachSessionRoster() {
@@ -722,6 +810,30 @@ Page({
       this.setData({ footerButtonText: '微信支付' });
       return;
     }
+    if (this.data.orderType === 'court' && !this.data.isCoachCourseOrder) {
+      const wechatDue = roundYuan(this.data.wechatDueYuan);
+      const balanceDeduct = roundYuan(this.data.storedBalanceDeductYuan);
+      if (wechatDue <= 0.009) {
+        if (balanceDeduct > 0 && (this.data.bookingVouchers || []).length > 0) {
+          this.setData({ footerButtonText: '确认支付（券+储值）' });
+          return;
+        }
+        if (balanceDeduct > 0) {
+          this.setData({ footerButtonText: '确认使用储值余额' });
+          return;
+        }
+        if ((this.data.bookingVouchers || []).length > 0) {
+          this.setData({ footerButtonText: '确认使用团购券' });
+          return;
+        }
+      }
+      if (balanceDeduct > 0 && wechatDue > 0) {
+        this.setData({ footerButtonText: `储值 ¥${formatYuanText(balanceDeduct)} + 微信 ¥${formatYuanText(wechatDue)}` });
+        return;
+      }
+      this.setData({ footerButtonText: '确认付款' });
+      return;
+    }
     this.setData({ footerButtonText: '确认付款' });
   },
 
@@ -963,21 +1075,17 @@ Page({
     const { orderType, totalPrice } = this.data;
     const isCourtPlain =
       orderType === 'court' && !this.data.isCoachCourseOrder;
-    if (isCourtPlain && (this.data.bookingVouchers || []).length > 0) {
-      const cashDue = Number(this.data.cashDueYuan);
-      if (!Number.isFinite(cashDue) || cashDue < 0) {
-        wx.showToast({ title: '订单金额无效', icon: 'none' });
-        return;
-      }
-      if (cashDue <= 0.009) {
-        await this.submitCourtBookingWithVouchersOnly();
+    if (isCourtPlain) {
+      this.recomputeCourtPayAmounts();
+      const wechatDue = roundYuan(this.data.wechatDueYuan);
+      if (wechatDue <= 0.009) {
+        await this.submitCourtBookingFullyCovered();
         return;
       }
     }
-    const payYuan =
-      isCourtPlain && (this.data.bookingVouchers || []).length > 0
-        ? Number(this.data.cashDueYuan)
-        : Number(totalPrice);
+    const payYuan = isCourtPlain
+      ? Number(this.data.wechatDueYuan)
+      : Number(totalPrice);
     if (!Number.isFinite(payYuan) || payYuan <= 0) {
       wx.showToast({ title: '订单金额无效', icon: 'none' });
       return;
@@ -1089,7 +1197,8 @@ Page({
           : '',
         bookingVouchers: isCourtPlain ? this.data.bookingVouchers || [] : [],
         voucherDeductionYuan: isCourtPlain ? Number(this.data.voucherDeductionYuan) || 0 : 0,
-        cashDueYuan: isCourtPlain ? Number(this.data.cashDueYuan) || 0 : Number(this.data.totalPrice),
+        storedBalanceDeductYuan: isCourtPlain ? Number(this.data.storedBalanceDeductYuan) || 0 : 0,
+        cashDueYuan: isCourtPlain ? Number(this.data.wechatDueYuan) || 0 : Number(this.data.totalPrice),
       };
     }
 
@@ -1326,7 +1435,7 @@ Page({
     await this.saveOrderToDB();
   },
 
-  async submitCourtBookingWithVouchersOnly() {
+  async submitCourtBookingFullyCovered() {
     const phone = String(wx.getStorageSync(STORAGE_KEYS.userPhone) || '').trim();
     if (!phone) {
       wx.showToast({ title: '请先登录并授权手机号', icon: 'none' });
@@ -1349,6 +1458,7 @@ Page({
         phone,
         snapshot,
         vouchers: this.data.bookingVouchers || [],
+        storedBalanceDeductYuan: Number(this.data.storedBalanceDeductYuan) || 0,
       });
       this.endLoading();
       const r = cloudRes && cloudRes.result ? cloudRes.result : {};

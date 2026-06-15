@@ -541,6 +541,7 @@ exports.main = async (event, context) => {
             ? event.booking.bookingVouchers
             : [],
           voucherDeductionYuan: Number(event.booking.voucherDeductionYuan) || 0,
+          storedBalanceDeductYuan: Number(event.booking.storedBalanceDeductYuan) || 0,
           cashDueYuan:
             event.booking.cashDueYuan != null
               ? Number(event.booking.cashDueYuan)
@@ -560,8 +561,12 @@ exports.main = async (event, context) => {
           paymentMethod:
             Array.isArray(event.booking.bookingVouchers) &&
             event.booking.bookingVouchers.length > 0
-              ? 'voucher_mixed'
-              : 'wechat_pending',
+              ? Number(event.booking.storedBalanceDeductYuan) > 0
+                ? 'voucher_balance_mixed'
+                : 'voucher_mixed'
+              : Number(event.booking.storedBalanceDeductYuan) > 0
+                ? 'balance_mixed'
+                : 'wechat_pending',
           createdAt: Date.now(),
         },
       });
@@ -609,6 +614,44 @@ exports.main = async (event, context) => {
       return {
         returnCode: 'FAIL',
         returnMsg: '订单保存失败，请重试',
+        payment: undefined,
+      };
+    }
+  }
+
+  // 场馆储值卡：统一下单成功后写 db_stored_value_purchase（pending），支付结果由 payCallback 入账 db_member_venue_balance
+  if (res.returnCode === 'SUCCESS' && event.storedValuePurchase && event.storedValuePurchase.type === 'venue_stored_value') {
+    const sp = event.storedValuePurchase;
+    const phone = String(sp.phone || '').trim();
+    const venueId = String(sp.venueId || '').trim();
+    const payYuan = Math.round(Number(sp.payYuan) * 100) / 100;
+    const creditYuan = Math.round(Number(sp.creditYuan) * 100) / 100;
+    if (!phone || !venueId || payYuan <= 0 || creditYuan <= 0 || creditYuan < payYuan) {
+      return {
+        returnCode: 'FAIL',
+        returnMsg: '储值卡参数无效',
+        payment: undefined,
+      };
+    }
+    try {
+      await db.collection('db_stored_value_purchase').add({
+        data: {
+          phone,
+          venueId,
+          venueName: sp.venueName != null ? String(sp.venueName).trim() : '',
+          outTradeNo,
+          totalFee,
+          payYuan,
+          creditYuan,
+          status: 'pending',
+          createdAt: Date.now(),
+        },
+      });
+    } catch (err) {
+      console.error('db_stored_value_purchase 写入失败', err);
+      return {
+        returnCode: 'FAIL',
+        returnMsg: '储值订单保存失败，请重试',
         payment: undefined,
       };
     }

@@ -1,0 +1,69 @@
+@import '../admin-venue-edit/index.wxss';
+
+.venue-name-hint {
+  margin: 0 0 16rpx;
+  font-size: 26rpx;
+  color: #5a7a68;
+}
+
+.plan-card {
+  margin-top: 20rpx;
+  padding: 24rpx 20rpx;
+  background: #f8faf9;
+  border-radius: 16rpx;
+  border: 1rpx solid #e0ebe4;
+}
+
+.plan-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.plan-num {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #134e35;
+}
+
+.plan-price-row {
+  display: flex;
+  align-items: center;
+  margin-top: 12rpx;
+}
+
+.plan-mini-label {
+  width: 200rpx;
+  font-size: 24rpx;
+  color: #5a7a68;
+  flex-shrink: 0;
+}
+
+.plan-in {
+  flex: 1;
+  height: 72rpx;
+  padding: 0 20rpx;
+  background: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid #dce8e0;
+  font-size: 28rpx;
+}
+
+.plan-preview {
+  margin-top: 16rpx;
+  font-size: 24rpx;
+  color: #134e35;
+}
+
+.plan-enabled-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16rpx;
+}
+
+.plan-enabled-label {
+  font-size: 24rpx;
+  color: #5a7a68;
+}

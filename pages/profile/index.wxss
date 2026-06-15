@@ -151,6 +151,11 @@
   box-sizing: border-box;
 }
 
+.profile-reward-section card + card {
+  margin-top: 20rpx;
+  display: block;
+}
+
 .profile-reward-card {
   display: flex;
   align-items: center;
@@ -175,6 +180,16 @@
   font-size: 44rpx;
   color: #ffc107;
   line-height: 1;
+}
+
+.profile-reward-icon-wrap--balance {
+  background: linear-gradient(145deg, #fff3e0 0%, #ffe0b2 100%);
+}
+
+.profile-reward-card--balance .profile-reward-icon-star {
+  color: #e65100;
+  font-size: 40rpx;
+  font-weight: 700;
 }
 
 .profile-reward-text {

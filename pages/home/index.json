@@ -4,6 +4,7 @@
     "header": "/components/header/header",
     "desc-container": "/components/desc-container/desc-container",
     "goods": "/components/goods/goods",
-    "lottie-loading": "/components/lottie-loading/index"
+    "lottie-loading": "/components/lottie-loading/index",
+    "card": "/components/card/card"
   }
 }

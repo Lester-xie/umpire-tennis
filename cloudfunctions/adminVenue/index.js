@@ -260,7 +260,49 @@ function normalizeVenuePayload(body) {
   if (!catNorm.omit && catNorm.list != null) {
     data.categoryList = catNorm.list;
   }
+  const svNorm = normalizeStoredValuePlans(body.storedValuePlans);
+  if (!svNorm.ok) {
+    return svNorm;
+  }
+  if (!svNorm.omit && svNorm.list != null) {
+    data.storedValuePlans = svNorm.list;
+  }
   return { ok: true, data };
+}
+
+/** 场馆储值卡档位：payYuan 实付，creditYuan 入账余额 */
+function normalizeStoredValuePlans(raw) {
+  if (raw === undefined) {
+    return { ok: true, omit: true, list: null };
+  }
+  if (!Array.isArray(raw)) {
+    return { ok: false, errMsg: 'storedValuePlans 须为数组' };
+  }
+  const out = [];
+  for (let i = 0; i < raw.length; i += 1) {
+    const row = raw[i];
+    if (!row || typeof row !== 'object') {
+      return { ok: false, errMsg: `储值档位第 ${i + 1} 项无效` };
+    }
+    const payYuan = Math.round(Number(row.payYuan) * 100) / 100;
+    const creditYuan = Math.round(Number(row.creditYuan) * 100) / 100;
+    if (!Number.isFinite(payYuan) || payYuan <= 0) {
+      return { ok: false, errMsg: `储值档位第 ${i + 1} 项充值金额无效` };
+    }
+    if (!Number.isFinite(creditYuan) || creditYuan <= 0) {
+      return { ok: false, errMsg: `储值档位第 ${i + 1} 项实得金额无效` };
+    }
+    if (creditYuan < payYuan) {
+      return { ok: false, errMsg: `储值档位第 ${i + 1} 项实得金额不能小于充值金额` };
+    }
+    out.push({
+      payYuan,
+      creditYuan,
+      enabled: row.enabled !== false,
+      sort: i,
+    });
+  }
+  return { ok: true, omit: false, list: out };
 }
 
 /**

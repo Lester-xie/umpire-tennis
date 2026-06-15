@@ -1,0 +1,41 @@
+<view class="profile-container">
+  <lottie-loading visible="{{lottieLoadingVisible}}" />
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="我的储值" />
+  </view>
+  <scroll-view
+    class="content-scroll"
+    scroll-y="true"
+    enhanced="{{true}}"
+    show-scrollbar="{{false}}"
+    style="margin-top: {{headerHeight}}px; height: {{contentHeight}}px;"
+  >
+    <view class="content-wrapper">
+      <view class="hint-banner" wx:if="{{isLoggedIn && sections.length > 0}}">
+        <text>不同场馆间的储值余额不可通用，订场时请在本场馆使用对应余额。</text>
+      </view>
+      <block wx:if="{{sections.length > 0}}">
+        <view class="card section-card" wx:for="{{sections}}" wx:key="venueId">
+          <view class="venue-title">{{item.venueName}}</view>
+          <view class="hour-list">
+            <view class="hour-row">
+              <view class="hour-row-main">
+                <text class="hour-label">储值余额</text>
+                <text class="hour-value balance-value">¥{{item.balanceText}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
+      <view class="card section-card" wx:else>
+        <view class="empty-tip">
+          <text wx:if="{{!isLoggedIn}}">登录后可查看各场馆储值余额</text>
+          <text wx:else>暂无储值余额，充值后将显示在此</text>
+          <navigator wx:if="{{!isLoggedIn}}" class="empty-link" url="/pages/profile/index" open-type="switchTab">去登录</navigator>
+          <navigator wx:elif="{{isLoggedIn}}" class="empty-link" url="/pages/stored-value/index">去充值</navigator>
+        </view>
+      </view>
+      <view class="placeholder" style="height: {{placeholderHeight}}px;"></view>
+    </view>
+  </scroll-view>
+</view>

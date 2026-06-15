@@ -83,6 +83,37 @@ function recalcVoucherPayment(totalPriceYuan, vouchers) {
   return { voucherDeductionYuan, cashDueYuan };
 }
 
+/** 普通订场：券后应付、储值抵扣、微信应付 */
+function recalcCourtPlainPayment({
+  totalPriceYuan,
+  vouchers,
+  courtPayMethod,
+  storedBalanceYuan,
+}) {
+  const { voucherDeductionYuan, cashDueYuan } = recalcVoucherPayment(totalPriceYuan, vouchers);
+  const bal = roundYuan(storedBalanceYuan);
+  const method = String(courtPayMethod || 'wechat');
+  let storedBalanceDeductYuan = 0;
+  if (method === 'stored_balance' || method === 'mixed_balance') {
+    storedBalanceDeductYuan = roundYuan(Math.min(bal, cashDueYuan));
+  }
+  const wechatDueYuan = roundYuan(Math.max(0, cashDueYuan - storedBalanceDeductYuan));
+  return {
+    voucherDeductionYuan,
+    cashDueYuan,
+    storedBalanceDeductYuan,
+    wechatDueYuan,
+  };
+}
+
+function defaultCourtPayMethod({ cashDueYuan, storedBalanceYuan }) {
+  const due = roundYuan(cashDueYuan);
+  const bal = roundYuan(storedBalanceYuan);
+  if (bal >= due && due > 0) return 'stored_balance';
+  if (bal > 0 && due > 0) return 'mixed_balance';
+  return 'wechat';
+}
+
 module.exports = {
   roundYuan,
   resolveRegularSlotPriceYuan,
@@ -90,4 +121,6 @@ module.exports = {
   getUncoveredSlotPrices,
   findMatchingSlot,
   recalcVoucherPayment,
+  recalcCourtPlainPayment,
+  defaultCourtPayMethod,
 };

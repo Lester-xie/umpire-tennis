@@ -19,11 +19,14 @@
     "pages/admin-venue-edit/index",
     "pages/admin-venue-courts/index",
     "pages/admin-venue-categories/index",
+    "pages/admin-venue-stored-value/index",
     "pages/admin-courses/index",
     "pages/admin-course-edit/index",
     "pages/admin-stats/index",
     "pages/profile-meituan-verify/index",
-    "pages/order-voucher-verify/index"
+    "pages/order-voucher-verify/index",
+    "pages/stored-value/index",
+    "pages/profile-stored-value/index"
   ],
   "window": {
     "backgroundTextStyle": "light",

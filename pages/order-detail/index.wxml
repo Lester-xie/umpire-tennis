@@ -160,6 +160,45 @@
             </view>
           </view>
 
+          <!-- 普通订场：储值余额支付 -->
+          <view class="coach-pay-panel" wx:if="{{!isCoachCourseOrder && venueStoredBalanceReady && venueStoredBalanceYuan > 0}}">
+            <view class="coach-pay-title">储值余额</view>
+            <view class="coach-balance-banner">
+              <view class="coach-balance-banner-main">
+                <text class="coach-balance-banner-label">本场馆可用余额</text>
+                <text class="coach-balance-banner-num">{{venueStoredBalanceYuan}}</text>
+                <text class="coach-balance-banner-unit">元</text>
+              </view>
+              <text class="coach-balance-banner-tip">储值余额仅限本场馆使用，不可跨馆通用</text>
+            </view>
+            <view
+              wx:if="{{venueStoredBalanceYuan >= cashDueYuan && cashDueYuan > 0}}"
+              class="coach-pay-option {{courtPayMethod === 'stored_balance' ? 'coach-pay-option--on' : ''}}"
+              data-method="stored_balance"
+              bindtap="selectCourtPayMethod"
+            >
+              <text class="coach-pay-option-label">使用储值余额</text>
+              <text class="coach-pay-option-desc">抵扣 ¥{{cashDueYuan}}</text>
+            </view>
+            <view
+              wx:if="{{venueStoredBalanceYuan > 0 && venueStoredBalanceYuan < cashDueYuan}}"
+              class="coach-pay-option {{courtPayMethod === 'mixed_balance' ? 'coach-pay-option--on' : ''}}"
+              data-method="mixed_balance"
+              bindtap="selectCourtPayMethod"
+            >
+              <text class="coach-pay-option-label">储值 + 微信支付</text>
+              <text class="coach-pay-option-desc">储值 ¥{{storedBalanceDeductYuan}} + 微信 ¥{{wechatDueYuan}}</text>
+            </view>
+            <view
+              class="coach-pay-option {{courtPayMethod === 'wechat' ? 'coach-pay-option--on' : ''}}"
+              data-method="wechat"
+              bindtap="selectCourtPayMethod"
+            >
+              <text class="coach-pay-option-label">仅微信支付</text>
+              <text class="coach-pay-option-desc">不使用储值余额</text>
+            </view>
+          </view>
+
           <!-- 费用明细 -->
           <view class="fee-detail">
             <view class="fee-item" wx:if="{{!(isCoachCourseOrder && payMethod === 'mixed')}}">
@@ -198,9 +237,13 @@
               <text class="fee-label">团购券抵扣</text>
               <text class="fee-value fee-value--deduct">- ¥ {{voucherDeductionYuan}}</text>
             </view>
-            <view class="fee-item" wx:if="{{!isCoachCourseOrder && bookingVouchers.length > 0 && cashDueYuan > 0}}">
+            <view class="fee-item" wx:if="{{!isCoachCourseOrder && storedBalanceDeductYuan > 0}}">
+              <text class="fee-label">储值余额抵扣</text>
+              <text class="fee-value fee-value--deduct">- ¥ {{storedBalanceDeductYuan}}</text>
+            </view>
+            <view class="fee-item" wx:if="{{!isCoachCourseOrder && wechatDueYuan > 0}}">
               <text class="fee-label">微信支付</text>
-              <text class="fee-value">¥ {{cashDueYuan}}</text>
+              <text class="fee-value">¥ {{wechatDueYuan}}</text>
             </view>
             <block wx:if="{{isCoachCourseOrder && payMethod === 'mixed'}}">
               <view class="fee-item">
@@ -220,8 +263,9 @@
               <text class="fee-label">合计</text>
               <text class="fee-value" wx:if="{{isCoachCourseOrder && payMethod === 'course_hours'}}">课时 {{requiredCourseHours}} 小时</text>
               <text class="fee-value" wx:elif="{{isCoachCourseOrder && payMethod === 'mixed'}}">课时 {{coachHoursDeductForPay}} 小时 + ¥ {{comboCashYuan}}</text>
-              <text class="fee-value" wx:elif="{{!isCoachCourseOrder && bookingVouchers.length > 0 && cashDueYuan <= 0}}">团购券全额抵扣</text>
-              <text class="fee-value" wx:elif="{{!isCoachCourseOrder && bookingVouchers.length > 0}}">券 ¥{{voucherDeductionYuan}} + 微信 ¥{{cashDueYuan}}</text>
+              <text class="fee-value" wx:elif="{{!isCoachCourseOrder && wechatDueYuan <= 0 && (bookingVouchers.length > 0 || storedBalanceDeductYuan > 0)}}">券/储值全额抵扣</text>
+              <text class="fee-value" wx:elif="{{!isCoachCourseOrder && storedBalanceDeductYuan > 0 && wechatDueYuan > 0}}">储值 ¥{{storedBalanceDeductYuan}} + 微信 ¥{{wechatDueYuan}}</text>
+              <text class="fee-value" wx:elif="{{!isCoachCourseOrder && bookingVouchers.length > 0}}">券 ¥{{voucherDeductionYuan}} + 微信 ¥{{wechatDueYuan}}</text>
               <text class="fee-value" wx:else>¥ {{totalPrice}}</text>
             </view>
           </view>
@@ -236,8 +280,9 @@
     <view class="footer-left">
       <text class="footer-total" wx:if="{{orderType === 'court' && isCoachCourseOrder && payMethod === 'course_hours'}}">使用课时 {{requiredCourseHours}} 小时</text>
       <text class="footer-total" wx:elif="{{orderType === 'court' && isCoachCourseOrder && payMethod === 'mixed'}}">课时 {{coachHoursDeductForPay}} 小时 + 微信 ¥{{comboCashYuan}}</text>
-      <text class="footer-total" wx:elif="{{orderType === 'court' && !isCoachCourseOrder && bookingVouchers.length > 0 && cashDueYuan <= 0}}">团购券全额抵扣</text>
-      <text class="footer-total" wx:elif="{{orderType === 'court' && !isCoachCourseOrder && bookingVouchers.length > 0}}">微信应付 ¥{{cashDueYuan}}</text>
+      <text class="footer-total" wx:elif="{{orderType === 'court' && !isCoachCourseOrder && wechatDueYuan <= 0 && (bookingVouchers.length > 0 || storedBalanceDeductYuan > 0)}}">券/储值全额抵扣</text>
+      <text class="footer-total" wx:elif="{{orderType === 'court' && !isCoachCourseOrder && storedBalanceDeductYuan > 0 && wechatDueYuan > 0}}">储值 ¥{{storedBalanceDeductYuan}} + 微信 ¥{{wechatDueYuan}}</text>
+      <text class="footer-total" wx:elif="{{orderType === 'court' && !isCoachCourseOrder && bookingVouchers.length > 0}}">微信应付 ¥{{wechatDueYuan}}</text>
       <text class="footer-total" wx:else>合计：¥ {{totalPrice}}</text>
     </view>
     <view class="footer-right">

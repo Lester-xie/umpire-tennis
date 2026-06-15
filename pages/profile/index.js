@@ -11,8 +11,10 @@ const {
   createUser,
   decryptPhoneNumber,
   listAllMemberCourseHours,
+  listAllMemberVenueBalances,
   DEFAULT_USER_AVATAR,
 } = require('../../api/tennisDb');
+const { roundYuan, formatYuanText } = require('../../utils/storedValuePlans');
 
 function resolveAvatarForUI(avatarValue) {
   // user.avatar/userAvatar：云 fileID（cloud://）、https、或包内路径如 /assets/...
@@ -76,6 +78,9 @@ Page({
     /** 全部场馆剩余课时合计（展示在账户卡片） */
     totalCourseHours: 0,
     totalCourseHoursText: '—',
+    /** 全部场馆储值余额合计 */
+    totalStoredBalanceYuan: 0,
+    totalStoredBalanceText: '—',
   },
   _loadingTaskCount: 0,
 
@@ -115,12 +120,18 @@ Page({
       const userIdentity = buildUserIdentity(isCoach, isVip, isManager);
       const badgeKind = identityBadgeKind(isCoach, isVip, isManager);
       let totalCourseHours = 0;
+      let totalStoredBalanceYuan = 0;
       if (isLoggedIn && userPhone) {
         totalCourseHours = await this.fetchTotalCourseHoursSum();
+        totalStoredBalanceYuan = await this.fetchTotalStoredBalanceSum();
       }
       const totalCourseHoursText =
         isLoggedIn && userPhone
           ? this.formatHoursNumber(totalCourseHours)
+          : '—';
+      const totalStoredBalanceText =
+        isLoggedIn && userPhone
+          ? formatYuanText(totalStoredBalanceYuan)
           : '—';
       this.setData({
         isLoggedIn,
@@ -136,6 +147,8 @@ Page({
         identityBadgeKind: badgeKind,
         totalCourseHours,
         totalCourseHoursText,
+        totalStoredBalanceYuan,
+        totalStoredBalanceText,
       });
     } finally {
       if (firstVisit) {
@@ -168,6 +181,21 @@ Page({
       return sum;
     } catch (e) {
       console.warn('fetchTotalCourseHoursSum', e);
+      return 0;
+    }
+  },
+
+  async fetchTotalStoredBalanceSum() {
+    try {
+      const res = await listAllMemberVenueBalances();
+      const rows = (res && res.result && Array.isArray(res.result.data)) ? res.result.data : [];
+      let sum = 0;
+      rows.forEach((r) => {
+        sum += roundYuan(r.balanceYuan);
+      });
+      return sum;
+    } catch (e) {
+      console.warn('fetchTotalStoredBalanceSum', e);
       return 0;
     }
   },
@@ -411,6 +439,14 @@ Page({
       return;
     }
     wx.navigateTo({ url: '/pages/profile-course-hours/index' });
+  },
+
+  handleStoredValueTap() {
+    if (!this.data.isLoggedIn) {
+      wx.showToast({ title: '请先登录', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({ url: '/pages/profile-stored-value/index' });
   },
 
   /** 教练或管理员：进入教练约场页（需已选场馆） */

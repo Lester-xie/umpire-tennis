@@ -1,0 +1,40 @@
+<view class="admin-sub-page">
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="储值卡管理" />
+  </view>
+  <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
+    <view wx:if="{{loading}}" class="muted">加载中…</view>
+    <block wx:else>
+      <view class="venue-name-hint" wx:if="{{name}}">场馆：{{name}}</view>
+
+      <view class="field">
+        <block wx:for="{{planRows}}" wx:for-index="idx" wx:key="idx">
+          <view class="plan-card">
+            <view class="plan-card-head">
+              <text class="plan-num">档位 {{idx + 1}}</text>
+              <view wx:if="{{planRows.length > 1}}" class="court-remove" data-idx="{{idx}}" bindtap="onRemoveRow">删除</view>
+            </view>
+            <view class="plan-price-row">
+              <text class="plan-mini-label">充值金额（元）</text>
+              <input class="plan-in" type="digit" placeholder="如 1000" value="{{item.payYuan}}" data-idx="{{idx}}" bindinput="onPayYuan" />
+            </view>
+            <view class="plan-price-row">
+              <text class="plan-mini-label">实得余额（元）</text>
+              <input class="plan-in" type="digit" placeholder="如 1200" value="{{item.creditYuan}}" data-idx="{{idx}}" bindinput="onCreditYuan" />
+            </view>
+            <view class="plan-preview" wx:if="{{item.previewLabel}}">{{item.previewLabel}}</view>
+            <view class="plan-enabled-row">
+              <text class="plan-enabled-label">上架展示</text>
+              <switch checked="{{item.enabled}}" color="#134e35" data-idx="{{idx}}" bindchange="onEnabledChange" />
+            </view>
+          </view>
+        </block>
+
+        <view class="add-court" bindtap="onAddRow">+ 添加一档储值卡</view>
+      </view>
+
+      <button class="submit-btn" bindtap="onSave">保存</button>
+    </block>
+    <view class="footer-space"></view>
+  </scroll-view>
+</view>

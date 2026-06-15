@@ -74,6 +74,21 @@
             <view class="profile-reward-btn" bindtap="handleRedeemTap">查看</view>
           </view>
         </card>
+        <card>
+          <view class="profile-reward-card profile-reward-card--balance">
+            <view class="profile-reward-icon-wrap profile-reward-icon-wrap--balance">
+              <text class="profile-reward-icon-star">¥</text>
+            </view>
+            <view class="profile-reward-text">
+              <text class="profile-reward-label">储值余额</text>
+              <view class="profile-reward-value-row">
+                <text class="profile-reward-num">{{isLoggedIn ? totalStoredBalanceText : '—'}}</text>
+                <text class="profile-reward-unit" wx:if="{{isLoggedIn}}">元</text>
+              </view>
+            </view>
+            <view class="profile-reward-btn" bindtap="handleStoredValueTap">查看</view>
+          </view>
+        </card>
       </view>
 
       <!-- 菜单列表 -->

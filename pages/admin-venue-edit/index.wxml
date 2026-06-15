@@ -56,6 +56,10 @@
           <text class="manage-entry-text">用途管理</text>
           <text class="manage-entry-arrow">›</text>
         </navigator>
+        <navigator url="/pages/admin-venue-stored-value/index?id={{venueId}}" class="manage-entry" hover-class="manage-entry--hover">
+          <text class="manage-entry-text">储值卡管理</text>
+          <text class="manage-entry-arrow">›</text>
+        </navigator>
       </view>
 
       <view class="field" wx:if="{{isNew}}">

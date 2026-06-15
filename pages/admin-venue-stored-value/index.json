@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "储值卡管理",
+  "usingComponents": {
+    "header": "/components/header/header"
+  }
+}

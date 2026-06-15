@@ -1,0 +1,52 @@
+<view class="stored-page">
+  <lottie-loading visible="{{lottieLoadingVisible}}" />
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="场馆储值" />
+  </view>
+  <scroll-view
+    class="content-scroll"
+    scroll-y="true"
+    enhanced="{{true}}"
+    show-scrollbar="{{false}}"
+    style="margin-top: {{headerHeight}}px; height: {{contentHeight}}px;"
+  >
+    <view class="content-wrapper">
+      <view class="venue-bar">
+        <view class="venue-bar-main">
+          <view>
+            <text class="venue-bar-label">当前场馆</text>
+            <text class="venue-bar-name">{{venueName || '未选择场馆'}}</text>
+          </view>
+          <view class="venue-switch" bindtap="onSwitchVenue">切换场馆</view>
+        </view>
+        <view class="hint-banner" wx:if="{{isLoggedIn}}">
+          储值余额仅在本场馆使用，不同场馆余额不可通用。
+        </view>
+      </view>
+
+
+      <block wx:if="{{planCards.length > 0}}">
+        <view class="plan-card" wx:for="{{planCards}}" wx:key="idx">
+          <text class="plan-title">{{item.label}}</text>
+          <view class="plan-price-row">
+            <text class="plan-pay">¥{{item.payText}}</text>
+            <text class="plan-credit">实得 ¥{{item.creditText}}</text>
+          </view>
+          <view
+            class="plan-btn {{isLoggedIn && !paying ? '' : 'plan-btn--disabled'}}"
+            data-idx="{{item.idx}}"
+            bindtap="onRechargeTap"
+          >立即充值</view>
+        </view>
+      </block>
+
+      <view class="empty-card" wx:else>
+        <text wx:if="{{!venueId}}">请先在首页选择场馆</text>
+        <text wx:else>该场馆暂未配置储值卡，请联系场馆工作人员</text>
+        <view wx:if="{{!venueId}}" class="empty-link" bindtap="onSwitchVenue">去选择场馆</view>
+      </view>
+
+      <view class="placeholder" style="height: {{placeholderHeight}}px;"></view>
+    </view>
+  </scroll-view>
+</view>

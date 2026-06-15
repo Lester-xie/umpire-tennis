@@ -6,6 +6,20 @@
   <scroll-view class="content-scroll" scroll-y="true" style="margin-top: {{headerHeight}}px; height: {{contentHeight}}px;">
     <view class="content-wrapper">
       <desc-container />
+      <view class="stored-value-entry-container">
+        <card bindtap="goStoredValue">
+          <view class="stored-value-entry" hover-class="stored-value-entry--hover">
+            <view class="stored-value-entry-main">
+              <text class="stored-value-entry-title">场馆储值</text>
+            </view>
+            <image
+              class="stored-value-entry-img"
+              src="/assets/images/tennis-index.png"
+              mode="aspectFit"
+            />
+          </view>
+        </card>
+      </view>
       <goods bind:courseloading="onCourseLoading" />
       <view style="height: {{placeholderHeight}}px;"></view>
     </view>
