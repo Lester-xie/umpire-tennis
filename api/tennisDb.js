@@ -5,6 +5,21 @@ const { venueIdLooseEqual } = require('../utils/venueId');
 
 /** 与 app.js、pages/location 一致 */
 const STORAGE_SELECTED_VENUE = 'selected_venue';
+/** 与 pages/profile 一致：个人页课时/储值汇总缓存 */
+const PROFILE_SUMMARY_CACHE_KEY = 'profile_summary_cache';
+
+/** 储值/课时等账户汇总变更后调用，强制个人页下次 onShow 重新拉取 */
+function markProfileSummaryStale() {
+  try {
+    const app = typeof getApp === 'function' ? getApp() : null;
+    if (app && app.globalData) {
+      app.globalData.profileSummaryStale = true;
+    }
+    wx.removeStorageSync(PROFILE_SUMMARY_CACHE_KEY);
+  } catch (e) {
+    console.warn('markProfileSummaryStale', e);
+  }
+}
 
 function getDb() {
   return wx.cloud.database();
@@ -127,6 +142,7 @@ function refreshSelectedVenueFromCloud(appInstance) {
   }).then((normalized) => {
     if (!normalized) return null;
     app.globalData.selectedVenue = normalized;
+    app.globalData.venueRefreshedAt = Date.now();
     try {
       wx.setStorageSync(STORAGE_SELECTED_VENUE, normalized);
     } catch (e) {
@@ -544,6 +560,7 @@ module.exports = {
   listTicketShopDeals,
   completeCourtBookingWithVouchers,
   requestWechatPay,
+  markProfileSummaryStale,
   adminVenue,
 };
 

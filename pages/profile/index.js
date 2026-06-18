@@ -1,10 +1,15 @@
 const STORAGE_KEYS = {
   profileVisited: 'profile_has_visited',
+  profileSummaryCache: 'profile_summary_cache',
+  avatarUrlCache: 'profile_avatar_temp_url',
   userAvatar: 'user_avatar',
   userPhoneCode: 'user_phone_code',
   userPhone: 'user_phone',
   userNickname: 'user_nickname',
 };
+
+/** 同一会话内切回「我的」tab 时，距上次拉取未超过该间隔则跳过重复请求 */
+const PROFILE_REFRESH_MS = 45 * 1000;
 
 const {
   getUserByPhone,
@@ -16,6 +21,31 @@ const {
 } = require('../../api/tennisDb');
 const { roundYuan, formatYuanText } = require('../../utils/storedValuePlans');
 
+function readAvatarUrlCache(fileID) {
+  if (!fileID) return '';
+  try {
+    const cache = wx.getStorageSync(STORAGE_KEYS.avatarUrlCache) || {};
+    const hit = cache[fileID];
+    if (hit && hit.url && Date.now() - (hit.ts || 0) < 7 * 24 * 60 * 60 * 1000) {
+      return hit.url;
+    }
+  } catch (e) {
+    console.warn('readAvatarUrlCache', e);
+  }
+  return '';
+}
+
+function writeAvatarUrlCache(fileID, url) {
+  if (!fileID || !url) return;
+  try {
+    const cache = wx.getStorageSync(STORAGE_KEYS.avatarUrlCache) || {};
+    cache[fileID] = { url, ts: Date.now() };
+    wx.setStorageSync(STORAGE_KEYS.avatarUrlCache, cache);
+  } catch (e) {
+    console.warn('writeAvatarUrlCache', e);
+  }
+}
+
 function resolveAvatarForUI(avatarValue) {
   // user.avatar/userAvatar：云 fileID（cloud://）、https、或包内路径如 /assets/...
   // 旧逻辑：可能存的是本地文件路径（仍允许回退显示）
@@ -25,6 +55,9 @@ function resolveAvatarForUI(avatarValue) {
   if (v.startsWith('http://') || v.startsWith('https://')) return Promise.resolve(v);
   if (!v.startsWith('cloud://')) return Promise.resolve(v);
 
+  const cachedUrl = readAvatarUrlCache(v);
+  if (cachedUrl) return Promise.resolve(cachedUrl);
+
   return new Promise((resolve, reject) => {
     wx.cloud.getTempFileURL({
       fileList: [{ fileID: v }],
@@ -32,6 +65,7 @@ function resolveAvatarForUI(avatarValue) {
       maxAge: 60 * 60 * 24 * 7,
       success: (res) => {
         const url = res?.fileList?.[0]?.tempFileURL || '';
+        if (url) writeAvatarUrlCache(v, url);
         resolve(url);
       },
       fail: reject,
@@ -40,6 +74,75 @@ function resolveAvatarForUI(avatarValue) {
     console.error('resolveAvatarForUI failed', err);
     return '';
   });
+}
+
+function readProfileSummaryCache(phone) {
+  if (!phone) return null;
+  try {
+    const raw = wx.getStorageSync(STORAGE_KEYS.profileSummaryCache);
+    if (!raw || raw.phone !== phone) return null;
+    if (Date.now() - (raw.ts || 0) > PROFILE_REFRESH_MS) return null;
+    return raw;
+  } catch (e) {
+    console.warn('readProfileSummaryCache', e);
+    return null;
+  }
+}
+
+function writeProfileSummaryCache(phone, summary) {
+  if (!phone || !summary) return;
+  try {
+    wx.setStorageSync(STORAGE_KEYS.profileSummaryCache, {
+      phone,
+      ts: Date.now(),
+      ...summary,
+    });
+  } catch (e) {
+    console.warn('writeProfileSummaryCache', e);
+  }
+}
+
+function clearProfileSummaryCache() {
+  try {
+    wx.removeStorageSync(STORAGE_KEYS.profileSummaryCache);
+  } catch (e) {
+    console.warn('clearProfileSummaryCache', e);
+  }
+}
+
+function buildSummaryFromFlags(flags, totalCourseHours, totalStoredBalanceYuan) {
+  const isVip = !!flags.isVip;
+  const isCoach = !!flags.isCoach;
+  const isManager = !!flags.isManager;
+  return {
+    isVip,
+    isCoach,
+    isManager,
+    userIdentity: buildUserIdentity(isCoach, isVip, isManager),
+    identityBadgeKind: identityBadgeKind(isCoach, isVip, isManager),
+    totalCourseHours,
+    totalCourseHoursText: formatHoursNumberStatic(totalCourseHours),
+    totalStoredBalanceYuan,
+    totalStoredBalanceText: formatYuanText(totalStoredBalanceYuan),
+  };
+}
+
+function formatHoursNumberStatic(n) {
+  const x = Number(n) || 0;
+  if (Number.isInteger(x) || Math.abs(x - Math.round(x)) < 1e-6) {
+    return String(Math.round(x));
+  }
+  return x.toFixed(1);
+}
+
+function syncAvatarForDisplay(avatarFileID, cachedSummary) {
+  const fileID = String(avatarFileID || '').trim();
+  if (!fileID) return '';
+  if (fileID.startsWith('http://') || fileID.startsWith('https://') || !fileID.startsWith('cloud://')) {
+    return fileID;
+  }
+  if (cachedSummary && cachedSummary.userAvatar) return cachedSummary.userAvatar;
+  return readAvatarUrlCache(fileID);
 }
 
 /** 管理员（isManager）> 教练 > VIP：徽章只展示最高一档 */
@@ -83,6 +186,8 @@ Page({
     totalStoredBalanceText: '—',
   },
   _loadingTaskCount: 0,
+  _profileSummary: null,
+  _profileRefreshPromise: null,
 
   onLoad() {
     const app = getApp();
@@ -94,80 +199,136 @@ Page({
     }
   },
 
-  async onShow() {
-    /** 仅首次进入「我的」页展示全屏 loading，后续切换 tab 进入不再展示 */
-    const firstVisit = !wx.getStorageSync(STORAGE_KEYS.profileVisited);
-    if (firstVisit) {
-      this.beginLoading('加载中');
+  onShow() {
+    const app = getApp();
+    if (app && app.globalData && app.globalData.profileSummaryStale) {
+      clearProfileSummaryCache();
+      this._profileSummary = null;
     }
-    try {
-      const app = getApp();
-      const isLoggedIn = app ? app.checkLogin() : false;
-      const userAvatarFileID = wx.getStorageSync(STORAGE_KEYS.userAvatar) || '';
-      const userAvatar = await resolveAvatarForUI(userAvatarFileID);
-      const userNickname = wx.getStorageSync(STORAGE_KEYS.userNickname) || '';
-      const userPhone = wx.getStorageSync(STORAGE_KEYS.userPhone) || '';
-      const userDisplayName = isLoggedIn ? (userNickname || '昂湃用户') : '点击登录';
-      let isVip = false;
-      let isCoach = false;
-      let isManager = false;
-      if (isLoggedIn && userPhone) {
-        const flags = await this.fetchUserRoleFlags(userPhone);
-        isVip = flags.isVip;
-        isCoach = flags.isCoach;
-        isManager = flags.isManager;
-      }
-      const userIdentity = buildUserIdentity(isCoach, isVip, isManager);
-      const badgeKind = identityBadgeKind(isCoach, isVip, isManager);
-      let totalCourseHours = 0;
-      let totalStoredBalanceYuan = 0;
-      if (isLoggedIn && userPhone) {
-        totalCourseHours = await this.fetchTotalCourseHoursSum();
-        totalStoredBalanceYuan = await this.fetchTotalStoredBalanceSum();
-      }
-      const totalCourseHoursText =
-        isLoggedIn && userPhone
-          ? this.formatHoursNumber(totalCourseHours)
-          : '—';
-      const totalStoredBalanceText =
-        isLoggedIn && userPhone
-          ? formatYuanText(totalStoredBalanceYuan)
-          : '—';
-      this.setData({
-        isLoggedIn,
-        userAvatar,
-        userAvatarFileID,
-        userNickname,
-        userDisplayName,
-        userPhone,
-        isVip,
-        isCoach,
-        isManager,
-        userIdentity,
-        identityBadgeKind: badgeKind,
-        totalCourseHours,
-        totalCourseHoursText,
-        totalStoredBalanceYuan,
-        totalStoredBalanceText,
+    this.applyProfileFromLocal();
+    this.refreshProfileSummary();
+  },
+
+  /** 先用本地 storage / 缓存即时渲染，避免等网络再出首屏 */
+  applyProfileFromLocal() {
+    const app = getApp();
+    const isLoggedIn = app ? app.checkLogin() : false;
+    const userNickname = wx.getStorageSync(STORAGE_KEYS.userNickname) || '';
+    const userPhone = wx.getStorageSync(STORAGE_KEYS.userPhone) || '';
+    const userAvatarFileID = wx.getStorageSync(STORAGE_KEYS.userAvatar) || '';
+    const userDisplayName = isLoggedIn ? (userNickname || '昂湃用户') : '点击登录';
+    const cached = isLoggedIn && userPhone ? readProfileSummaryCache(userPhone) : null;
+    const syncAvatar = isLoggedIn
+      ? (syncAvatarForDisplay(userAvatarFileID, cached) || '/assets/images/default-avatar.jpg')
+      : '';
+
+    const patch = {
+      isLoggedIn,
+      userNickname,
+      userDisplayName,
+      userPhone,
+      userAvatarFileID,
+      userAvatar: syncAvatar,
+    };
+
+    if (cached) {
+      Object.assign(patch, {
+        isVip: !!cached.isVip,
+        isCoach: !!cached.isCoach,
+        isManager: !!cached.isManager,
+        userIdentity: cached.userIdentity || '',
+        identityBadgeKind: cached.identityBadgeKind || '',
+        totalCourseHours: Number(cached.totalCourseHours) || 0,
+        totalCourseHoursText: cached.totalCourseHoursText || '0',
+        totalStoredBalanceYuan: Number(cached.totalStoredBalanceYuan) || 0,
+        totalStoredBalanceText: cached.totalStoredBalanceText || '0',
       });
-    } finally {
-      if (firstVisit) {
-        try {
-          wx.setStorageSync(STORAGE_KEYS.profileVisited, true);
-        } catch (e) {
-          console.warn('set profileVisited failed', e);
-        }
-        this.endLoading();
-      }
+    } else if (!isLoggedIn || !userPhone) {
+      Object.assign(patch, {
+        isVip: false,
+        isCoach: false,
+        isManager: false,
+        userIdentity: '',
+        identityBadgeKind: '',
+        totalCourseHours: 0,
+        totalCourseHoursText: '—',
+        totalStoredBalanceYuan: 0,
+        totalStoredBalanceText: '—',
+      });
     }
+
+    this.setData(patch);
+  },
+
+  shouldSkipProfileRefresh(userPhone) {
+    const app = getApp();
+    if (app && app.globalData && app.globalData.profileSummaryStale) {
+      return false;
+    }
+    const mem = this._profileSummary;
+    if (!mem || mem.phone !== userPhone) return false;
+    return Date.now() - (mem.ts || 0) < PROFILE_REFRESH_MS;
+  },
+
+  async refreshProfileSummary() {
+    const app = getApp();
+    const isLoggedIn = app ? app.checkLogin() : false;
+    const userPhone = wx.getStorageSync(STORAGE_KEYS.userPhone) || '';
+    const userAvatarFileID = wx.getStorageSync(STORAGE_KEYS.userAvatar) || '';
+
+    if (!isLoggedIn || !userPhone) {
+      this._profileSummary = null;
+      return;
+    }
+
+    if (app && app.globalData && app.globalData.profileSummaryStale) {
+      app.globalData.profileSummaryStale = false;
+    } else if (this.shouldSkipProfileRefresh(userPhone)) {
+      return;
+    }
+
+    if (this._profileRefreshPromise) {
+      return this._profileRefreshPromise;
+    }
+
+    const firstVisit = !wx.getStorageSync(STORAGE_KEYS.profileVisited);
+    const task = (async () => {
+      try {
+        const [userAvatar, flags, totalCourseHours, totalStoredBalanceYuan] = await Promise.all([
+          resolveAvatarForUI(userAvatarFileID),
+          this.fetchUserRoleFlags(userPhone),
+          this.fetchTotalCourseHoursSum(),
+          this.fetchTotalStoredBalanceSum(),
+        ]);
+        const summary = buildSummaryFromFlags(flags, totalCourseHours, totalStoredBalanceYuan);
+        const ts = Date.now();
+        this._profileSummary = { phone: userPhone, ts, userAvatar, ...summary };
+        writeProfileSummaryCache(userPhone, { userAvatar, ...summary });
+        this.setData({
+          userAvatar: userAvatar || '/assets/images/default-avatar.jpg',
+          userAvatarFileID,
+          ...summary,
+        });
+      } catch (e) {
+        console.warn('refreshProfileSummary', e);
+      } finally {
+        this._profileRefreshPromise = null;
+        if (firstVisit) {
+          try {
+            wx.setStorageSync(STORAGE_KEYS.profileVisited, true);
+          } catch (e) {
+            console.warn('set profileVisited failed', e);
+          }
+        }
+      }
+    })();
+
+    this._profileRefreshPromise = task;
+    return task;
   },
 
   formatHoursNumber(n) {
-    const x = Number(n) || 0;
-    if (Number.isInteger(x) || Math.abs(x - Math.round(x)) < 1e-6) {
-      return String(Math.round(x));
-    }
-    return x.toFixed(1);
+    return formatHoursNumberStatic(n);
   },
 
   async fetchTotalCourseHoursSum() {
@@ -352,7 +513,17 @@ Page({
         const isVip = !!user.isVip;
         const isCoach = !!user.isCoach;
         const isManager = !!user.isManager;
-        const totalCourseHours = await this.fetchTotalCourseHoursSum();
+        const [totalCourseHours, totalStoredBalanceYuan] = await Promise.all([
+          this.fetchTotalCourseHoursSum(),
+          this.fetchTotalStoredBalanceSum(),
+        ]);
+        const summary = buildSummaryFromFlags(
+          { isVip, isCoach, isManager },
+          totalCourseHours,
+          totalStoredBalanceYuan,
+        );
+        writeProfileSummaryCache(phone, { userAvatar: resolvedAvatar, ...summary });
+        this._profileSummary = { phone, ts: Date.now(), userAvatar: resolvedAvatar, ...summary };
         this.setData({
           isLoggedIn: true,
           userAvatar: resolvedAvatar,
@@ -360,13 +531,7 @@ Page({
           userNickname: nickname,
           userPhone: phone,
           userDisplayName: nickname || '昂湃用户',
-          isVip,
-          isCoach,
-          isManager,
-          userIdentity: buildUserIdentity(isCoach, isVip, isManager),
-          identityBadgeKind: identityBadgeKind(isCoach, isVip, isManager),
-          totalCourseHours,
-          totalCourseHoursText: this.formatHoursNumber(totalCourseHours),
+          ...summary,
         });
 
         this.endLoading();
@@ -485,13 +650,17 @@ Page({
           wx.removeStorageSync(STORAGE_KEYS.userPhoneCode);
           wx.removeStorageSync(STORAGE_KEYS.userAvatar);
           wx.removeStorageSync(STORAGE_KEYS.userNickname);
+          clearProfileSummaryCache();
         } catch (e) {
           console.warn('clear user storage', e);
         }
         const app = getApp();
         if (app) {
           app.globalData.isLoggedIn = false;
+          app.globalData.profileSummaryStale = false;
         }
+        this._profileSummary = null;
+        this._profileRefreshPromise = null;
         this.setData({
           isLoggedIn: false,
           userAvatar: '',
@@ -506,6 +675,8 @@ Page({
           identityBadgeKind: '',
           totalCourseHours: 0,
           totalCourseHoursText: '—',
+          totalStoredBalanceYuan: 0,
+          totalStoredBalanceText: '—',
         });
       },
     });

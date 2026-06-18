@@ -1,4 +1,4 @@
-const { getVenues, requestWechatPay } = require('../../api/tennisDb');
+const { getVenues, requestWechatPay, markProfileSummaryStale } = require('../../api/tennisDb');
 const { normalizeVenueId } = require('../../utils/venueId');
 const {
   activeStoredValuePlans,
@@ -155,6 +155,7 @@ Page({
       wx.requestPayment({
         ...payment,
         success: () => {
+          markProfileSummaryStale();
           wx.showToast({ title: '充值成功', icon: 'success' });
         },
         fail: (err) => {

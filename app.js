@@ -12,6 +12,10 @@ App({
     shouldClearBookingData: false, // 是否需要清空预订页面数据
     isLoggedIn: false, // 仅当 wx.login 成功后为 true
     selectedVenue: null, // 用户选择的球场 { id, name, address, latitude, longitude }
+    /** 为 true 时「我的」页下次 onShow 强制刷新课时/储值汇总 */
+    profileSummaryStale: false,
+    /** refreshSelectedVenueFromCloud 最近一次成功时间戳 */
+    venueRefreshedAt: 0,
   },
   onLaunch() {
     this.initSystemInfo();
@@ -35,6 +39,7 @@ App({
       const v = wx.getStorageSync(STORAGE_SELECTED_VENUE);
       if (v && v.id) {
         this.globalData.selectedVenue = v;
+        this.globalData.venueRefreshedAt = Date.now();
       }
     } catch (e) {
       console.warn('restoreSelectedVenue failed', e);

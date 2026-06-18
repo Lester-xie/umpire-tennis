@@ -19,6 +19,7 @@ const {
   getBookedSlots,
   requestWechatPay,
   listMemberVenueBalance,
+  markProfileSummaryStale,
 } = require('../../api/tennisDb');
 const { buildLessonKey, formatLessonKeyDisplay } = require('../../utils/lessonKey');
 const { lessonKeyFromTypeMapFormat, splitCourseDescriptionLines } = require('../../utils/courseCatalog');
@@ -1240,6 +1241,12 @@ Page({
             if (app && app.globalData) {
               app.globalData.shouldClearBookingData = true;
             }
+            if (
+              !this.data.isCoachCourseOrder &&
+              Number(this.data.storedBalanceDeductYuan) > 0
+            ) {
+              markProfileSummaryStale();
+            }
             wx.redirectTo({ url: '/pages/booking-success/index' });
             return;
           }
@@ -1482,6 +1489,9 @@ Page({
       const app = getApp();
       if (app && app.globalData) {
         app.globalData.shouldClearBookingData = true;
+      }
+      if (Number(this.data.storedBalanceDeductYuan) > 0) {
+        markProfileSummaryStale();
       }
       wx.redirectTo({ url: '/pages/booking-success/index' });
     } catch (e) {

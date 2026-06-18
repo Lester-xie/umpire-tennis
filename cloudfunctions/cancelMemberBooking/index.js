@@ -272,6 +272,76 @@ async function returnCourseHoursForBooking(booking, now) {
   return { ok: true };
 }
 
+async function returnStoredBalanceForBooking(booking, now) {
+  const subtype = String(booking.bookingSubtype || '').trim();
+  if (subtype === 'coach_course') return { ok: true };
+
+  const refundYuan = Math.round(Number(booking.storedBalanceDeductYuan) * 100) / 100;
+  if (refundYuan <= 0) return { ok: true };
+  if (String(booking.storedBalanceRefundStatus || '') === 'success') {
+    return { ok: true, skipped: true };
+  }
+
+  const phone = String(booking.phone || '').trim();
+  const vId = String(booking.venueId != null ? booking.venueId : '').trim();
+  if (!phone || !vId) {
+    console.warn('returnStoredBalanceForBooking: 缺少字段', booking._id);
+    return { ok: false, errMsg: '订单缺少用户信息，无法退回储值' };
+  }
+
+  try {
+    const balColl = db.collection('db_member_venue_balance');
+    const hit = await balColl.where({ phone, venueId: vId }).limit(1).get();
+    if (hit.data && hit.data[0] && hit.data[0]._id) {
+      await balColl.doc(hit.data[0]._id).update({
+        data: {
+          balanceYuan: _.inc(refundYuan),
+          updatedAt: now,
+        },
+      });
+    } else {
+      const n = Number(vId);
+      let updated = false;
+      if (Number.isFinite(n)) {
+        const hitNum = await balColl.where({ phone, venueId: n }).limit(1).get();
+        if (hitNum.data && hitNum.data[0] && hitNum.data[0]._id) {
+          await balColl.doc(hitNum.data[0]._id).update({
+            data: {
+              balanceYuan: _.inc(refundYuan),
+              updatedAt: now,
+            },
+          });
+          updated = true;
+        }
+      }
+      if (!updated) {
+        await balColl.add({
+          data: {
+            phone,
+            venueId: vId,
+            balanceYuan: refundYuan,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+      }
+    }
+
+    await db.collection('db_booking').doc(booking._id).update({
+      data: {
+        storedBalanceRefundStatus: 'success',
+        storedBalanceRefundedYuan: refundYuan,
+        storedBalanceRefundedAt: now,
+        updatedAt: now,
+      },
+    });
+    return { ok: true };
+  } catch (err) {
+    console.error('returnStoredBalanceForBooking', err);
+    return { ok: false, errMsg: err.message || '储值退回失败' };
+  }
+}
+
 async function reactivateCoachHoldsIfSessionHasRoom(booking, now) {
   const subtype = String(booking.bookingSubtype || '').trim();
   if (subtype !== 'coach_course') return;
@@ -362,7 +432,7 @@ async function emitBookingRealtimeSignal({ venueId, orderDate }) {
 /**
  * 会员取消订场/教练课订单
  * event: { phone, bookingId }
- * 规则：距首场开始不足规定时间不可取消（普通 6h；团课/畅打以占用上的 refundHoursBeforeStart 为准）；已付原路退；pending 仅关单
+ * 规则：距首场开始不足规定时间不可取消（普通 6h；团课/畅打以占用上的 refundHoursBeforeStart 为准）；已付原路退微信/课时/储值；pending 仅关单
  */
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext();
@@ -452,6 +522,10 @@ exports.main = async (event) => {
     const rh = await returnCourseHoursForBooking({ ...booking, _id: bookingId }, now);
     if (!rh.ok) {
       return rh;
+    }
+    const rb = await returnStoredBalanceForBooking({ ...booking, _id: bookingId }, now);
+    if (!rb.ok) {
+      return rb;
     }
 
     await db

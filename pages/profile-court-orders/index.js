@@ -1,4 +1,4 @@
-const { getMyBookings, cancelMemberBooking } = require('../../api/tennisDb');
+const { getMyBookings, cancelMemberBooking, markProfileSummaryStale } = require('../../api/tennisDb');
 const { buildCourtOrderDisplay } = require('../../utils/profileHistoryHelpers');
 
 Page({
@@ -82,7 +82,7 @@ Page({
     wx.showModal({
       title: '取消订单',
       content:
-        '确定取消该订单？已支付的金额将原路退回微信，已使用的课时将退回账户。距场次开始不足 6 小时时无法在线取消。',
+        '确定取消该订单？已支付的金额将原路退回（微信/储值余额/课时，按实际支付方式）；距场次开始不足 6 小时时无法在线取消。',
       confirmText: '确定取消',
       confirmColor: '#c62828',
       success: async (res) => {
@@ -96,6 +96,7 @@ Page({
             wx.showToast({ title: r.errMsg || '取消失败', icon: 'none' });
             return;
           }
+          markProfileSummaryStale();
           wx.showToast({ title: '已取消', icon: 'success' });
           this.loadCourtOrders();
         } catch (err) {

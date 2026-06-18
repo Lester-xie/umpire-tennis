@@ -32,6 +32,10 @@ function isRealtimeWatchTransportError(err) {
   if (code === -402002) return true;
   return /ws connection|login fail|invalid state|init watch fail|realtime listener/i.test(msg);
 }
+
+/** 切回预订 tab 时，距上次完整拉取未超过该间隔则先用缓存、后台静默刷新占用 */
+const BOOKING_REFRESH_MS = 45 * 1000;
+const BOOKING_VIP_CACHE_KEY = 'booking_vip_cache';
 Page({
   data: {
     dateList: [], // 日期列表
@@ -83,6 +87,10 @@ Page({
   _realtimeWatchLoggedNoise: false,
   /** watch 不可用时轮询已订格子的定时器 */
   _bookingSlotsPollTimer: null,
+  /** 最近一次完整拉取（价目 + 占用）的 key：venueId__date */
+  _lastBookingDataKey: '',
+  _lastBookingFetchAt: 0,
+  _bookingLoadPromise: null,
 
   /** 标题：去选场页，选完后返回本页 */
   handleContentHeaderTitleTap() {
@@ -106,28 +114,45 @@ Page({
     if (!this.ensureVenueSelected()) {
       return;
     }
-    if (!this._initialLoadFinished) {
-      return;
-    }
-    const newVenueId = this.syncSelectedVenueName();
-    /** 仅 id/名变时 sync 才非空；改价后二者不变也需重拉 courtList */
-    const venueIdToReload =
-      newVenueId != null && String(newVenueId).trim() !== ''
-        ? newVenueId
-        : this.data.selectedVenueId;
-    if (venueIdToReload) {
-      this.loadSlotPricesAndRender(venueIdToReload);
-    }
-    this._realtimeWatchFailCount = 0;
-    this._realtimeWatchLoggedNoise = false;
-    this.restartRealtimeWatch();
-    this.refreshBookedSlotsNow({ showLoading: true });
-    // 检查是否需要清空数据（下单成功后返回）
+
     const app = getApp();
     if (app && app.globalData && app.globalData.shouldClearBookingData) {
       this.clearBookingData();
       app.globalData.shouldClearBookingData = false;
+      this.invalidateBookingCache();
     }
+
+    this._realtimeWatchFailCount = 0;
+    this._realtimeWatchLoggedNoise = false;
+
+    if (!this._initialLoadFinished) {
+      return;
+    }
+
+    const newVenueId = this.syncSelectedVenueName();
+    const venueChanged = newVenueId != null && String(newVenueId).trim() !== '';
+    if (venueChanged) {
+      this.invalidateBookingCache();
+    }
+
+    const selectedDate = this.data.selectedDate || getTodayDateStr();
+    const dataKey = `${this.data.selectedVenueId}__${selectedDate}`;
+    const cacheFresh = !venueChanged
+      && this._lastBookingDataKey === dataKey
+      && Date.now() - (this._lastBookingFetchAt || 0) < BOOKING_REFRESH_MS;
+
+    if (cacheFresh) {
+      this.restartRealtimeWatch();
+      this.refreshBookedSlotsNow({ showLoading: false });
+      return;
+    }
+
+    const venueIdToReload = venueChanged ? newVenueId : this.data.selectedVenueId;
+    if (venueIdToReload) {
+      this.loadSlotPricesAndRender(venueIdToReload, { showLoading: true });
+      return;
+    }
+    this.restartRealtimeWatch();
   },
 
   onHide() {
@@ -215,8 +240,9 @@ Page({
   
   // 清空预订数据
   clearBookingData() {
+    this.invalidateBookingCache();
     // 重新加载价格规则并生成时间段和场地数据
-    this.loadSlotPricesAndRender();
+    this.loadSlotPricesAndRender(undefined, { showLoading: true });
     
     // 清空选中状态
     this.setData({
@@ -274,61 +300,127 @@ Page({
     });
   },
 
-  loadSlotPricesAndRender(venueIdOverride) {
-    this.beginLoading();
-    refreshSelectedVenueFromCloud()
-      .then(() => {
-        this.syncSelectedVenueName();
-        this.loadSlotPricesAndRenderCore(venueIdOverride);
-      })
-      .catch(() => {
-        this.loadSlotPricesAndRenderCore(venueIdOverride);
+  invalidateBookingCache() {
+    this._lastBookingDataKey = '';
+    this._lastBookingFetchAt = 0;
+  },
+
+  readVipCache(phone) {
+    if (!phone) return null;
+    try {
+      const raw = wx.getStorageSync(BOOKING_VIP_CACHE_KEY);
+      if (!raw || raw.phone !== phone) return null;
+      if (Date.now() - (raw.ts || 0) > BOOKING_REFRESH_MS) return null;
+      return !!raw.isVip;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  writeVipCache(phone, isVip) {
+    if (!phone) return;
+    try {
+      wx.setStorageSync(BOOKING_VIP_CACHE_KEY, {
+        phone,
+        isVip: !!isVip,
+        ts: Date.now(),
       });
+    } catch (e) {
+      console.warn('writeVipCache', e);
+    }
+  },
+
+  shouldRefreshVenueFromCloud() {
+    const app = getApp();
+    const venue = app && app.globalData && app.globalData.selectedVenue;
+    const courtList = venue && Array.isArray(venue.courtList) ? venue.courtList : [];
+    const refreshedAt = app && app.globalData ? (app.globalData.venueRefreshedAt || 0) : 0;
+    const fresh = Date.now() - refreshedAt < BOOKING_REFRESH_MS;
+    if (fresh && courtList.length > 0) return false;
+    return true;
+  },
+
+  async fetchVipFlag(phone) {
+    if (!phone) return false;
+    try {
+      const res = await getUserByPhone(phone);
+      const user = res && res.data && res.data[0];
+      return !!(user && user.isVip);
+    } catch (e) {
+      console.warn('fetchVipFlag booking', e);
+      return false;
+    }
+  },
+
+  loadSlotPricesAndRender(venueIdOverride, options = {}) {
+    const showLoading = options.showLoading !== false;
+    if (this._bookingLoadPromise) {
+      return this._bookingLoadPromise;
+    }
+
+    const task = (async () => {
+      if (showLoading) this.beginLoading();
+      try {
+        if (this.shouldRefreshVenueFromCloud()) {
+          try {
+            await refreshSelectedVenueFromCloud();
+          } catch (e) {
+            console.warn('refreshSelectedVenueFromCloud booking', e);
+          }
+        }
+        this.syncSelectedVenueName();
+        await this.loadSlotPricesAndRenderCore(venueIdOverride);
+      } finally {
+        if (showLoading) this.endLoading();
+      }
+    })();
+
+    this._bookingLoadPromise = task.finally(() => {
+      this._bookingLoadPromise = null;
+    });
+    return this._bookingLoadPromise;
   },
 
   async loadSlotPricesAndRenderCore(venueIdOverride) {
     const venueId =
       venueIdOverride !== undefined ? venueIdOverride : this.data.selectedVenueId;
 
-    this.slotPriceMap = {}; // { 'courtId-slotIndex': price }
-
+    this.slotPriceMap = {};
     const selectedDate = this.data.selectedDate || getTodayDateStr();
-
-    let isVipUser = false;
     const phone = String(wx.getStorageSync('user_phone') || '').trim();
-    if (phone) {
-      try {
-        const res = await getUserByPhone(phone);
-        const user = res && res.data && res.data[0];
-        isVipUser = !!(user && user.isVip);
-      } catch (e) {
-        console.warn('getUserByPhone booking', e);
-      }
+    const cachedVip = phone ? this.readVipCache(phone) : null;
+
+    if (cachedVip != null) {
+      this._bookingIsVipUser = cachedVip;
+      this.setData({ isVipUser: cachedVip });
     }
-    this._bookingIsVipUser = isVipUser;
-    this.setData({ isVipUser });
 
-    const afterFetchBooked = () => {
-      this.fetchBookedSlotsForDate(selectedDate).then((applied) => {
-        if (applied === null) return;
-        if (!applied) {
-          this.bookedSlotKeySet = new Set();
-          this.coachHoldMeta = {};
-        }
-        this.generateTimeSchedule();
-        this.restartRealtimeWatch();
-      }).catch(() => {
-        this.bookedSlotKeySet = new Set();
-        this.coachHoldMeta = {};
-        this.generateTimeSchedule();
-      }).finally(() => {
-        this.endLoading();
-      });
-    };
+    const vipPromise = cachedVip != null
+      ? Promise.resolve(cachedVip)
+      : this.fetchVipFlag(phone);
+    const bookedPromise = venueId
+      ? this.fetchBookedSlotsForDate(selectedDate)
+      : Promise.resolve(false);
 
-    // 没有 venueId 时直接走旧逻辑（不可用/无价格）
+    const [isVipUser, applied] = await Promise.all([vipPromise, bookedPromise]);
+
+    if (cachedVip == null) {
+      this._bookingIsVipUser = isVipUser;
+      this.setData({ isVipUser });
+      if (phone) this.writeVipCache(phone, isVipUser);
+    }
+
+    if (applied === null) {
+      return;
+    }
+    if (!applied) {
+      this.bookedSlotKeySet = new Set();
+      this.coachHoldMeta = {};
+    }
+
     if (!venueId) {
-      afterFetchBooked();
+      this.generateTimeSchedule();
+      this.restartRealtimeWatch();
       return;
     }
 
@@ -336,19 +428,19 @@ Page({
     const venue = app && app.globalData && app.globalData.selectedVenue;
     const courtList = venue && Array.isArray(venue.courtList) ? venue.courtList : [];
 
-    // 优先使用 venue 文档里的 courtList（VIP 用户用 vipPriceList 建图）
     if (courtList.length > 0) {
       this.slotPriceMap = buildSlotPriceMapFromCourtList(courtList, {
         useVipPrices: isVipUser,
       });
-      afterFetchBooked();
-      return;
+    } else {
+      this.slotPriceMap = {};
+      wx.showToast({ title: '场馆未配置场地价格', icon: 'none' });
     }
 
-    // 无 courtList / priceList 时无法在客户端展示单价
-    this.slotPriceMap = {};
-    wx.showToast({ title: '场馆未配置场地价格', icon: 'none' });
-    afterFetchBooked();
+    this.generateTimeSchedule();
+    this.restartRealtimeWatch();
+    this._lastBookingDataKey = `${venueId}__${selectedDate}`;
+    this._lastBookingFetchAt = Date.now();
   },
 
   beginLoading() {
@@ -924,6 +1016,7 @@ Page({
 
   // 切换日期：等 getBookedSlots 返回后再一次性生成格子，避免「先清空占用→仅标价→再合并」的中间帧闪烁
   updateSlotsAvailability(selectedDate) {
+    this.invalidateBookingCache();
     this.beginLoading();
     this.setData({
       selectedDate,
@@ -939,6 +1032,8 @@ Page({
       }
       this.generateTimeSchedule(selectedDate);
       this.restartRealtimeWatch();
+      this._lastBookingDataKey = `${this.data.selectedVenueId}__${selectedDate}`;
+      this._lastBookingFetchAt = Date.now();
     }).catch(() => {
       this.bookedSlotKeySet = new Set();
       this.coachHoldMeta = {};
