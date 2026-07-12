@@ -32,6 +32,11 @@ const {
   defaultCourtPayMethod,
 } = require('../../utils/bookingVoucherMatch');
 const { roundYuan, formatYuanText } = require('../../utils/storedValuePlans');
+const { preventTouchMove } = require('../../utils/preventTouchMove');
+const {
+  attachPageMemberAssetRealtime,
+  detachPageMemberAssetRealtime,
+} = require('../../utils/memberAssetRealtime');
 
 function enrichGoodItemDisplay(g) {
   if (!g) return null;
@@ -78,6 +83,7 @@ function grantHoursFromSessionKey(sessionKey) {
 }
 
 Page({
+  preventTouchMove,
   data: {
     showPhoneAuthModal: false, // 需手机号注册/授权时展示
     orderType: 'court', // 订单类型：court 场地订单 | goods 商品订单
@@ -508,6 +514,18 @@ Page({
     this.loadCoachCourseHoursBalance();
     this.loadVenueStoredBalance();
     this.loadCoachSessionRoster();
+    this.updateFooterButtonText();
+    this._memberAssetWatchSessionGen = this._memberAssetWatchSessionGen || 0;
+    attachPageMemberAssetRealtime(this, () => this.handleMemberAssetRealtimeChange());
+  },
+
+  onHide() {
+    detachPageMemberAssetRealtime(this);
+  },
+
+  handleMemberAssetRealtimeChange() {
+    this.loadCoachCourseHoursBalance();
+    this.loadVenueStoredBalance();
     this.updateFooterButtonText();
   },
 
@@ -1053,6 +1071,7 @@ Page({
   },
 
   onUnload() {
+    detachPageMemberAssetRealtime(this);
     this._loadingTaskCount = 0;
     this.setData({ lottieLoadingVisible: false });
   },

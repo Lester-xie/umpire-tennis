@@ -1,0 +1,9 @@
+{
+  "name": "adminGetUserMemberAssets",
+  "version": "1.0.0",
+  "description": "管理员按手机号查询用户储值与课时",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

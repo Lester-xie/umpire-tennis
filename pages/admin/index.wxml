@@ -5,7 +5,7 @@
   <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
     <view class="admin-grid">
       <navigator url="/pages/admin-users/index" class="admin-card" hover-class="admin-card--hover">
-        <text class="admin-card-title">用户与角色</text>
+        <text class="admin-card-title">用户管理</text>
         <text class="admin-card-desc">按手机号设置教练与 VIP（管理员仅数据库配置）</text>
       </navigator>
       <navigator url="/pages/admin-venues/index" class="admin-card" hover-class="admin-card--hover">

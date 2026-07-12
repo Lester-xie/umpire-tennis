@@ -30,6 +30,8 @@ Component({
   },
 
   methods: {
+    preventTouchMove() {},
+
     initAnimation() {
       if (this._animation) {
         this.destroyAnimation();

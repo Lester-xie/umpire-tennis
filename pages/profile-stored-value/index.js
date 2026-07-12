@@ -1,6 +1,10 @@
 const { getVenues, listAllMemberVenueBalances } = require('../../api/tennisDb');
 const { normalizeVenueId } = require('../../utils/venueId');
 const { formatYuanText, roundYuan } = require('../../utils/storedValuePlans');
+const {
+  attachPageMemberAssetRealtime,
+  detachPageMemberAssetRealtime,
+} = require('../../utils/memberAssetRealtime');
 
 function buildSections(balanceRows, venueNameById) {
   const byVenue = {};
@@ -32,7 +36,13 @@ Page({
   _loadingTaskCount: 0,
 
   onShow() {
+    this._memberAssetWatchSessionGen = this._memberAssetWatchSessionGen || 0;
     this.refresh();
+    attachPageMemberAssetRealtime(this, () => this.refresh({ force: true }));
+  },
+
+  onHide() {
+    detachPageMemberAssetRealtime(this);
   },
 
   onReady() {
@@ -87,7 +97,8 @@ Page({
     });
   },
 
-  async refresh() {
+  async refresh(options) {
+    const force = !!(options && options.force);
     const app = getApp();
     const isLoggedIn = app ? app.checkLogin() : false;
     this.setData({ isLoggedIn });
@@ -95,9 +106,13 @@ Page({
       this.setData({ sections: [] });
       return;
     }
+    if (!force && this._refreshPromise) {
+      return this._refreshPromise;
+    }
     this.beginLoading();
-    try {
-      const [venueRes, balRes] = await Promise.all([getVenues(), listAllMemberVenueBalances()]);
+    const task = (async () => {
+      try {
+        const [venueRes, balRes] = await Promise.all([getVenues(), listAllMemberVenueBalances()]);
       const venueNameById = {};
       ((venueRes && venueRes.data) || []).forEach((v) => {
         const id = normalizeVenueId(v._id);
@@ -105,11 +120,19 @@ Page({
       });
       const rows = (balRes && balRes.result && balRes.result.data) || [];
       this.setData({ sections: buildSections(rows, venueNameById) });
-    } catch (e) {
-      console.error('profile-stored-value refresh', e);
-      this.setData({ sections: [] });
+      } catch (e) {
+        console.error('profile-stored-value refresh', e);
+        this.setData({ sections: [] });
+      } finally {
+        this.endLoading();
+      }
+    })();
+    this._refreshPromise = task;
+    try {
+      await task;
     } finally {
-      this.endLoading();
+      this._refreshPromise = null;
     }
+    return task;
   },
 });

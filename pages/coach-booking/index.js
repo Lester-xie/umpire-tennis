@@ -18,6 +18,7 @@ const { buildSlotPriceMapFromCourtList } = require('../../utils/bookingSlotPrice
 const coachPurpose = require('../../utils/coachBookingPurpose');
 const { mergeBookedSlotsAndCoachHolds } = require('../../utils/coachBookingBookedMerge');
 const { buildBookingTimeSlots } = require('../../utils/bookingTimeSlots');
+const { preventTouchMove } = require('../../utils/preventTouchMove');
 const { buildCoachCourts } = require('../../utils/bookingCoachSlots');
 const {
   computeBookingMainContentHeightPx,
@@ -102,6 +103,7 @@ function collectSlotPairsForCoachHoldIds(coachHoldMeta, editingHoldIds) {
 }
 
 Page({
+  preventTouchMove,
   data: {
     dateList: [], // 日期列表
     selectedDate: '', // 选中的日期字符串
@@ -148,7 +150,7 @@ Page({
     /** 团课/畅打：人数与退课、成团检查 */
     minParticipants: 3,
     maxParticipants: 12,
-    refundHoursBeforeStart: 6,
+    refundHoursBeforeStart: 3,
     /** 会员应付场次价（元）；与占用 1 格或多格无关；场馆 categoryList 有配置时自动填入；必填 */
     purposeMemberPriceYuan: '',
     purposeMemberPricePlaceholder: '必填，元/次',
@@ -683,7 +685,7 @@ Page({
             enrollPatch = {
               minParticipants: Number.isFinite(minP) && minP >= 1 ? minP : 3,
               maxParticipants: Number.isFinite(maxP) && maxP >= 1 ? maxP : 12,
-              refundHoursBeforeStart: Number.isFinite(rh) && rh >= 0 ? rh : 6,
+              refundHoursBeforeStart: Number.isFinite(rh) && rh >= 0 ? rh : 3,
             };
           } else if (lt === 'experience' || lt === 'regular') {
             const rhEff =
@@ -691,7 +693,7 @@ Page({
                 ? rh
                 : Number.isFinite(rhMeta) && rhMeta >= 0
                   ? rhMeta
-                  : 6;
+                  : 3;
             enrollPatch = { refundHoursBeforeStart: rhEff };
           }
           if (this.data.isManagerUser) {
@@ -1268,9 +1270,9 @@ Page({
     if (lt === 'group' || lt === 'open_play') {
       patch.minParticipants = 3;
       patch.maxParticipants = 12;
-      patch.refundHoursBeforeStart = 6;
+      patch.refundHoursBeforeStart = 3;
     } else if (lt === 'experience' || lt === 'regular') {
-      patch.refundHoursBeforeStart = 6;
+      patch.refundHoursBeforeStart = 3;
     }
     this.setData(patch, () => this.applyPurposeMemberPriceDefault());
   },
@@ -1301,7 +1303,7 @@ Page({
           ...scalePatch,
           minParticipants: 3,
           maxParticipants: 12,
-          refundHoursBeforeStart: 6,
+          refundHoursBeforeStart: 3,
         },
         () => this.applyPurposeMemberPriceDefault()
       );
@@ -1316,9 +1318,9 @@ Page({
     if (v === 'group') {
       patch.minParticipants = 3;
       patch.maxParticipants = 12;
-      patch.refundHoursBeforeStart = 6;
+      patch.refundHoursBeforeStart = 3;
     } else if (v === 'experience' || v === 'regular') {
-      patch.refundHoursBeforeStart = 6;
+      patch.refundHoursBeforeStart = 3;
     }
     this.setData(patch, () => this.applyPurposeMemberPriceDefault());
   },

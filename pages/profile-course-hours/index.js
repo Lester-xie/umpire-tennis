@@ -7,6 +7,10 @@ const {
 const { formatLessonKeyDisplay } = require('../../utils/lessonKey');
 const { normalizeVenueId } = require('../../utils/venueId');
 const { hasExperienceCoachParticipation } = require('../../utils/experienceParticipation');
+const {
+  attachPageMemberAssetRealtime,
+  detachPageMemberAssetRealtime,
+} = require('../../utils/memberAssetRealtime');
 
 function buildSections(venueRows, venueNameById, hasParticipatedExperience) {
   const byVenue = {};
@@ -56,7 +60,13 @@ Page({
   _loadingTaskCount: 0,
 
   onShow() {
+    this._memberAssetWatchSessionGen = this._memberAssetWatchSessionGen || 0;
     this.refresh();
+    attachPageMemberAssetRealtime(this, () => this.refresh({ force: true }));
+  },
+
+  onHide() {
+    detachPageMemberAssetRealtime(this);
   },
 
   onReady() {
@@ -98,7 +108,8 @@ Page({
     });
   },
 
-  async refresh() {
+  async refresh(options) {
+    const force = !!(options && options.force);
     const app = getApp();
     const isLoggedIn = app ? app.checkLogin() : false;
     const phone = String(wx.getStorageSync('user_phone') || '').trim();
@@ -108,7 +119,12 @@ Page({
       return;
     }
 
+    if (!force && this._refreshPromise) {
+      return this._refreshPromise;
+    }
+
     this.beginLoading('加载课时中');
+    const task = (async () => {
     try {
       const [venuesRes, hoursRes, bookingsRes] = await Promise.all([
         getVenues(),
@@ -142,9 +158,18 @@ Page({
     } finally {
       this.endLoading();
     }
+    })();
+    this._refreshPromise = task;
+    try {
+      await task;
+    } finally {
+      this._refreshPromise = null;
+    }
+    return task;
   },
 
   onUnload() {
+    detachPageMemberAssetRealtime(this);
     this._loadingTaskCount = 0;
     this.setData({ lottieLoadingVisible: false });
   },

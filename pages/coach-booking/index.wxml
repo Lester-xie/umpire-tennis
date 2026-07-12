@@ -1,4 +1,5 @@
 <wxs src="../../wxs/string.wxs" module="str" />
+<page-meta page-style="{{ showPurposeSheet ? 'overflow: hidden;' : '' }}" />
 <view class="container">
   <lottie-loading visible="{{lottieLoadingVisible}}" />
   <header showBackButton="{{true}}" title="预约场地" />
@@ -161,8 +162,9 @@
     </view>
   </view>
 
-  <view class="purpose-mask" wx:if="{{showPurposeSheet}}" catchtap="closePurposeSheet"></view>
+  <view class="purpose-mask" wx:if="{{showPurposeSheet}}" catchtouchmove="preventTouchMove" catchtap="closePurposeSheet"></view>
   <view class="purpose-sheet" wx:if="{{showPurposeSheet}}">
+    <scroll-view scroll-y class="purpose-sheet-scroll" enhanced="{{true}}" show-scrollbar="{{false}}">
     <view class="purpose-sheet-title">{{ purposeSheetMode === 'edit' ? '更改场地类型' : '填写场地用途' }}</view>
     <block wx:if="{{purposeShowStandardTypes || showOpenPlayChip}}">
       <view class="purpose-section-label">课程类型</view>
@@ -208,7 +210,7 @@
           </view>
         </view>
       </view>
-      <view class="purpose-enroll-hint">距首场开始不足该时间不可取消；默认 6 小时</view>
+      <view class="purpose-enroll-hint">距首场开始不足该时间不可取消；默认 3 小时</view>
     </block>
     <block wx:if="{{lessonType === 'group' || lessonType === 'open_play'}}">
       <view class="purpose-section-label">人数与规则</view>
@@ -240,6 +242,7 @@
       bindinput="onPurposeMemberPriceInput"
     />
     <view class="purpose-hint">{{ purposeSheetMode === 'edit' ? '保存后会员在订场页将看到更新后的用途说明' : '确定后该时段将对会员显示为已占用，不可再订' }}</view>
+    </scroll-view>
     <view class="purpose-sheet-actions">
       <view class="purpose-btn purpose-btn--ghost" bindtap="closePurposeSheet">取消</view>
       <view class="purpose-btn purpose-btn--primary" bindtap="confirmPurposeSheet">确定</view>

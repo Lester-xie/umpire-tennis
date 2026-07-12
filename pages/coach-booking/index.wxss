@@ -460,12 +460,20 @@
   bottom: 0;
   z-index: 201;
   max-height: 75vh;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background: #fff;
   border-radius: 28rpx 28rpx 0 0;
   padding: 28rpx 32rpx calc(28rpx + env(safe-area-inset-bottom));
   box-shadow: 0 -8rpx 32rpx rgba(0, 0, 0, 0.12);
   box-sizing: border-box;
+}
+
+.purpose-sheet-scroll {
+  flex: 1;
+  min-height: 0;
+  height: 0;
 }
 
 .purpose-sheet-title {

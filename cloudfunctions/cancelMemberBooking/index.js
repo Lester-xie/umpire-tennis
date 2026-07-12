@@ -6,7 +6,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 
-const MEMBER_CANCEL_LEAD_MS = 6 * 60 * 60 * 1000;
+const MEMBER_CANCEL_LEAD_MS = 3 * 60 * 60 * 1000;
 
 function normalizeOrderDate(raw) {
   const s = String(raw || '').trim();
@@ -432,7 +432,7 @@ async function emitBookingRealtimeSignal({ venueId, orderDate }) {
 /**
  * 会员取消订场/教练课订单
  * event: { phone, bookingId }
- * 规则：距首场开始不足规定时间不可取消（普通 6h；团课/畅打以占用上的 refundHoursBeforeStart 为准）；已付原路退微信/课时/储值；pending 仅关单
+ * 规则：距首场开始不足规定时间不可取消（普通 3h；团课/畅打以占用上的 refundHoursBeforeStart 为准）；已付原路退微信/课时/储值；pending 仅关单
  */
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext();

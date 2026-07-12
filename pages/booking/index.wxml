@@ -33,7 +33,7 @@
         </view>
       </scroll-view>
       <view class="content-time">
-        <view class="booking-loading-overlay {{priceLoading ? 'show' : ''}}">
+        <view class="booking-loading-overlay {{priceLoading ? 'show' : ''}}" catchtouchmove="preventTouchMove">
           <canvas id="booking-loading-canvas" type="2d" class="booking-loading-canvas"></canvas>
         </view>
         <!-- 可滚动的区域 -->

@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "用户与角色",
+  "navigationBarTitleText": "用户管理",
   "usingComponents": {
     "header": "/components/header/header"
   }

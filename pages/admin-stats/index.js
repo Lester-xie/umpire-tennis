@@ -1,4 +1,5 @@
 const { adminOrderStatsByMonth, adminCoachMonthStats } = require('../../api/tennisDb');
+const { preventTouchMove } = require('../../utils/preventTouchMove');
 
 function padMonth(d) {
   const y = d.getFullYear();
@@ -12,6 +13,7 @@ function fenToYuanStr(fen) {
 }
 
 Page({
+  preventTouchMove,
   data: {
     scrollHeight: 400,
     monthValue: '',

@@ -1,6 +1,6 @@
 <view class="admin-sub-page">
   <view class="header-wrapper">
-    <header showBackButton="{{true}}" title="用户与角色" />
+    <header showBackButton="{{true}}" title="用户管理" />
   </view>
   <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
     <view class="field">
@@ -15,14 +15,24 @@
       />
     </view>
 
+    <view class="field">
+      <text class="field-label">场馆</text>
+      <picker
+        mode="selector"
+        range="{{venuePickerLabels}}"
+        value="{{selectedVenueIndex}}"
+        bindchange="onAdminVenueChange"
+      >
+        <view class="venue-pick">{{selectedVenueName || '请选择场馆'}}</view>
+      </picker>
+    </view>
+
     <button
-      class="query-btn"
-      type="default"
+      class="admin-btn"
       loading="{{querying}}"
       disabled="{{querying}}"
       bindtap="onQueryUser"
     >查询</button>
-    <text class="page-hint">先查询用户，再调整下方开关并保存。</text>
 
     <block wx:if="{{userCardVisible}}">
       <view class="user-card">
@@ -48,7 +58,55 @@
         </view>
       </view>
 
-      <button class="submit-btn" bindtap="onSubmit">保存角色</button>
+      <view class="section-card" wx:if="{{venueAssetsReady}}">
+        <view class="section-head">
+          <text class="section-title">{{selectedVenueName}} · 账户</text>
+        </view>
+
+        <view class="asset-input-row">
+          <text class="asset-input-label">储值余额</text>
+          <input
+            class="asset-input asset-input--balance"
+            type="digit"
+            placeholder="0.00"
+            value="{{balanceInput}}"
+            bindinput="onBalanceInput"
+          />
+          <text class="asset-unit">元</text>
+        </view>
+
+        <view class="asset-input-row asset-input-row--hour">
+          <text class="asset-input-label">{{hour1v1Label}}</text>
+          <input
+            class="asset-input asset-input--hours"
+            type="number"
+            placeholder="0"
+            value="{{hour1v1Input}}"
+            bindinput="onHour1v1Input"
+          />
+          <text class="asset-unit">小时</text>
+        </view>
+
+        <view class="asset-input-row asset-input-row--hour">
+          <text class="asset-input-label">{{hour1v2Label}}</text>
+          <input
+            class="asset-input asset-input--hours"
+            type="number"
+            placeholder="0"
+            value="{{hour1v2Input}}"
+            bindinput="onHour1v2Input"
+          />
+          <text class="asset-unit">小时</text>
+        </view>
+      </view>
+
+      <button
+        class="admin-btn admin-btn--spaced"
+        wx:if="{{userCardVisible}}"
+        loading="{{saving}}"
+        disabled="{{saving}}"
+        bindtap="onSubmit"
+      >保存</button>
     </block>
   </scroll-view>
 </view>

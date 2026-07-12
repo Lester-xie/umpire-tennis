@@ -1,5 +1,5 @@
-/** 会员自助取消：须不晚于场次首场开始前 6 小时（与云函数 cancelMemberBooking 一致） */
-const MEMBER_CANCEL_LEAD_MS = 6 * 60 * 60 * 1000;
+/** 会员自助取消：须不晚于场次首场开始前 3 小时（与云函数 cancelMemberBooking 一致） */
+const MEMBER_CANCEL_LEAD_MS = 3 * 60 * 60 * 1000;
 
 function minSlotIndexFromBookedSlots(bookedSlots) {
   const arr = Array.isArray(bookedSlots) ? bookedSlots : [];

@@ -1,0 +1,9 @@
+{
+  "name": "adminSetUserMemberAssets",
+  "version": "1.0.0",
+  "description": "管理员调整用户储值余额与课时",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

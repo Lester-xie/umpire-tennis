@@ -12,6 +12,7 @@ const {
 const { applyCoachSessionFlatVenuePrice } = require('../../utils/coachSessionVenuePrice');
 const lottie = require('lottie-miniprogram');
 const loadingAnimationData = require('../../assets/images/loading.js');
+const { preventTouchMove } = require('../../utils/preventTouchMove');
 
 function normalizeDateForWatch(raw) {
   const s = String(raw || '').trim();
@@ -37,6 +38,7 @@ function isRealtimeWatchTransportError(err) {
 const BOOKING_REFRESH_MS = 45 * 1000;
 const BOOKING_VIP_CACHE_KEY = 'booking_vip_cache';
 Page({
+  preventTouchMove,
   data: {
     dateList: [], // 日期列表
     selectedDate: '', // 选中的日期字符串

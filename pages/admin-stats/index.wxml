@@ -1,3 +1,4 @@
+<page-meta page-style="{{ packageRewardModalVisible ? 'overflow: hidden;' : '' }}" />
 <view class="admin-sub-page">
   <view class="header-wrapper">
     <header showBackButton="{{true}}" title="交易统计" />
@@ -135,7 +136,7 @@
     <view class="hint">按支付成功时间 paidAt 所在自然月统计；仅含 status 为 paid 的订单。教练课与课包订单每类最多拉取 1000 条。教练课金额取订单中的标价 totalPrice，纯课时支付订单金额可能为 0。课包奖励金为当月付款且 ≥10h 正课包、且会员已绑定体验课成单教练时计入该教练。</view>
   </scroll-view>
 
-  <view wx:if="{{packageRewardModalVisible}}" class="pr-modal-mask" bindtap="onClosePackageRewardModal">
+  <view wx:if="{{packageRewardModalVisible}}" class="pr-modal-mask" catchtouchmove="preventTouchMove" catchtap="onClosePackageRewardModal">
     <view class="pr-modal" catchtap="onPackageRewardModalNop">
       <view class="pr-modal-hd">课包奖励金 · 明细</view>
       <scroll-view

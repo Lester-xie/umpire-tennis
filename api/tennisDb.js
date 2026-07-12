@@ -243,7 +243,7 @@ function getMyBookings(options) {
 }
 
 /**
- * 会员取消订场/教练课：首场开始前满 6 小时可取消；已付原路退微信、退课时（云函数内校验）
+ * 会员取消订场/教练课：首场开始前满 3 小时可取消；已付原路退微信、退课时（云函数内校验）
  * @param {{ bookingId: string }} payload
  */
 function cancelMemberBooking(payload) {
@@ -400,6 +400,22 @@ function adminGetUserByPhone(payload) {
   });
 }
 
+/** 管理员：按手机号查询用户储值余额与课时 */
+function adminGetUserMemberAssets(payload) {
+  return wx.cloud.callFunction({
+    name: 'adminGetUserMemberAssets',
+    data: payload || {},
+  });
+}
+
+/** 管理员：保存用户储值余额与课时 */
+function adminSetUserMemberAssets(payload) {
+  return wx.cloud.callFunction({
+    name: 'adminSetUserMemberAssets',
+    data: payload || {},
+  });
+}
+
 /** 管理员：更新课程文档 */
 function adminUpdateCourse(payload) {
   return wx.cloud.callFunction({
@@ -548,6 +564,8 @@ module.exports = {
   updateCoachHolds,
   adminSetUserRoles,
   adminGetUserByPhone,
+  adminGetUserMemberAssets,
+  adminSetUserMemberAssets,
   adminUpdateCourse,
   adminCoachHoldForCoach,
   adminVenueSlotLock,

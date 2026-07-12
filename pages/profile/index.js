@@ -20,6 +20,11 @@ const {
   DEFAULT_USER_AVATAR,
 } = require('../../api/tennisDb');
 const { roundYuan, formatYuanText } = require('../../utils/storedValuePlans');
+const {
+  attachPageMemberAssetRealtime,
+  detachPageMemberAssetRealtime,
+  restartMemberAssetRealtimeWatch,
+} = require('../../utils/memberAssetRealtime');
 
 function readAvatarUrlCache(fileID) {
   if (!fileID) return '';
@@ -207,6 +212,18 @@ Page({
     }
     this.applyProfileFromLocal();
     this.refreshProfileSummary();
+    this._memberAssetWatchSessionGen = this._memberAssetWatchSessionGen || 0;
+    attachPageMemberAssetRealtime(this, () => this.handleMemberAssetRealtimeChange());
+  },
+
+  onHide() {
+    detachPageMemberAssetRealtime(this);
+  },
+
+  handleMemberAssetRealtimeChange() {
+    clearProfileSummaryCache();
+    this._profileSummary = null;
+    this.refreshProfileSummary({ force: true });
   },
 
   /** 先用本地 storage / 缓存即时渲染，避免等网络再出首屏 */
@@ -270,7 +287,8 @@ Page({
     return Date.now() - (mem.ts || 0) < PROFILE_REFRESH_MS;
   },
 
-  async refreshProfileSummary() {
+  async refreshProfileSummary(options) {
+    const force = !!(options && options.force);
     const app = getApp();
     const isLoggedIn = app ? app.checkLogin() : false;
     const userPhone = wx.getStorageSync(STORAGE_KEYS.userPhone) || '';
@@ -281,13 +299,18 @@ Page({
       return;
     }
 
-    if (app && app.globalData && app.globalData.profileSummaryStale) {
+    if (force) {
+      if (app && app.globalData) {
+        app.globalData.profileSummaryStale = false;
+      }
+      this._profileRefreshPromise = null;
+    } else if (app && app.globalData && app.globalData.profileSummaryStale) {
       app.globalData.profileSummaryStale = false;
     } else if (this.shouldSkipProfileRefresh(userPhone)) {
       return;
     }
 
-    if (this._profileRefreshPromise) {
+    if (!force && this._profileRefreshPromise) {
       return this._profileRefreshPromise;
     }
 
@@ -509,6 +532,7 @@ Page({
         wx.setStorageSync(STORAGE_KEYS.userPhone, phone);
         wx.setStorageSync(STORAGE_KEYS.userAvatar, avatar);
         wx.setStorageSync(STORAGE_KEYS.userNickname, nickname);
+        restartMemberAssetRealtimeWatch(this, () => this.handleMemberAssetRealtimeChange());
 
         const isVip = !!user.isVip;
         const isCoach = !!user.isCoach;
@@ -547,6 +571,7 @@ Page({
 
       // 必须先写 storage，再 setData，否则 onShow 可能先读到空 user_avatar 并覆盖头像
       wx.setStorageSync(STORAGE_KEYS.userPhone, phone);
+      restartMemberAssetRealtimeWatch(this, () => this.handleMemberAssetRealtimeChange());
       wx.setStorageSync(STORAGE_KEYS.userNickname, defaultNickname);
       wx.setStorageSync(STORAGE_KEYS.userAvatar, DEFAULT_USER_AVATAR);
 
@@ -573,6 +598,7 @@ Page({
   },
 
   onUnload() {
+    detachPageMemberAssetRealtime(this);
     this._loadingTaskCount = 0;
     this.setData({ lottieLoadingVisible: false });
   },
@@ -659,6 +685,7 @@ Page({
           app.globalData.isLoggedIn = false;
           app.globalData.profileSummaryStale = false;
         }
+        detachPageMemberAssetRealtime(this);
         this._profileSummary = null;
         this._profileRefreshPromise = null;
         this.setData({
