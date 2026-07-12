@@ -57,7 +57,6 @@ exports.main = async (event, context) => {
 
   // 需要在云函数环境变量里配置微信 app secret
   const appSecret = process.env.WECHAT_APP_SECRET;
-  console.log('appSecret', appSecret);
   if (!appSecret) {
     return {
       phoneNumber: null,

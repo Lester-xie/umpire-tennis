@@ -1103,9 +1103,16 @@ Page({
         return;
       }
     }
-    const payYuan = isCourtPlain
+    let payYuan = isCourtPlain
       ? Number(this.data.wechatDueYuan)
       : Number(totalPrice);
+    if (
+      orderType === 'court' &&
+      this.data.isCoachCourseOrder &&
+      this.data.payMethod === 'mixed'
+    ) {
+      payYuan = Number(this.data.comboCashYuan);
+    }
     if (!Number.isFinite(payYuan) || payYuan <= 0) {
       wx.showToast({ title: '订单金额无效', icon: 'none' });
       return;
@@ -1128,8 +1135,7 @@ Page({
     }
 
     /** 普通订场占用校验由 pay / completeCourtBookingWithVouchers 云函数负责，不在支付前调 getBookedSlots */
-    /** 当前页所有微信统一下单金额固定 1 分（totalFee 单位：分） */
-    const totalFee = 1;
+    const totalFee = Math.max(1, Math.round(payYuan * 100));
 
     const payPayload = {
       totalFee,

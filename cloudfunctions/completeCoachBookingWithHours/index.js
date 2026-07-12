@@ -187,7 +187,6 @@ async function setUserExperienceCoachFromHoldIds(phone, coachHoldIds) {
         updatedAt: ts,
       },
     })
-    console.log('db_user 已写入体验课教练', phoneNorm, coachId, coachName)
   } catch (e) {
     console.error('setUserExperienceCoachFromHoldIds update user', e)
   }

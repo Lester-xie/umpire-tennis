@@ -129,8 +129,7 @@ Page({
       wx.showToast({ title: '请先授权手机号', icon: 'none' });
       return;
     }
-    // TODO: 测试用 1 分，上线前改回 Math.max(1, Math.round(plan.payYuan * 100))
-    const totalFee = 1;
+    const totalFee = Math.max(1, Math.round(plan.payYuan * 100));
     this.setData({ paying: true });
     this.beginLoading();
     try {

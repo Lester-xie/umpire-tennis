@@ -505,7 +505,6 @@ Page({
       });
       const phoneNumber =
         decryptRes && decryptRes.result ? decryptRes.result.phoneNumber : decryptRes.phoneNumber;
-      console.log('phoneNumber', decryptRes);
 
       if (!phoneNumber) {
         this.endLoading();

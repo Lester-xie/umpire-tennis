@@ -150,7 +150,6 @@ async function setUserExperienceCoachFromHoldIds(phone, coachHoldIds) {
         updatedAt: now,
       },
     })
-    console.log('db_user 已写入体验课教练', phoneNorm, coachId, coachName)
   } catch (e) {
     console.error('setUserExperienceCoachFromHoldIds update user', e)
   }
@@ -297,7 +296,6 @@ async function savePaidOrderToDb({
   if (exist.data && exist.data.length > 0) {
     const _id = exist.data[0]._id
     await coll.doc(_id).update({ data: payload })
-    console.log('db_pay_order 已更新', _id, outTradeNo)
   } else {
     await coll.add({
       data: {
@@ -305,7 +303,6 @@ async function savePaidOrderToDb({
         createdAt: now,
       },
     })
-    console.log('db_pay_order 已新增', outTradeNo)
   }
 }
 
@@ -385,13 +382,11 @@ async function markBookingPaid({ outTradeNo, transactionId, timeEnd }) {
   const coll = db.collection('db_booking')
   const exist = await coll.where({ outTradeNo }).limit(1).get()
   if (!exist.data || exist.data.length === 0) {
-    console.log('markBookingPaid: 无匹配 db_booking', outTradeNo)
     return
   }
   const booking = exist.data[0]
   const _id = booking._id
   if (String(booking.status || '') === 'paid') {
-    console.log('markBookingPaid: 已支付，跳过', outTradeNo)
     return
   }
   const now = Date.now()
@@ -403,7 +398,6 @@ async function markBookingPaid({ outTradeNo, transactionId, timeEnd }) {
     .where({ outTradeNo, status: 'pending' })
     .update({ data: { status: 'payment_confirming', updatedAt: now } })
   if (!lockRes.stats || lockRes.stats.updated < 1) {
-    console.log('markBookingPaid: 非 pending，跳过', outTradeNo)
     return
   }
 
@@ -469,7 +463,6 @@ async function markBookingPaid({ outTradeNo, transactionId, timeEnd }) {
       paymentMethod: payMethodFinal,
     },
   })
-  console.log('db_booking 已标记已支付', _id, outTradeNo)
 
   if (hasVouchers) {
     try {
@@ -586,8 +579,6 @@ async function markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, 
   if (!lockRes.stats || lockRes.stats.updated < 1) {
     return
   }
-  console.log('db_course_purchase 已标记已支付', _id, outTradeNo)
-
   const balColl = db.collection('db_member_course_hours')
   const bal = await balColl.where({ phone, lessonKey, venueId }).limit(1).get()
   if (bal.data && bal.data.length > 0) {
@@ -610,8 +601,6 @@ async function markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, 
       },
     })
   }
-  console.log('db_member_course_hours 已入账', phone, venueId, lessonKey, grantHours)
-
   if (grantHours >= 10) {
     try {
       const userHit = await db.collection('db_user').where({ phone }).limit(1).get()
@@ -623,10 +612,9 @@ async function markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, 
             updatedAt: now,
           },
         })
-        console.log('db_user 已设为 VIP（单次购课包≥10课时）', phone, grantHours)
       }
     } catch (e) {
-      console.error('setVipAfterCoursePurchase failed', phone, e)
+      console.error('setVipAfterCoursePurchase failed', e)
     }
   }
 }
@@ -645,7 +633,6 @@ async function markStoredValuePurchasePaidAndGrantBalance({ outTradeNo, transact
   const _id = row._id;
   const st = String(row.status || '');
   if (st === 'paid') {
-    console.log('markStoredValuePurchasePaid: 已处理，跳过', outTradeNo);
     return;
   }
   const phone = String(row.phone || '').trim();
@@ -665,7 +652,6 @@ async function markStoredValuePurchasePaidAndGrantBalance({ outTradeNo, transact
       updatedAt: now,
     },
   });
-  console.log('db_stored_value_purchase 已标记已支付', _id, outTradeNo);
 
   const balColl = db.collection('db_member_venue_balance');
   const balHit = await balColl.where({ phone, venueId }).limit(1).get();
@@ -687,7 +673,6 @@ async function markStoredValuePurchasePaidAndGrantBalance({ outTradeNo, transact
       },
     });
   }
-  console.log('db_member_venue_balance 已入账', phone, venueId, creditYuan);
 }
 
 /** 会员微信支付成功后释放教练占用的连续时段 */
@@ -716,7 +701,6 @@ exports.main = async (event, context) => {
   const { outTradeNo, totalFee, resultCode, transactionId, timeEnd } = event;
 
   if (resultCode === 'SUCCESS') {
-    console.log(`支付成功，订单号: ${outTradeNo}, 金额: ${totalFee}`);
     try {
       await savePaidOrderToDb({
         outTradeNo,
@@ -757,8 +741,6 @@ exports.main = async (event, context) => {
         errormessage: err.message || '写入订单失败',
       };
     }
-  } else {
-    console.log(`支付失败，订单号: ${outTradeNo}`);
   }
 
   return {
