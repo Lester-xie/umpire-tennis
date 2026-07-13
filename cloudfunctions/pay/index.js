@@ -587,6 +587,7 @@ exports.main = async (event, context) => {
     const lessonKey = String(gp.lessonKey || '').trim();
     const grantHours = Math.floor(Number(gp.grantHours) || 0);
     const venueId = String(gp.venueId || '').trim();
+    const { calcUnitPriceCents } = require('./courseHourUnit');
     if (!phone || !lessonKey || grantHours <= 0 || !venueId) {
       return {
         returnCode: 'FAIL',
@@ -595,6 +596,7 @@ exports.main = async (event, context) => {
       };
     }
     try {
+      const unitPriceCents = calcUnitPriceCents(totalFee, grantHours);
       await db.collection('db_course_purchase').add({
         data: {
           phone,
@@ -606,6 +608,8 @@ exports.main = async (event, context) => {
           grantHours,
           lessonKey,
           goodDesc: gp.goodDesc != null ? String(gp.goodDesc).trim() : '',
+          unitPriceCents,
+          remainingHours: grantHours,
           createdAt: Date.now(),
         },
       });

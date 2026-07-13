@@ -5,6 +5,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
 const _ = db.command;
+const { restorePurchaseHoursFromUnits } = require('./courseHourUnit');
 
 const MEMBER_CANCEL_LEAD_MS = 3 * 60 * 60 * 1000;
 
@@ -269,6 +270,7 @@ async function returnCourseHoursForBooking(booking, now) {
         });
     }
   }
+  await restorePurchaseHoursFromUnits(db, booking, now);
   return { ok: true };
 }
 

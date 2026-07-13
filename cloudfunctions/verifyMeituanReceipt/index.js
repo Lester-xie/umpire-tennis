@@ -9,8 +9,11 @@ const {
   evaluateBookingVoucher,
   normalizePlatform,
   platformLabel,
+  findShopDeal,
+  resolveVoucherPriceYuan,
 } = require('./meituanDealGrantMap');
 const { grantMemberCourseHours, resolveAipaiVenueId } = require('./grantHours');
+const { calcUnitPriceCents } = require('./courseHourUnit');
 const { queryShopDeals, meituanPrepare, meituanConsume } = require('./meituanApi');
 const { consumeBookingVoucherBatch } = require('./bookingVoucherConsume');
 
@@ -463,7 +466,20 @@ exports.main = async (event) => {
     const grantMeta = preview.grant;
     const now = Date.now();
     const memberName = member.name != null ? String(member.name).trim() : '';
-    const dealTitle = dealForGrant.title || '';
+    const dealTitle = dealForGrant.title || grantMeta.label || '';
+
+    const shopRes = await queryShopDeals(platform);
+    const shopDeal = findShopDeal({
+      dealId: dealForGrant.dealId,
+      dealGroupId: dealForGrant.dealGroupId,
+      shopDeals: shopRes.ok ? shopRes.deals : [],
+    });
+    const priceYuan = resolveVoucherPriceYuan(
+      { ...dealForGrant, price: consume.deal && consume.deal.price },
+      shopDeal,
+    );
+    const totalFeeCents = Math.max(0, Math.round(priceYuan * 100));
+    const unitPriceCents = calcUnitPriceCents(totalFeeCents, grantMeta.grantHours);
 
     try {
       await db.collection('db_ticket_receipt').add({
@@ -482,6 +498,9 @@ exports.main = async (event) => {
           lessonKey: grantMeta.lessonKey,
           grantHours: grantMeta.grantHours,
           grantLabel: grantMeta.label,
+          totalFeeCents,
+          unitPriceCents,
+          payPriceYuan: priceYuan,
           traceId: consume.traceId || '',
           consumedAt: now,
           createdAt: now,
@@ -495,12 +514,19 @@ exports.main = async (event) => {
       console.error('db_ticket_receipt add failed after meituan consume', receiptCodeKey, e);
     }
 
+    const sourceMeta = platform === 2 ? 'douyin_receipt' : 'meituan_receipt';
     const grantRes = await grantMemberCourseHours({
       phone: memberPhone,
       venueId,
       lessonKey: grantMeta.lessonKey,
       grantHours: grantMeta.grantHours,
-      sourceMeta: platform === 2 ? 'douyin_receipt' : 'meituan_receipt',
+      sourceMeta,
+      voucherPurchase: {
+        totalFeeCents,
+        goodDesc: dealTitle,
+        platform,
+        receiptCodeKey,
+      },
     });
 
     return {
@@ -512,9 +538,18 @@ exports.main = async (event) => {
         memberPhone,
         memberName,
         venueId,
-        grant: grantMeta,
+        grant: {
+          ...grantMeta,
+          totalFeeCents,
+          unitPriceCents,
+          payPriceYuan: priceYuan,
+        },
         traceId: consume.traceId || '',
         grantPending: grantRes.ok ? false : grantRes.errMsg || '课时入账失败，请联系客服',
+        purchasePending:
+          grantRes.ok && grantRes.purchaseRecord && !grantRes.purchaseRecord.ok
+            ? grantRes.purchaseRecord.errMsg || '课包单价记录失败，请联系客服'
+            : false,
       },
     };
   }

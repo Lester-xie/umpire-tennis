@@ -4,6 +4,10 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 
 const db = cloud.database()
 const _ = db.command
+const {
+  allocateLessonUnits,
+  applyPurchaseRemainingUpdates,
+} = require('./courseHourUnit')
 
 function buildLessonKey(lessonType, pairMode, groupMode) {
   const lt = String(lessonType || '').trim()
@@ -342,6 +346,23 @@ exports.main = async (event) => {
       return { ok: false, errMsg: '课时不足' }
     }
 
+    const alloc = await allocateLessonUnits(db, {
+      phone,
+      venueId: venueIdNorm,
+      lessonKey: lessonKeyClient,
+      hoursNeeded: requiredHours,
+    })
+    let lessonUnits = []
+    let lessonValueCents = 0
+    let purchaseUpdates = []
+    if (alloc.ok) {
+      lessonUnits = alloc.lessonUnits
+      lessonValueCents = alloc.lessonValueCents
+      purchaseUpdates = alloc.purchaseUpdates
+    } else {
+      console.warn('completeCoachBookingWithHours: 无课包单价快照', alloc.errMsg)
+    }
+
     const deductRes = await db
       .collection('db_member_course_hours')
       .where({
@@ -360,6 +381,8 @@ exports.main = async (event) => {
     if (!deductRes.stats || deductRes.stats.updated < 1) {
       return { ok: false, errMsg: '扣减课时失败，请重试' }
     }
+
+    await applyPurchaseRemainingUpdates(db, purchaseUpdates, now)
 
     await db.collection('db_booking').add({
       data: {
@@ -384,6 +407,8 @@ exports.main = async (event) => {
           snapshot.memberDisplayName != null
             ? String(snapshot.memberDisplayName).trim().slice(0, 40)
             : '',
+        lessonUnits,
+        lessonValueCents,
         paidAt: now,
         createdAt: now,
         updatedAt: now,

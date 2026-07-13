@@ -5,6 +5,11 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV }) // 使用当前云环境
 
 const db = cloud.database()
 const _ = db.command
+const {
+  calcUnitPriceCents,
+  allocateLessonUnits,
+  applyPurchaseRemainingUpdates,
+} = require('./courseHourUnit')
 
 function normalizeOrderDateCb(raw) {
   const s = String(raw || '').trim()
@@ -311,15 +316,29 @@ async function savePaidOrderToDb({
  */
 async function tryDeductCoachCourseHoursForBooking(booking, now) {
   const deduct = Math.floor(Number(booking.coachCourseHoursDeduct) || 0)
-  if (deduct <= 0) return true
-  if (String(booking.bookingSubtype || '').trim() !== 'coach_course') return true
+  if (deduct <= 0) return { ok: true, lessonUnits: [], lessonValueCents: 0 }
+  if (String(booking.bookingSubtype || '').trim() !== 'coach_course') {
+    return { ok: true, lessonUnits: [], lessonValueCents: 0 }
+  }
   const phone = String(booking.phone || '').trim()
   const lessonKey = String(booking.lessonKey || '').trim()
   const venueId = String(booking.venueId || '').trim()
   if (!phone || !lessonKey || !venueId) {
     console.error('tryDeductCoachCourseHoursForBooking: 缺少字段', booking._id)
-    return false
+    return { ok: false, lessonUnits: [], lessonValueCents: 0 }
   }
+
+  const alloc = await allocateLessonUnits(db, {
+    phone,
+    venueId,
+    lessonKey,
+    hoursNeeded: deduct,
+  })
+  if (!alloc.ok) {
+    console.error('tryDeductCoachCourseHoursForBooking: 分配单价失败', alloc.errMsg)
+    return { ok: false, lessonUnits: [], lessonValueCents: 0 }
+  }
+
   const deductRes = await db
     .collection('db_member_course_hours')
     .where({
@@ -336,9 +355,16 @@ async function tryDeductCoachCourseHoursForBooking(booking, now) {
     })
   const ok = deductRes.stats && deductRes.stats.updated >= 1
   if (!ok) {
-    console.error('组合支付扣课时失败', phone, lessonKey, venueId, deduct)
+    console.error('组合支付扣课时失败', lessonKey, venueId, deduct)
+    return { ok: false, lessonUnits: [], lessonValueCents: 0 }
   }
-  return ok
+
+  await applyPurchaseRemainingUpdates(db, alloc.purchaseUpdates, now)
+  return {
+    ok: true,
+    lessonUnits: alloc.lessonUnits,
+    lessonValueCents: alloc.lessonValueCents,
+  }
 }
 
 /**
@@ -424,8 +450,8 @@ async function markBookingPaid({ outTradeNo, transactionId, timeEnd }) {
     return
   }
 
-  const deductOk = await tryDeductCoachCourseHoursForBooking(booking, now)
-  if (!deductOk) {
+  const deductResult = await tryDeductCoachCourseHoursForBooking(booking, now)
+  if (!deductResult.ok) {
     console.error('markBookingPaid: 课时扣减失败，回退 pending', outTradeNo)
     await coll.doc(_id).update({
       data: { status: 'pending', updatedAt: now },
@@ -461,6 +487,8 @@ async function markBookingPaid({ outTradeNo, transactionId, timeEnd }) {
       paidAt: now,
       updatedAt: now,
       paymentMethod: payMethodFinal,
+      lessonUnits: deductResult.lessonUnits || [],
+      lessonValueCents: Math.floor(Number(deductResult.lessonValueCents) || 0),
     },
   })
 
@@ -574,6 +602,8 @@ async function markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, 
       timeEnd: timeEnd || '',
       paidAt: now,
       updatedAt: now,
+      unitPriceCents: calcUnitPriceCents(row.totalFee, grantHours),
+      remainingHours: grantHours,
     },
   })
   if (!lockRes.stats || lockRes.stats.updated < 1) {
