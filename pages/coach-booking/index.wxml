@@ -164,8 +164,8 @@
 
   <view class="purpose-mask" wx:if="{{showPurposeSheet}}" catchtouchmove="preventTouchMove" catchtap="closePurposeSheet"></view>
   <view class="purpose-sheet" wx:if="{{showPurposeSheet}}">
-    <scroll-view scroll-y class="purpose-sheet-scroll" enhanced="{{true}}" show-scrollbar="{{false}}">
     <view class="purpose-sheet-title">{{ purposeSheetMode === 'edit' ? '更改场地类型' : '填写场地用途' }}</view>
+    <scroll-view scroll-y class="purpose-sheet-scroll" enhanced="{{true}}" show-scrollbar="{{false}}">
     <block wx:if="{{purposeShowStandardTypes || showOpenPlayChip}}">
       <view class="purpose-section-label">课程类型</view>
       <view class="purpose-chip-row">
@@ -183,7 +183,7 @@
         </picker>
       </block>
       <view wx:else class="purpose-coach-pick purpose-coach-pick--empty" bindtap="onCoachPickEmptyTap">暂无可选教练 · 点击重试</view>
-      <view class="purpose-open-hint">未选择时占用记在本人管理员账号下</view>
+      <view class="purpose-open-hint">默认当前账号，也可改为指定其他教练</view>
     </block>
     <view wx:if="{{isManagerUser && lessonType === 'open_play'}}" class="purpose-open-hint">畅打可不指定教练，占用记在本人管理员账号下</view>
     <block wx:if="{{lessonType === 'experience' || lessonType === 'regular'}}">

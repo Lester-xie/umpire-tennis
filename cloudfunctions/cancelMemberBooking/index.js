@@ -5,7 +5,6 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
 const _ = db.command;
-const { restorePurchaseHoursFromUnits } = require('./courseHourUnit');
 
 const MEMBER_CANCEL_LEAD_MS = 3 * 60 * 60 * 1000;
 
@@ -180,6 +179,7 @@ function refundDescForBooking(booking) {
 }
 
 async function refundWeChatPortion(booking, now) {
+  /** 仅退微信实付金额（totalFee，单位：分）；纯课时/纯储值订单 totalFee=0 则跳过 */
   const totalFee = Math.floor(Number(booking.totalFee) || 0);
   if (totalFee <= 0) return { ok: true, skipped: true };
   if (String(booking.refundStatus || '') === 'success') return { ok: true, skipped: true };
@@ -227,15 +227,19 @@ async function refundWeChatPortion(booking, now) {
   }
 }
 
+/**
+ * 教练课取消：退回已扣课时（纯课时 course_hours，或组合支付 mixed 中的 coachCourseHoursDeduct）
+ * 普通订场不涉及课时
+ */
 async function returnCourseHoursForBooking(booking, now) {
   const subtype = String(booking.bookingSubtype || '').trim();
   const payMethod = String(booking.paymentMethod || '').trim();
   if (subtype !== 'coach_course') return { ok: true };
 
   let hours = Math.floor(Number(booking.coachCourseHoursDeduct) || 0);
-  if (hours <= 0 && payMethod === 'course_hours') {
+  if (hours <= 0 && (payMethod === 'course_hours' || payMethod === 'mixed')) {
     const slots = Array.isArray(booking.bookedSlots) ? booking.bookedSlots : [];
-    hours = slots.length;
+    if (payMethod === 'course_hours') hours = slots.length;
   }
   if (hours <= 0) return { ok: true };
 
@@ -270,10 +274,12 @@ async function returnCourseHoursForBooking(booking, now) {
         });
     }
   }
-  await restorePurchaseHoursFromUnits(db, booking, now);
   return { ok: true };
 }
 
+/**
+ * 普通订场取消：退回储值抵扣（储值仅可用于订场，教练课订单不会走到此处）
+ */
 async function returnStoredBalanceForBooking(booking, now) {
   const subtype = String(booking.bookingSubtype || '').trim();
   if (subtype === 'coach_course') return { ok: true };
@@ -434,7 +440,12 @@ async function emitBookingRealtimeSignal({ venueId, orderDate }) {
 /**
  * 会员取消订场/教练课订单
  * event: { phone, bookingId }
- * 规则：距首场开始不足规定时间不可取消（普通 3h；团课/畅打以占用上的 refundHoursBeforeStart 为准）；已付原路退微信/课时/储值；pending 仅关单
+ *
+ * 取消退款规则（paid）：
+ * - 微信实付（totalFee>0）→ 原路微信退款
+ * - 教练课已扣课时（course_hours / mixed）→ 退回 db_member_course_hours
+ * - 普通订场储值抵扣 → 退回场馆储值（储值仅可用于订场，不可用于教练课）
+ * pending / payment_confirming：仅关单，不退款
  */
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext();
@@ -517,14 +528,17 @@ exports.main = async (event) => {
   }
 
   if (st === 'paid') {
+    // 1) 微信实付原路退（纯课时/纯储值无微信款时自动跳过）
     const rf = await refundWeChatPortion({ ...booking, _id: bookingId }, now);
     if (!rf.ok) {
       return rf;
     }
+    // 2) 教练课：退回已扣课时
     const rh = await returnCourseHoursForBooking({ ...booking, _id: bookingId }, now);
     if (!rh.ok) {
       return rh;
     }
+    // 3) 普通订场：退回储值抵扣（教练课不会退储值）
     const rb = await returnStoredBalanceForBooking({ ...booking, _id: bookingId }, now);
     if (!rb.ok) {
       return rb;

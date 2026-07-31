@@ -119,7 +119,7 @@ async function findCourseHoursDoc({ phone, venueId, lessonKey, docId }) {
  * event: {
  *   targetPhone: string,
  *   balances?: Array<{ docId?: string, venueId: string, balanceYuan: number }>,
- *   courseHours?: Array<{ docId?: string, venueId: string, lessonKey: string, hours: number }>,
+ *   courseHours?: Array<{ docId?: string, venueId: string, lessonKey: string, hours: number, unitPriceYuan?: number }>,
  * }
  */
 exports.main = async (event) => {
@@ -194,6 +194,7 @@ exports.main = async (event) => {
       const venueId = String(item.venueId || '').trim();
       const lessonKey = String(item.lessonKey || '').trim();
       const hours = Math.floor(Number(item.hours));
+      const unitPriceYuan = roundYuan(item.unitPriceYuan);
       const docId = item.docId != null ? String(item.docId).trim() : '';
       if (!venueId) {
         return { ok: false, errMsg: `课时第 ${i + 1} 项缺少场馆` };
@@ -203,6 +204,9 @@ exports.main = async (event) => {
       }
       if (!Number.isFinite(hours) || hours < 0) {
         return { ok: false, errMsg: `课时第 ${i + 1} 项数量无效` };
+      }
+      if (!Number.isFinite(unitPriceYuan) || unitPriceYuan < 0) {
+        return { ok: false, errMsg: `课时第 ${i + 1} 项单价无效` };
       }
       const existing = await findCourseHoursDoc({ phone: targetPhone, venueId, lessonKey, docId });
       if (docId && !existing) {
@@ -214,10 +218,11 @@ exports.main = async (event) => {
             venueId: existing.venueId != null ? existing.venueId : venueId,
             lessonKey: existing.lessonKey != null ? existing.lessonKey : lessonKey,
             hours,
+            unitPriceYuan,
             updatedAt: now,
           },
         });
-        courseHourUpdates.push({ docId: existing._id, venueId, lessonKey, hours });
+        courseHourUpdates.push({ docId: existing._id, venueId, lessonKey, hours, unitPriceYuan });
       } else {
         const addRes = await db.collection('db_member_course_hours').add({
           data: {
@@ -225,11 +230,19 @@ exports.main = async (event) => {
             venueId,
             lessonKey,
             hours,
+            unitPriceYuan,
             createdAt: now,
             updatedAt: now,
           },
         });
-        courseHourUpdates.push({ docId: addRes._id, venueId, lessonKey, hours, created: true });
+        courseHourUpdates.push({
+          docId: addRes._id,
+          venueId,
+          lessonKey,
+          hours,
+          unitPriceYuan,
+          created: true,
+        });
       }
     }
 

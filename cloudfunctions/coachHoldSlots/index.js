@@ -307,8 +307,12 @@ exports.main = async (event, context) => {
 
   const now = Date.now();
   const phone = user.phone != null ? String(user.phone).trim() : '';
-  const coachName =
+  let coachName =
     user.name != null && String(user.name).trim() !== '' ? String(user.name).trim() : '';
+  if (!coachName && /^1\d{10}$/.test(phone)) {
+    coachName = `尾号${phone.slice(-4)}`;
+  }
+  if (!coachName) coachName = '教练';
 
   try {
     for (let i = 0; i < normalized.length; i += 1) {

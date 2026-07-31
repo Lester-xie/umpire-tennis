@@ -53,8 +53,10 @@ function buildVenueAssetFields(venueId, assetCache) {
     balanceInput: String(roundYuan(bal ? bal.balanceYuan : 0)),
     hour1v1DocId: h1 && h1.docId ? String(h1.docId) : '',
     hour1v1Input: String(Math.max(0, Math.floor(Number(h1 ? h1.hours : 0)))),
+    hour1v1UnitPriceInput: String(roundYuan(h1 ? h1.unitPriceYuan : 0)),
     hour1v2DocId: h2 && h2.docId ? String(h2.docId) : '',
     hour1v2Input: String(Math.max(0, Math.floor(Number(h2 ? h2.hours : 0)))),
+    hour1v2UnitPriceInput: String(roundYuan(h2 ? h2.unitPriceYuan : 0)),
   };
 }
 
@@ -80,9 +82,11 @@ Page({
     balanceInput: '0',
     hour1v1DocId: '',
     hour1v1Input: '0',
+    hour1v1UnitPriceInput: '0',
     hour1v1Label: formatLessonKeyDisplay('regular:1v1'),
     hour1v2DocId: '',
     hour1v2Input: '0',
+    hour1v2UnitPriceInput: '0',
     hour1v2Label: formatLessonKeyDisplay('regular:1v2'),
   },
 
@@ -149,8 +153,10 @@ Page({
       balanceInput: '0',
       hour1v1DocId: '',
       hour1v1Input: '0',
+      hour1v1UnitPriceInput: '0',
       hour1v2DocId: '',
       hour1v2Input: '0',
+      hour1v2UnitPriceInput: '0',
     });
   },
 
@@ -260,8 +266,16 @@ Page({
     this.setData({ hour1v1Input: e.detail.value || '' });
   },
 
+  onHour1v1UnitPriceInput(e) {
+    this.setData({ hour1v1UnitPriceInput: e.detail.value || '' });
+  },
+
   onHour1v2Input(e) {
     this.setData({ hour1v2Input: e.detail.value || '' });
+  },
+
+  onHour1v2UnitPriceInput(e) {
+    this.setData({ hour1v2UnitPriceInput: e.detail.value || '' });
   },
 
   assertQueriedPhone() {
@@ -301,6 +315,18 @@ Page({
       return;
     }
 
+    const hour1v1UnitPriceYuan = roundYuan(this.data.hour1v1UnitPriceInput);
+    const hour1v2UnitPriceYuan = roundYuan(this.data.hour1v2UnitPriceInput);
+    if (
+      !Number.isFinite(hour1v1UnitPriceYuan) ||
+      hour1v1UnitPriceYuan < 0 ||
+      !Number.isFinite(hour1v2UnitPriceYuan) ||
+      hour1v2UnitPriceYuan < 0
+    ) {
+      wx.showToast({ title: '课时单价无效', icon: 'none' });
+      return;
+    }
+
     this.setData({ saving: true });
     wx.showLoading({ title: '保存中', mask: true });
     try {
@@ -325,12 +351,14 @@ Page({
               venueId,
               lessonKey: 'regular:1v1',
               hours: hour1v1,
+              unitPriceYuan: hour1v1UnitPriceYuan,
             },
             {
               docId: this.data.hour1v2DocId || '',
               venueId,
               lessonKey: 'regular:1v2',
               hours: hour1v2,
+              unitPriceYuan: hour1v2UnitPriceYuan,
             },
           ],
         }),

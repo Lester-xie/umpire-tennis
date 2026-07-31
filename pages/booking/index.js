@@ -817,6 +817,18 @@ Page({
     const ROW = 126;
     const CELL = 120;
     const GAP = 8;
+    const metaMap = this.coachHoldMeta || {};
+
+    const occupantKey = (meta) => {
+      if (!meta || typeof meta !== 'object') return '';
+      const oid = meta.coachOpenid != null ? String(meta.coachOpenid).trim() : '';
+      if (oid) return `oid:${oid}`;
+      const ph = meta.coachPhone != null ? String(meta.coachPhone).trim() : '';
+      if (ph) return `ph:${ph}`;
+      const nm = meta.coachName != null ? String(meta.coachName).trim() : '';
+      if (nm) return `nm:${nm}`;
+      return '';
+    };
 
     for (let i = 0; i < n; i += 1) {
       slots[i].coachSpan = 1;
@@ -835,19 +847,20 @@ Page({
         continue;
       }
       const label = (cur.coachPurpose || '').trim();
+      const occupant = occupantKey(metaMap[`${courtId}-${i}`]);
       let span = 1;
       let j = i + 1;
       while (j < n) {
         const next = slots[j];
         if (!next.booked || !next.bookedByCoach) break;
         if ((next.coachPurpose || '').trim() !== label) break;
+        if (occupantKey(metaMap[`${courtId}-${j}`]) !== occupant) break;
         span += 1;
         j += 1;
       }
       cur.coachSpan = span;
       cur.coachTimeRange = this.formatCoachSlotRange(i, span);
       const ids = [];
-      const metaMap = this.coachHoldMeta || {};
       for (let k = 0; k < span; k += 1) {
         const m = metaMap[`${courtId}-${i + k}`];
         if (m && m.holdId) ids.push(String(m.holdId));

@@ -6,7 +6,6 @@ const db = cloud.database()
 const _ = db.command
 const {
   allocateLessonUnits,
-  applyPurchaseRemainingUpdates,
 } = require('./courseHourUnit')
 
 function buildLessonKey(lessonType, pairMode, groupMode) {
@@ -354,13 +353,11 @@ exports.main = async (event) => {
     })
     let lessonUnits = []
     let lessonValueCents = 0
-    let purchaseUpdates = []
     if (alloc.ok) {
       lessonUnits = alloc.lessonUnits
       lessonValueCents = alloc.lessonValueCents
-      purchaseUpdates = alloc.purchaseUpdates
     } else {
-      console.warn('completeCoachBookingWithHours: 无课包单价快照', alloc.errMsg)
+      console.warn('completeCoachBookingWithHours: 无课时单价快照', alloc.errMsg)
     }
 
     const deductRes = await db
@@ -381,8 +378,6 @@ exports.main = async (event) => {
     if (!deductRes.stats || deductRes.stats.updated < 1) {
       return { ok: false, errMsg: '扣减课时失败，请重试' }
     }
-
-    await applyPurchaseRemainingUpdates(db, purchaseUpdates, now)
 
     await db.collection('db_booking').add({
       data: {

@@ -470,13 +470,17 @@
   box-sizing: border-box;
 }
 
+/* 真机上 scroll-view 必须有明确高度；flex:1 + height:0 会导致内容区高度为 0，只剩底部按钮 */
 .purpose-sheet-scroll {
-  flex: 1;
-  min-height: 0;
-  height: 0;
+  flex: none;
+  width: 100%;
+  height: 52vh;
+  max-height: 52vh;
+  box-sizing: border-box;
 }
 
 .purpose-sheet-title {
+  flex-shrink: 0;
   font-size: 32rpx;
   font-weight: 600;
   color: #134e35;
@@ -531,9 +535,10 @@
 .purpose-enroll-input {
   flex: 1;
   min-width: 0;
-  /* 原生 input 无默认行高盒模型，flex 下易出现内容高度≈1px，需显式高度 */
+  /* 原生 input 在部分真机 flex 下高度异常，需显式 min-height + box-sizing */
   min-height: 72rpx;
-  height: 30rpx;
+  height: 72rpx;
+  line-height: 40rpx;
   padding: 16rpx 20rpx;
   font-size: 28rpx;
   color: #134e35;
@@ -611,7 +616,8 @@
   border-radius: 16rpx;
   border: 2rpx solid rgba(19, 78, 53, 0.2);
   min-height: 72rpx;
-  height: 30rpx;
+  height: 72rpx;
+  line-height: 40rpx;
 }
 
 .purpose-open-hint {
@@ -629,9 +635,10 @@
 }
 
 .purpose-sheet-actions {
+  flex-shrink: 0;
   display: flex;
   gap: 20rpx;
-  margin-top: 8rpx;
+  margin-top: 16rpx;
 }
 
 .purpose-btn {

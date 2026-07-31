@@ -235,22 +235,13 @@ exports.main = async (event) => {
   }
 
   const coachPhoneRaw = (event && event.coachPhone) != null ? String(event.coachPhone).trim() : '';
-  const lessonTypeEarly = event.lessonType != null ? String(event.lessonType).trim() : '';
 
   let coachUser = null;
   let targetOpenid = '';
   let coachPhone = coachPhoneRaw;
 
-  if (lessonTypeEarly === 'open_play' && !coachPhoneRaw) {
-    /** 畅打可不指定教练：占用记在管理员本人名下 */
-    coachUser = admin;
-    targetOpenid = adminOpenid;
-    coachPhone = admin.phone != null ? String(admin.phone).trim() : '';
-  } else if (
-    !coachPhoneRaw &&
-    ['experience', 'regular', 'group'].includes(lessonTypeEarly)
-  ) {
-    /** 体验课/正课/团课未选教练：占用记在管理员本人名下（与畅打一致） */
+  if (!coachPhoneRaw) {
+    /** 未指定教练：体验课 / 正课 / 团课 / 畅打 一律记在管理员本人名下 */
     coachUser = admin;
     targetOpenid = adminOpenid;
     coachPhone = admin.phone != null ? String(admin.phone).trim() : '';
@@ -370,10 +361,14 @@ exports.main = async (event) => {
 
   const now = Date.now();
   const phone = coachUser.phone != null ? String(coachUser.phone).trim() : '';
-  const coachName =
+  let coachName =
     coachUser.name != null && String(coachUser.name).trim() !== ''
       ? String(coachUser.name).trim()
       : '';
+  if (!coachName && /^1\d{10}$/.test(phone)) {
+    coachName = `尾号${phone.slice(-4)}`;
+  }
+  if (!coachName) coachName = '教练';
 
   try {
     for (let i = 0; i < normalized.length; i += 1) {

@@ -208,6 +208,24 @@
   margin-top: 4rpx;
 }
 
+.asset-block {
+  margin-top: 8rpx;
+  margin-bottom: 8rpx;
+  padding-bottom: 8rpx;
+  border-bottom: 1rpx solid #eef1f6;
+}
+
+.asset-block:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.asset-input-row--price {
+  margin-top: 0;
+  margin-bottom: 12rpx;
+}
+
 .asset-input-label {
   flex-shrink: 0;
   font-size: 28rpx;
@@ -219,7 +237,7 @@
   flex-shrink: 0;
   font-size: 26rpx;
   color: #888;
-  width: 56rpx;
+  min-width: 72rpx;
 }
 
 .asset-input {

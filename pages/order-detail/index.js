@@ -1135,7 +1135,9 @@ Page({
     }
 
     /** 普通订场占用校验由 pay / completeCourtBookingWithVouchers 云函数负责，不在支付前调 getBookedSlots */
-    const totalFee = Math.max(1, Math.round(payYuan * 100));
+    /** 购买课时：测试用 1 分；订场等仍按实付金额 */
+    const totalFee =
+      orderType === 'goods' ? 1 : Math.max(1, Math.round(payYuan * 100));
 
     const payPayload = {
       totalFee,
@@ -1189,6 +1191,8 @@ Page({
         lessonKey,
         venueId: goodsVenueId,
         goodDesc,
+        /** 套餐标价（分），用于课时单价；与微信实付 totalFee 可不同（如测试 1 分） */
+        listPriceCents: Math.max(1, Math.round(Number(this.data.totalPrice) * 100)),
       };
     }
     if (orderType === 'court') {

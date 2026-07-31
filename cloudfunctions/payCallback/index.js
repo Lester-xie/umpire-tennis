@@ -7,8 +7,9 @@ const db = cloud.database()
 const _ = db.command
 const {
   calcUnitPriceCents,
+  centsToYuan,
+  mergeUnitPriceYuan,
   allocateLessonUnits,
-  applyPurchaseRemainingUpdates,
 } = require('./courseHourUnit')
 
 function normalizeOrderDateCb(raw) {
@@ -359,7 +360,6 @@ async function tryDeductCoachCourseHoursForBooking(booking, now) {
     return { ok: false, lessonUnits: [], lessonValueCents: 0 }
   }
 
-  await applyPurchaseRemainingUpdates(db, alloc.purchaseUpdates, now)
   return {
     ok: true,
     lessonUnits: alloc.lessonUnits,
@@ -595,6 +595,12 @@ async function markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, 
     }
   }
 
+  const listCents = Math.floor(Number(row.listPriceCents) || 0)
+  const feeForUnit = listCents > 0 ? listCents : Math.floor(Number(row.totalFee) || 0)
+  const existingUnit = Math.floor(Number(row.unitPriceCents) || 0)
+  const unitPriceCentsForGrant =
+    existingUnit > 0 ? existingUnit : calcUnitPriceCents(feeForUnit, grantHours)
+
   const lockRes = await coll.where({ outTradeNo, status: 'pending' }).update({
     data: {
       status: 'paid',
@@ -602,20 +608,31 @@ async function markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, 
       timeEnd: timeEnd || '',
       paidAt: now,
       updatedAt: now,
-      unitPriceCents: calcUnitPriceCents(row.totalFee, grantHours),
+      unitPriceCents: unitPriceCentsForGrant,
       remainingHours: grantHours,
     },
   })
   if (!lockRes.stats || lockRes.stats.updated < 1) {
     return
   }
+  const addUnitPriceYuan = centsToYuan(unitPriceCentsForGrant)
   const balColl = db.collection('db_member_course_hours')
   const bal = await balColl.where({ phone, lessonKey, venueId }).limit(1).get()
   if (bal.data && bal.data.length > 0) {
-    const bid = bal.data[0]._id
+    const balDoc = bal.data[0]
+    const bid = balDoc._id
+    const oldHours = Math.max(0, Math.floor(Number(balDoc.hours) || 0))
+    const oldUnitPriceYuan = Number(balDoc.unitPriceYuan)
+    const unitPriceYuan = mergeUnitPriceYuan(
+      oldHours,
+      oldUnitPriceYuan,
+      grantHours,
+      addUnitPriceYuan,
+    )
     await balColl.doc(bid).update({
       data: {
         hours: _.inc(grantHours),
+        unitPriceYuan,
         updatedAt: now,
       },
     })
@@ -626,6 +643,7 @@ async function markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, 
         venueId,
         lessonKey,
         hours: grantHours,
+        unitPriceYuan: addUnitPriceYuan,
         createdAt: now,
         updatedAt: now,
       },

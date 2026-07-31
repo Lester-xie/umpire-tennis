@@ -519,6 +519,17 @@ exports.main = async (event, context) => {
           payment: undefined,
         };
       }
+      /** 场馆储值仅可用于普通订场，教练课禁止使用储值 */
+      const clientStoredDeduct = Number(event.booking.storedBalanceDeductYuan) || 0;
+      if (bookingSubtype === 'coach_course' && clientStoredDeduct > 0) {
+        return {
+          returnCode: 'FAIL',
+          returnMsg: '教练课不支持储值支付，储值仅可用于订场',
+          payment: undefined,
+        };
+      }
+      const storedBalanceDeductYuan =
+        bookingSubtype === 'coach_course' ? 0 : clientStoredDeduct;
 
       await db.collection('db_booking').add({
         data: {
@@ -541,7 +552,7 @@ exports.main = async (event, context) => {
             ? event.booking.bookingVouchers
             : [],
           voucherDeductionYuan: Number(event.booking.voucherDeductionYuan) || 0,
-          storedBalanceDeductYuan: Number(event.booking.storedBalanceDeductYuan) || 0,
+          storedBalanceDeductYuan,
           cashDueYuan:
             event.booking.cashDueYuan != null
               ? Number(event.booking.cashDueYuan)
@@ -561,10 +572,10 @@ exports.main = async (event, context) => {
           paymentMethod:
             Array.isArray(event.booking.bookingVouchers) &&
             event.booking.bookingVouchers.length > 0
-              ? Number(event.booking.storedBalanceDeductYuan) > 0
+              ? storedBalanceDeductYuan > 0
                 ? 'voucher_balance_mixed'
                 : 'voucher_mixed'
-              : Number(event.booking.storedBalanceDeductYuan) > 0
+              : storedBalanceDeductYuan > 0
                 ? 'balance_mixed'
                 : 'wechat_pending',
           createdAt: Date.now(),
@@ -596,13 +607,18 @@ exports.main = async (event, context) => {
       };
     }
     try {
-      const unitPriceCents = calcUnitPriceCents(totalFee, grantHours);
+      const listPriceCents = Math.max(
+        1,
+        Math.floor(Number(gp.listPriceCents) || 0) || totalFee,
+      );
+      const unitPriceCents = calcUnitPriceCents(listPriceCents, grantHours);
       await db.collection('db_course_purchase').add({
         data: {
           phone,
           venueId,
           outTradeNo,
           totalFee,
+          listPriceCents,
           status: 'pending',
           courseId: gp.courseId != null ? String(gp.courseId) : '',
           grantHours,

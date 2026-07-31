@@ -122,33 +122,6 @@ async function avatarUrlByPhoneMap(phones) {
   return out
 }
 
-/** 展示用：按占用人 _openid 从 db_user 取昵称，修正占用文档中错误的 coachName */
-async function userNameByOpenidMap(openids) {
-  const list = [...new Set((openids || []).map((x) => String(x || '').trim()).filter(Boolean))]
-  if (list.length === 0) return {}
-  const out = {}
-  const chunkSize = 20
-  for (let i = 0; i < list.length; i += chunkSize) {
-    const chunk = list.slice(i, i + chunkSize)
-    try {
-      const ur = await db
-        .collection('db_user')
-        .where({ _openid: _.in(chunk) })
-        .field({ _openid: true, name: true })
-        .get()
-      ;(ur.data || []).forEach((row) => {
-        const oid = row._openid != null ? String(row._openid).trim() : ''
-        if (!oid) return
-        const nm = row.name != null && String(row.name).trim() !== '' ? String(row.name).trim() : ''
-        if (nm) out[oid] = nm
-      })
-    } catch (e) {
-      console.error('getBookedSlots userNameByOpenid', e)
-    }
-  }
-  return out
-}
-
 function collectCoachPhones(rosterByHoldId, sessionsPaid) {
   const s = new Set()
   Object.values(rosterByHoldId || {}).forEach((arr) => {
@@ -275,15 +248,6 @@ exports.main = async (event) => {
         status: 'active',
       })
       .get()
-    const holdOpenids = new Set()
-    ;(holdRes.data || []).forEach((doc) => {
-      if (normalizeOrderDate(doc.orderDate) !== orderDateNorm) return
-      const ltHold0 = doc.lessonType != null ? String(doc.lessonType).trim() : ''
-      if (ltHold0 === 'venue_lock') return
-      const o2 = doc._openid != null ? String(doc._openid).trim() : ''
-      if (o2) holdOpenids.add(o2)
-    })
-    const nameByOpenid = await userNameByOpenidMap([...holdOpenids])
     ;(holdRes.data || []).forEach((doc) => {
       if (normalizeOrderDate(doc.orderDate) !== orderDateNorm) return
       const cid = Number(doc.courtId)
@@ -294,12 +258,8 @@ exports.main = async (event) => {
       const holdId = doc._id != null ? String(doc._id) : ''
       const ltHold = doc.lessonType != null ? String(doc.lessonType).trim() : ''
       const openidForHold = doc._openid != null ? String(doc._openid).trim() : ''
-      const storedCoachName = doc.coachName != null ? String(doc.coachName).trim() : ''
-      const nameFromUser = openidForHold && nameByOpenid[openidForHold] ? nameByOpenid[openidForHold] : ''
-      const coachNameResolved =
-        ltHold === 'venue_lock'
-          ? storedCoachName
-          : (nameFromUser || storedCoachName)
+      const phoneForHold = doc.phone != null ? String(doc.phone).trim() : ''
+      const coachNameResolved = doc.coachName != null ? String(doc.coachName).trim() : ''
       const capacityLabel =
         ltHold === 'venue_lock'
           ? '已占用'
@@ -350,6 +310,8 @@ exports.main = async (event) => {
         sessionHoldIds,
         capacityLabel,
         coachName: coachNameResolved,
+        coachOpenid: openidForHold,
+        coachPhone: phoneForHold,
         lessonType: ltHold === 'venue_lock' ? 'venue_lock' : doc.lessonType != null ? String(doc.lessonType).trim() : 'experience',
         pairMode: doc.pairMode != null ? String(doc.pairMode).trim() : '1v1',
         groupMode: doc.groupMode != null ? String(doc.groupMode).trim() : '',
@@ -378,6 +340,8 @@ exports.main = async (event) => {
       if (keysArr.some((k) => coachHoldMeta[k] && !coachHoldMeta[k].fromReleasedSession)) continue
 
       let coachNameResolved = ''
+      let coachOpenidResolved = ''
+      let coachPhoneResolved = ''
       const holdIdCandidates = Array.isArray(bucket.sessionHoldIds) ? bucket.sessionHoldIds : []
       for (let hci = 0; hci < holdIdCandidates.length; hci += 1) {
         const hid = String(holdIdCandidates[hci] || '').trim()
@@ -386,25 +350,13 @@ exports.main = async (event) => {
           const hdr = await db.collection('db_coach_slot_hold').doc(hid).get()
           if (!hdr.data) continue
           const d0 = hdr.data
-          const lt0 = d0.lessonType != null ? String(d0.lessonType).trim() : ''
           const stored = d0.coachName != null ? String(d0.coachName).trim() : ''
           const oid = d0._openid != null ? String(d0._openid).trim() : ''
-          if (lt0 === 'venue_lock') {
-            if (stored) {
-              coachNameResolved = stored
-              break
-            }
-            continue
-          }
-          let fromProf = oid ? nameByOpenid[oid] : ''
-          if (oid && !fromProf) {
-            const m = await userNameByOpenidMap([oid])
-            fromProf = m[oid] || ''
-            if (m[oid]) nameByOpenid[oid] = m[oid]
-          }
-          const res = (fromProf || stored).trim()
-          if (res) {
-            coachNameResolved = res
+          const ph = d0.phone != null ? String(d0.phone).trim() : ''
+          if (stored) {
+            coachNameResolved = stored
+            coachOpenidResolved = oid
+            coachPhoneResolved = ph
             break
           }
         } catch (e) {
@@ -435,6 +387,8 @@ exports.main = async (event) => {
         sessionHoldIds: Array.isArray(bucket.sessionHoldIds) ? [...bucket.sessionHoldIds] : [],
         capacityLabel,
         coachName: coachNameResolved,
+        coachOpenid: coachOpenidResolved,
+        coachPhone: coachPhoneResolved,
         lessonType: 'experience',
         pairMode: '1v1',
         groupMode: '',

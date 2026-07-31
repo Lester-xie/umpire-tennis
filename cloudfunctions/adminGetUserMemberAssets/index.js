@@ -59,6 +59,8 @@ exports.main = async (event) => {
       venueId: row.venueId != null ? String(row.venueId).trim() : '',
       lessonKey: row.lessonKey != null ? String(row.lessonKey).trim() : '',
       hours: Math.max(0, Math.floor(Number(row.hours) || 0)),
+      /** 课时单价（元/节），如 3760÷20=188 */
+      unitPriceYuan: roundYuan(row.unitPriceYuan),
     }));
 
     return { ok: true, data: { balances, courseHours } };

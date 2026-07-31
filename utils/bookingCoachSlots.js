@@ -12,6 +12,18 @@ function formatCoachSlotRange(startIndex, span) {
   return `${pad(startH)}:00-${pad(endH)}:00`;
 }
 
+/** 合并连续占用时按「用途 + 占用人」区分，避免不同教练被并成一块 */
+function coachOccupantKey(meta) {
+  if (!meta || typeof meta !== 'object') return '';
+  const oid = meta.coachOpenid != null ? String(meta.coachOpenid).trim() : '';
+  if (oid) return `oid:${oid}`;
+  const ph = meta.coachPhone != null ? String(meta.coachPhone).trim() : '';
+  if (ph) return `ph:${ph}`;
+  const nm = meta.coachName != null ? String(meta.coachName).trim() : '';
+  if (nm) return `nm:${nm}`;
+  return '';
+}
+
 function applyCoachHoldMergeAndLayout(slots, courtId, {
   coachHoldMeta,
   myCoachHoldIdSet,
@@ -49,12 +61,14 @@ function applyCoachHoldMergeAndLayout(slots, courtId, {
       continue;
     }
     const label = (cur.coachPurpose || '').trim();
+    const occupant = coachOccupantKey(metaMap[`${courtId}-${i}`]);
     let span = 1;
     let j = i + 1;
     while (j < n) {
       const next = slots[j];
       if (!next.booked || !next.bookedByCoach) break;
       if ((next.coachPurpose || '').trim() !== label) break;
+      if (coachOccupantKey(metaMap[`${courtId}-${j}`]) !== occupant) break;
       span += 1;
       j += 1;
     }

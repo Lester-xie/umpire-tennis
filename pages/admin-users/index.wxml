@@ -75,28 +75,54 @@
           <text class="asset-unit">元</text>
         </view>
 
-        <view class="asset-input-row asset-input-row--hour">
-          <text class="asset-input-label">{{hour1v1Label}}</text>
-          <input
-            class="asset-input asset-input--hours"
-            type="number"
-            placeholder="0"
-            value="{{hour1v1Input}}"
-            bindinput="onHour1v1Input"
-          />
-          <text class="asset-unit">小时</text>
+        <view class="asset-block">
+          <view class="asset-input-row asset-input-row--hour">
+            <text class="asset-input-label">{{hour1v1Label}}</text>
+            <input
+              class="asset-input asset-input--hours"
+              type="number"
+              placeholder="0"
+              value="{{hour1v1Input}}"
+              bindinput="onHour1v1Input"
+            />
+            <text class="asset-unit">小时</text>
+          </view>
+          <view class="asset-input-row asset-input-row--price">
+            <text class="asset-input-label">课时单价</text>
+            <input
+              class="asset-input asset-input--balance"
+              type="digit"
+              placeholder="0"
+              value="{{hour1v1UnitPriceInput}}"
+              bindinput="onHour1v1UnitPriceInput"
+            />
+            <text class="asset-unit">元/节</text>
+          </view>
         </view>
 
-        <view class="asset-input-row asset-input-row--hour">
-          <text class="asset-input-label">{{hour1v2Label}}</text>
-          <input
-            class="asset-input asset-input--hours"
-            type="number"
-            placeholder="0"
-            value="{{hour1v2Input}}"
-            bindinput="onHour1v2Input"
-          />
-          <text class="asset-unit">小时</text>
+        <view class="asset-block">
+          <view class="asset-input-row asset-input-row--hour">
+            <text class="asset-input-label">{{hour1v2Label}}</text>
+            <input
+              class="asset-input asset-input--hours"
+              type="number"
+              placeholder="0"
+              value="{{hour1v2Input}}"
+              bindinput="onHour1v2Input"
+            />
+            <text class="asset-unit">小时</text>
+          </view>
+          <view class="asset-input-row asset-input-row--price">
+            <text class="asset-input-label">课时单价</text>
+            <input
+              class="asset-input asset-input--balance"
+              type="digit"
+              placeholder="0"
+              value="{{hour1v2UnitPriceInput}}"
+              bindinput="onHour1v2UnitPriceInput"
+            />
+            <text class="asset-unit">元/节</text>
+          </view>
         </view>
       </view>
 

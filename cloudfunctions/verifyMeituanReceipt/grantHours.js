@@ -4,7 +4,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
 const _ = db.command;
-const { calcUnitPriceCents } = require('./courseHourUnit');
+const { calcUnitPriceCents, centsToYuan, mergeUnitPriceYuan } = require('./courseHourUnit');
 
 function isExperienceLessonKey(lk) {
   return String(lk || '')
@@ -86,7 +86,8 @@ async function recordCoursePurchaseFromVoucher({
 }
 
 /**
- * 累加 db_member_course_hours；验券时可附带写入 db_course_purchase 记录课时单价
+ * 累加 db_member_course_hours，并按加权平均更新 unitPriceYuan；
+ * 验券时可附带写入 db_course_purchase
  */
 async function grantMemberCourseHours({
   phone,
@@ -106,12 +107,33 @@ async function grantMemberCourseHours({
     return { ok: false, errMsg: '入账参数无效' };
   }
 
+  let addUnitPriceYuan = 0;
+  if (voucherPurchase && typeof voucherPurchase === 'object') {
+    if (
+      voucherPurchase.addUnitPriceYuan != null &&
+      Number.isFinite(Number(voucherPurchase.addUnitPriceYuan))
+    ) {
+      addUnitPriceYuan = Math.round(Number(voucherPurchase.addUnitPriceYuan) * 100) / 100;
+    } else {
+      addUnitPriceYuan = centsToYuan(calcUnitPriceCents(voucherPurchase.totalFeeCents, gh));
+    }
+  }
+
   const balColl = db.collection('db_member_course_hours');
   const bal = await balColl.where({ phone: ph, lessonKey: lk, venueId: vid }).limit(1).get();
   if (bal.data && bal.data.length > 0) {
-    await balColl.doc(bal.data[0]._id).update({
+    const balDoc = bal.data[0];
+    const oldHours = Math.max(0, Math.floor(Number(balDoc.hours) || 0));
+    const unitPriceYuan = mergeUnitPriceYuan(
+      oldHours,
+      balDoc.unitPriceYuan,
+      gh,
+      addUnitPriceYuan,
+    );
+    await balColl.doc(balDoc._id).update({
       data: {
         hours: _.inc(gh),
+        unitPriceYuan,
         updatedAt: now,
         lastGrantSource: sourceMeta || 'meituan',
       },
@@ -123,6 +145,7 @@ async function grantMemberCourseHours({
         venueId: vid,
         lessonKey: lk,
         hours: gh,
+        unitPriceYuan: addUnitPriceYuan,
         lastGrantSource: sourceMeta || 'meituan',
         createdAt: now,
         updatedAt: now,
@@ -168,6 +191,7 @@ async function grantMemberCourseHours({
     venueId: vid,
     lessonKey: lk,
     grantHours: gh,
+    unitPriceYuan: addUnitPriceYuan,
     purchaseRecord,
   };
 }
