@@ -205,7 +205,7 @@
         <view class="purpose-enroll-row">
           <text class="purpose-enroll-label">开课前（小时）</text>
           <view class="purpose-enroll-field">
-            <input class="purpose-enroll-input purpose-enroll-input--narrow" type="number" value="{{refundHoursBeforeStart}}" bindinput="onRefundHoursInput" />
+            <input class="purpose-enroll-input purpose-enroll-input--narrow" type="number" value="{{refundHoursBeforeStart}}" placeholder-class="purpose-input-placeholder" bindinput="onRefundHoursInput" />
             <text class="purpose-enroll-unit">小时</text>
           </view>
         </view>
@@ -217,16 +217,16 @@
       <view class="purpose-enroll-grid">
         <view class="purpose-enroll-row">
           <text class="purpose-enroll-label">最少人数</text>
-          <input class="purpose-enroll-input" type="number" value="{{minParticipants}}" bindinput="onMinParticipantsInput" />
+          <input class="purpose-enroll-input" type="number" value="{{minParticipants}}" placeholder-class="purpose-input-placeholder" bindinput="onMinParticipantsInput" />
         </view>
         <view class="purpose-enroll-row">
           <text class="purpose-enroll-label">最多人数</text>
-          <input class="purpose-enroll-input" type="number" value="{{maxParticipants}}" bindinput="onMaxParticipantsInput" />
+          <input class="purpose-enroll-input" type="number" value="{{maxParticipants}}" placeholder-class="purpose-input-placeholder" bindinput="onMaxParticipantsInput" />
         </view>
         <view class="purpose-enroll-row">
           <text class="purpose-enroll-label">开课前（小时）</text>
           <view class="purpose-enroll-field">
-            <input class="purpose-enroll-input purpose-enroll-input--narrow" type="number" value="{{refundHoursBeforeStart}}" bindinput="onRefundHoursInput" />
+            <input class="purpose-enroll-input purpose-enroll-input--narrow" type="number" value="{{refundHoursBeforeStart}}" placeholder-class="purpose-input-placeholder" bindinput="onRefundHoursInput" />
             <text class="purpose-enroll-unit">小时</text>
           </view>
         </view>
@@ -239,6 +239,7 @@
       type="digit"
       value="{{purposeMemberPriceYuan}}"
       placeholder="{{purposeMemberPricePlaceholder}}"
+      placeholder-class="purpose-input-placeholder"
       bindinput="onPurposeMemberPriceInput"
     />
     <view class="purpose-hint">{{ purposeSheetMode === 'edit' ? '保存后会员在订场页将看到更新后的用途说明' : '确定后该时段将对会员显示为已占用，不可再订' }}</view>

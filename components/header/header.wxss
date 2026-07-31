@@ -30,6 +30,10 @@
   width: 36rpx;
   height: 30rpx;
 }
+.home-icon {
+  width: 36rpx;
+  height: 36rpx;
+}
 .switch-account-icon {
   width: 40rpx;
   height: 40rpx;

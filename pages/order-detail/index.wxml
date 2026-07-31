@@ -74,6 +74,10 @@
               <text class="info-label">球馆</text>
               <text class="info-value">{{campusName}}</text>
             </view>
+            <view class="info-item" wx:if="{{isCoachCourseOrder && lessonKeyDisplay}}">
+              <text class="info-label">课程类型</text>
+              <text class="info-value">{{lessonKeyDisplay}}</text>
+            </view>
             <view class="info-item" wx:if="{{isCoachCourseOrder && coachCapacityLabel}}">
               <text class="info-label">课程</text>
               <text class="info-value">{{coachCapacityLabel}}</text>
@@ -87,18 +91,6 @@
           <!-- 教练时段：支付方式 -->
           <view class="coach-pay-panel" wx:if="{{isCoachCourseOrder}}">
             <view class="coach-pay-title">支付方式</view>
-            <view class="coach-balance-banner">
-              <view class="coach-balance-banner-main">
-                <text class="coach-balance-banner-label">当前剩余课时</text>
-                <block wx:if="{{coachCourseBalanceReady}}">
-                  <text class="coach-balance-banner-num">{{courseHoursBalance}}</text>
-                  <text class="coach-balance-banner-unit">小时</text>
-                </block>
-                <text wx:else class="coach-balance-banner-hint">{{coachCourseBalanceHint}}</text>
-              </view>
-              <text class="coach-balance-banner-tip">与本单课程类型、本场馆一致；不同场馆或课型不通用</text>
-            </view>
-            <view class="coach-pay-hint">本时段需消耗 {{requiredCourseHours}} 小时</view>
             <view class="coach-roster-card" wx:if="{{coachSessionRosterReady}}">
               <view class="coach-roster-row">
                 <text class="coach-roster-label">课节名额</text>
@@ -111,6 +103,31 @@
               <view class="coach-roster-warn" wx:if="{{coachSessionFull}}">名额已满，无法继续报名</view>
               <view class="coach-roster-warn" wx:elif="{{coachViewerAlreadyJoined}}">您已在名单中</view>
             </view>
+            <block wx:if="{{coachPayWechatOnly}}">
+              <view class="coach-pay-hint">团课 / 畅打仅支持微信支付</view>
+              <view
+                class="coach-pay-option {{payMethod === 'wechat' ? 'coach-pay-option--on' : ''}}"
+                data-method="wechat"
+                bindtap="selectPayMethod"
+              >
+                <text class="coach-pay-option-label">微信支付</text>
+                <text class="coach-pay-option-desc">按场次价 ¥{{totalPrice}}</text>
+              </view>
+            </block>
+            <block wx:else>
+            <view class="coach-balance-banner">
+              <view class="coach-balance-banner-main">
+                <text class="coach-balance-banner-label">当前剩余课时</text>
+                <block wx:if="{{coachCourseBalanceReady}}">
+                  <text class="coach-balance-banner-num">{{courseHoursBalance}}</text>
+                  <text class="coach-balance-banner-unit">小时</text>
+                </block>
+                <text wx:else class="coach-balance-banner-hint">{{coachCourseBalanceHint}}</text>
+              </view>
+              <text class="coach-balance-banner-tip" wx:if="{{lessonKeyDisplay}}">本单为「{{lessonKeyDisplay}}」，仅可使用本场馆该类型课时</text>
+              <text class="coach-balance-banner-tip" wx:else>与本单课程类型、本场馆一致；不同场馆或课型不通用</text>
+            </view>
+            <view class="coach-pay-hint">本时段需消耗 {{requiredCourseHours}} 小时</view>
             <view
               wx:if="{{courseHoursBalance >= requiredCourseHours}}"
               class="coach-pay-option {{payMethod === 'course_hours' ? 'coach-pay-option--on' : ''}}"
@@ -137,7 +154,8 @@
               <text class="coach-pay-option-label">微信支付（全额）</text>
               <text class="coach-pay-option-desc">不扣课时，按场地标价 ¥{{totalPrice}}</text>
             </view>
-            <view class="coach-pay-warn" wx:if="{{courseHoursBalance <= 0 && requiredCourseHours > 0}}">
+            </block>
+            <view class="coach-pay-warn" wx:if="{{!coachPayWechatOnly && courseHoursBalance <= 0 && requiredCourseHours > 0}}">
               当前账号在本场馆暂无对应课时，请使用微信支付全额付款，或先购买课程后再用课时 / 组合支付
             </view>
           </view>

@@ -164,7 +164,7 @@ function defaultCapacityLimit(lessonType, pairMode, groupMode) {
   if (lt === 'group') {
     const gm = String(groupMode || '').trim().toLowerCase();
     if (gm.includes('1v2')) return 1;
-    return 5;
+    return 6;
   }
   if (lt === 'open_play') {
     const gm = String(groupMode || '').trim().toLowerCase();

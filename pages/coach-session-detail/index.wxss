@@ -150,6 +150,9 @@
   padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
   background: #fff;
   border-top: 2rpx solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
 }
 
 .footer-btn {
@@ -177,4 +180,70 @@
 
 .divider {
   margin-top: 20rpx;
+}
+
+.login-modal-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.login-modal {
+  width: 560rpx;
+  background-color: #fff;
+  border-radius: 28rpx;
+  padding: 48rpx;
+}
+
+.login-modal-title {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+  margin-bottom: 24rpx;
+}
+
+.login-modal-desc {
+  font-size: 26rpx;
+  color: #666;
+  text-align: center;
+  line-height: 1.5;
+  margin-bottom: 40rpx;
+}
+
+.login-modal-btns {
+  display: flex;
+  gap: 20rpx;
+}
+
+.login-modal-btn {
+  flex: 1;
+  padding: 24rpx;
+  text-align: center;
+  font-size: 30rpx;
+  border-radius: 20rpx;
+  border: none;
+  margin: 0;
+}
+
+.login-modal-btn::after {
+  border: none;
+}
+
+.login-modal-btn.cancel {
+  background-color: #f0f0f0;
+  color: #666;
+}
+
+.login-modal-btn.confirm {
+  background: linear-gradient(135deg, #134e35 0%, #1a6b4a 100%);
+  color: #fff;
+  font-weight: 500;
 }

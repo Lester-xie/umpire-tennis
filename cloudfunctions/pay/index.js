@@ -519,6 +519,18 @@ exports.main = async (event, context) => {
           payment: undefined,
         };
       }
+      const lkLower = String(lessonKey || '').trim().toLowerCase();
+      if (
+        bookingSubtype === 'coach_course' &&
+        coachCourseHoursDeduct > 0 &&
+        (lkLower.startsWith('group:') || lkLower.startsWith('open_play:'))
+      ) {
+        return {
+          returnCode: 'FAIL',
+          returnMsg: '团课/畅打仅支持微信支付',
+          payment: undefined,
+        };
+      }
       /** 场馆储值仅可用于普通订场，教练课禁止使用储值 */
       const clientStoredDeduct = Number(event.booking.storedBalanceDeductYuan) || 0;
       if (bookingSubtype === 'coach_course' && clientStoredDeduct > 0) {

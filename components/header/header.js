@@ -33,18 +33,40 @@ Component({
         this.setData({ title: String(v).trim() || (getApp() && getApp().globalData.brand) || '昂湃网球' });
       }
     },
+    showBackButton() {
+      this.refreshNavMode();
+    },
   },
 
   data: {
     headerInfo: {},
+    /** 分享落地等仅一页时：左上角显示回主页 */
+    showHomeButton: false,
   },
 
   /**
    * 组件的方法列表
    */
   methods: {
+    refreshNavMode() {
+      if (!this.properties.showBackButton) {
+        this.setData({ showHomeButton: false });
+        return;
+      }
+      const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+      const showHomeButton = !(pages && pages.length > 1);
+      this.setData({ showHomeButton });
+    },
     handleBack() {
-      wx.navigateBack();
+      const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+      if (pages && pages.length > 1) {
+        wx.navigateBack();
+        return;
+      }
+      this.handleHome();
+    },
+    handleHome() {
+      wx.switchTab({ url: '/pages/home/index' });
     },
     handleSwitchAccount() {
       this.triggerEvent('switchaccount', {});
@@ -66,5 +88,6 @@ Component({
     } else {
       this.setData({ title });
     }
+    this.refreshNavMode();
   },
 });

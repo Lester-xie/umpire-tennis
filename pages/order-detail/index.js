@@ -20,6 +20,7 @@ const {
   requestWechatPay,
   listMemberVenueBalance,
   markProfileSummaryStale,
+  refreshSelectedVenueFromCloud,
 } = require('../../api/tennisDb');
 const { buildLessonKey, formatLessonKeyDisplay } = require('../../utils/lessonKey');
 const { lessonKeyFromTypeMapFormat, splitCourseDescriptionLines } = require('../../utils/courseCatalog');
@@ -37,6 +38,7 @@ const {
   attachPageMemberAssetRealtime,
   detachPageMemberAssetRealtime,
 } = require('../../utils/memberAssetRealtime');
+const { sessionMemberPriceFromMeta } = require('../../utils/coachSessionVenuePrice');
 
 function enrichGoodItemDisplay(g) {
   if (!g) return null;
@@ -47,6 +49,14 @@ function enrichGoodItemDisplay(g) {
     noteLine: note,
     tailLine: tail,
   };
+}
+
+/** 团课 / 畅打：仅允许微信支付，不可用课时或组合支付 */
+function isCoachWechatOnlyLessonKey(lk) {
+  const s = String(lk || '')
+    .trim()
+    .toLowerCase();
+  return s.startsWith('group:') || s.startsWith('open_play:');
 }
 
 function sortTypeMapFormatKeys(keys) {
@@ -105,6 +115,8 @@ Page({
     /** 占用教练的展示名（db_user.name，经 getBookedSlots / 订场页传入） */
     coachName: '',
     lessonKey: '',
+    /** 如「体验课 1V1」，用于订单页展示与课时匹配说明 */
+    lessonKeyDisplay: '',
     requiredCourseHours: 0,
     courseHoursBalance: 0,
     /** 是否已从云端拿到本单 lessonKey 在本场馆的课时余额（未登录等为 false） */
@@ -130,6 +142,8 @@ Page({
     coachMixedPreviewCash: 0,
     /** 用户是否手动切换过教练单支付方式（余额刷新时尽量保留「仅微信」等选择） */
     coachPayUserChose: false,
+    /** 团课 / 畅打：仅微信支付 */
+    coachPayWechatOnly: false,
     lottieLoadingVisible: false,
     /** 课时包：db_course.typeMap 多规格 */
     goodsHasTypeMap: false,
@@ -153,6 +167,182 @@ Page({
     wechatDueYuan: 0,
   },
   _loadingTaskCount: 0,
+
+  parseBookedSlotsCompact(raw) {
+    const s = String(raw || '').trim();
+    if (!s) return [];
+    return s
+      .split(',')
+      .map((part) => {
+        const bits = String(part || '').trim().split('-');
+        if (bits.length < 2) return null;
+        const courtId = Number(bits[0]);
+        const slotIndex = Number(bits[1]);
+        if (!Number.isFinite(courtId) || !Number.isFinite(slotIndex)) return null;
+        return { courtId, slotIndex };
+      })
+      .filter(Boolean);
+  },
+
+  /**
+   * 教练课报名入参：storage（优先）/ 短链 query / 旧版 coachPayload
+   */
+  parseCoachCourseLaunchOptions(options) {
+    let fromStore = null;
+    try {
+      fromStore = wx.getStorageSync('coach_course_order_payload') || null;
+      wx.removeStorageSync('coach_course_order_payload');
+    } catch (e) {
+      fromStore = null;
+    }
+
+    if (fromStore && typeof fromStore === 'object') {
+      const bookedSlots = Array.isArray(fromStore.bookedSlots) ? fromStore.bookedSlots : [];
+      if (bookedSlots.length > 0) {
+        return {
+          ok: true,
+          holdIds: Array.isArray(fromStore.holdIds) ? fromStore.holdIds : [],
+          bookedSlots,
+          lessonType: fromStore.lessonType || 'experience',
+          pairMode: fromStore.pairMode || '1v1',
+          groupMode: fromStore.groupMode || '',
+          lessonKeyRaw: fromStore.lessonKey,
+          capacityLabel: fromStore.capacityLabel || '',
+          coachNameRaw: fromStore.coachName || '',
+          selectedDate: String(fromStore.orderDate || '').trim(),
+          venueId: String(fromStore.venueId || '').trim(),
+          courts: [],
+        };
+      }
+    }
+
+    const compactSlots = this.parseBookedSlotsCompact(
+      options.slots != null ? decodeURIComponent(String(options.slots)) : '',
+    );
+    const compactVenue = options.v != null ? decodeURIComponent(String(options.v)) : '';
+    const compactDate = options.d != null ? decodeURIComponent(String(options.d)) : '';
+    if (compactSlots.length > 0 && compactVenue && compactDate) {
+      return {
+        ok: true,
+        holdIds: [],
+        bookedSlots: compactSlots,
+        lessonType: options.lt != null ? decodeURIComponent(String(options.lt)) : 'experience',
+        pairMode: options.pm != null ? decodeURIComponent(String(options.pm)) : '1v1',
+        groupMode: options.gm != null ? decodeURIComponent(String(options.gm)) : '',
+        lessonKeyRaw: options.lk != null ? decodeURIComponent(String(options.lk)) : '',
+        capacityLabel: '',
+        coachNameRaw: '',
+        selectedDate: compactDate,
+        venueId: String(compactVenue).trim(),
+        courts: [],
+      };
+    }
+
+    if (options.coachPayload) {
+      try {
+        const coachPayload = JSON.parse(decodeURIComponent(options.coachPayload || '{}'));
+        const courts = JSON.parse(decodeURIComponent(options.courts || '[]'));
+        const selectedDate = decodeURIComponent(options.selectedDate || '');
+        const venueId = decodeURIComponent(options.venueId || '');
+        const bookedSlots = Array.isArray(coachPayload.bookedSlots) ? coachPayload.bookedSlots : [];
+        if (bookedSlots.length > 0 && venueId && selectedDate) {
+          return {
+            ok: true,
+            holdIds: Array.isArray(coachPayload.holdIds) ? coachPayload.holdIds : [],
+            bookedSlots,
+            lessonType: coachPayload.lessonType || 'experience',
+            pairMode: coachPayload.pairMode || '1v1',
+            groupMode: coachPayload.groupMode || '',
+            lessonKeyRaw: coachPayload.lessonKey,
+            capacityLabel: coachPayload.capacityLabel || '',
+            coachNameRaw: coachPayload.coachName || '',
+            selectedDate,
+            venueId: String(venueId).trim(),
+            courts: Array.isArray(courts) ? courts : [],
+          };
+        }
+      } catch (err) {
+        console.error('parseCoachCourseLaunchOptions coachPayload', err);
+      }
+    }
+
+    return { ok: false, errMsg: '课程参数无效' };
+  },
+
+  applyCoachCourseOrder(parsed) {
+    const {
+      holdIds,
+      bookedSlots,
+      lessonType,
+      pairMode,
+      groupMode,
+      lessonKeyRaw,
+      capacityLabel,
+      coachNameRaw,
+      selectedDate,
+      venueId,
+      courts,
+    } = parsed;
+    const orderItems = this.processCoachCourseOrderItems(bookedSlots, courts);
+    let totalPrice = this.calculateTotalPrice(orderItems);
+    const formattedDate = this.formatDate(selectedDate);
+    const lessonKeyFromModes = buildLessonKey(lessonType, pairMode, groupMode);
+    const lessonKey =
+      lessonKeyRaw != null && String(lessonKeyRaw).trim() !== ''
+        ? String(lessonKeyRaw).trim()
+        : lessonKeyFromModes;
+    const lessonKeyDisplay = formatLessonKeyDisplay(lessonKey);
+    const coachPayWechatOnly = isCoachWechatOnlyLessonKey(lessonKey);
+    const capacityLabelResolved =
+      String(capacityLabel || '').trim() || lessonKeyDisplay || '教练课程';
+    const requiredCourseHours = bookedSlots.length;
+    const coachSlotPrices = this.computeCoachSlotPrices(bookedSlots, courts);
+    if (!(totalPrice > 0) && coachSlotPrices.length > 0) {
+      totalPrice = coachSlotPrices.reduce((a, b) => a + (Number(b) || 0), 0);
+    }
+    this.setData(
+      {
+        orderType: 'court',
+        isCoachCourseOrder: true,
+        coachHoldIds: (holdIds || []).map((id) => String(id)).filter(Boolean),
+        coachCapacityLabel: capacityLabelResolved,
+        coachName: String(coachNameRaw || '').trim(),
+        lessonKey,
+        lessonKeyDisplay,
+        coachPayWechatOnly,
+        requiredCourseHours,
+        orderDate: selectedDate,
+        formattedDate,
+        orderNumber: this.generateOrderNumber(),
+        orderItems,
+        totalPrice,
+        bookedSlots,
+        venueId,
+        payMethod: 'wechat',
+        courseHoursBalance: 0,
+        coachSlotPrices,
+        coachPayUserChose: false,
+        coachHoursDeductForPay: 0,
+        comboCashYuan: totalPrice,
+        coachCourseBalanceReady: coachPayWechatOnly,
+        coachCourseBalanceHint: coachPayWechatOnly ? '' : '加载中...',
+        coachSessionRosterReady: false,
+        coachSessionJoined: 0,
+        coachSessionLimit: 1,
+        coachSessionFull: false,
+        coachViewerAlreadyJoined: false,
+        coachSessionParticipantNamesStr: '',
+        courts: Array.isArray(courts) ? courts : [],
+      },
+      () => {
+        this.ensureCoachOrderVenue(venueId);
+        this.syncCampusName();
+        this.loadCoachCourseHoursBalance();
+        this.loadCoachSessionRoster();
+        this.updateFooterButtonText();
+      },
+    );
+  },
 
   onLoad(options) {
     this.syncCampusName();
@@ -184,70 +374,16 @@ Page({
       }
     }
 
-    // 教练课程时段：从预订页点击教练占用格
-    if (options.orderSource === 'coachCourse' && options.coachPayload) {
-      try {
-        const coachPayload = JSON.parse(decodeURIComponent(options.coachPayload || '{}'));
-        const courts = JSON.parse(decodeURIComponent(options.courts || '[]'));
-        const selectedDate = decodeURIComponent(options.selectedDate || '');
-        const venueId = decodeURIComponent(options.venueId || '');
-        const {
-          holdIds,
-          bookedSlots,
-          lessonType,
-          pairMode,
-          groupMode,
-          capacityLabel,
-          coachName: coachNameRaw,
-        } = coachPayload;
-        if (
-          Array.isArray(holdIds) &&
-          holdIds.length > 0 &&
-          Array.isArray(bookedSlots) &&
-          bookedSlots.length > 0
-        ) {
-          const orderItems = this.processCoachCourseOrderItems(bookedSlots, courts);
-          const totalPrice = this.calculateTotalPrice(orderItems);
-          const formattedDate = this.formatDate(selectedDate);
-          const lessonKey = buildLessonKey(lessonType, pairMode, groupMode);
-          const requiredCourseHours = bookedSlots.length;
-          const coachSlotPrices = this.computeCoachSlotPrices(bookedSlots, courts);
-          this.setData({
-            orderType: 'court',
-            isCoachCourseOrder: true,
-            coachHoldIds: holdIds.map((id) => String(id)),
-            coachCapacityLabel: String(capacityLabel || '').trim(),
-            coachName: String(coachNameRaw || '').trim(),
-            lessonKey,
-            requiredCourseHours,
-            orderDate: selectedDate,
-            formattedDate,
-            orderNumber: this.generateOrderNumber(),
-            orderItems,
-            totalPrice,
-            bookedSlots,
-            venueId,
-            payMethod: 'wechat',
-            courseHoursBalance: 0,
-            coachSlotPrices,
-            coachPayUserChose: false,
-            coachHoursDeductForPay: 0,
-            comboCashYuan: totalPrice,
-            coachCourseBalanceReady: false,
-            coachCourseBalanceHint: '加载中...',
-            coachSessionRosterReady: false,
-            coachSessionJoined: 0,
-            coachSessionLimit: 1,
-            coachSessionFull: false,
-            coachViewerAlreadyJoined: false,
-            coachSessionParticipantNamesStr: '',
-          });
-          this.syncCampusName();
-          return;
-        }
-      } catch (err) {
-        console.error('解析教练课程订单失败', err);
+    // 教练课程报名（订场格 / 分享详情页）；绝不能落入下方普通订场分支
+    if (String(options.orderSource || '').trim() === 'coachCourse') {
+      const parsed = this.parseCoachCourseLaunchOptions(options);
+      if (!parsed.ok) {
+        console.error('解析教练课程订单失败', parsed.errMsg);
+        wx.showToast({ title: parsed.errMsg || '课程参数无效', icon: 'none' });
+        return;
       }
+      this.applyCoachCourseOrder(parsed);
+      return;
     }
 
     // 场地订单：从 booking 页面跳转
@@ -509,6 +645,146 @@ Page({
     }
   },
 
+  async ensureCoachOrderVenue(venueId) {
+    const wantId = String(venueId || '').trim();
+    if (!wantId) return;
+    const app = getApp();
+    if (!app || !app.globalData) return;
+    const cur = app.globalData.selectedVenue;
+    const same =
+      cur &&
+      cur.id != null &&
+      (String(cur.id).trim() === wantId || Number(cur.id) === Number(wantId));
+    if (!same) {
+      app.globalData.selectedVenue = { id: wantId };
+    }
+    try {
+      await refreshSelectedVenueFromCloud(app);
+      this.syncCampusName();
+      const venue = app.globalData.selectedVenue;
+      const courtList = venue && Array.isArray(venue.courtList) ? venue.courtList : [];
+      if (courtList.length > 0 && (!this.data.courts || this.data.courts.length === 0)) {
+        const courts = courtList.map((c, idx) => ({
+          id: idx + 1,
+          name: (c && c.name) || `${idx + 1}号场`,
+        }));
+        this.setData({ courts });
+      }
+    } catch (e) {
+      console.warn('ensureCoachOrderVenue', e);
+    }
+  },
+
+  /**
+   * 分享入口等：用占用元数据校正 lessonKey / 场次价 / holdIds，
+   * 再拉课时余额以展示「使用课时 / 组合 / 微信」。
+   */
+  hydrateCoachCoursePricingFromMeta(metaMap) {
+    if (!this.data.isCoachCourseOrder) return;
+    const bs = Array.isArray(this.data.bookedSlots) ? [...this.data.bookedSlots] : [];
+    if (bs.length === 0) return;
+    bs.sort((a, b) =>
+      Number(a.courtId) !== Number(b.courtId)
+        ? Number(a.courtId) - Number(b.courtId)
+        : Number(a.slotIndex) - Number(b.slotIndex),
+    );
+    const first = bs[0];
+    const key = `${Number(first.courtId)}-${Number(first.slotIndex)}`;
+    const m = (metaMap && metaMap[key]) || {};
+
+    const lt =
+      m.lessonType != null && String(m.lessonType).trim() !== ''
+        ? String(m.lessonType).trim()
+        : '';
+    const pm =
+      m.pairMode != null && String(m.pairMode).trim() !== ''
+        ? String(m.pairMode).trim()
+        : '1v1';
+    const gm = m.groupMode != null ? String(m.groupMode).trim() : '';
+    const nextLessonKey =
+      lt && lt !== 'venue_lock' ? buildLessonKey(lt, pm, gm) : String(this.data.lessonKey || '').trim();
+    const prevLessonKey = String(this.data.lessonKey || '').trim();
+    const lessonKeyDisplay = formatLessonKeyDisplay(nextLessonKey || prevLessonKey);
+
+    const holdIdSet = new Set();
+    bs.forEach((s) => {
+      const kk = `${Number(s.courtId)}-${Number(s.slotIndex)}`;
+      const mm = (metaMap && metaMap[kk]) || {};
+      if (Array.isArray(mm.sessionHoldIds) && mm.sessionHoldIds.length > 0) {
+        mm.sessionHoldIds.forEach((hid) => {
+          const h = String(hid || '').trim();
+          if (h) holdIdSet.add(h);
+        });
+      } else if (mm.holdId) {
+        holdIdSet.add(String(mm.holdId).trim());
+      }
+    });
+    const nextHoldIds = [...holdIdSet].filter(Boolean);
+
+    const labelFromMeta =
+      m.capacityLabel != null && String(m.capacityLabel).trim() !== ''
+        ? String(m.capacityLabel).trim()
+        : '';
+    const prevLabel = String(this.data.coachCapacityLabel || '').trim();
+    const genericLabel = !prevLabel || prevLabel === '教练课程' || prevLabel === '教练占用';
+    const coachCapacityLabel = labelFromMeta || (!genericLabel ? prevLabel : '') || lessonKeyDisplay || prevLabel;
+
+    const patch = {
+      coachCapacityLabel,
+      coachName:
+        m.coachName != null && String(m.coachName).trim() !== ''
+          ? String(m.coachName).trim()
+          : this.data.coachName,
+      lessonKeyDisplay,
+    };
+    if (nextLessonKey) {
+      patch.lessonKey = nextLessonKey;
+      patch.coachPayWechatOnly = isCoachWechatOnlyLessonKey(nextLessonKey);
+      if (patch.coachPayWechatOnly) {
+        patch.payMethod = 'wechat';
+        patch.coachPayUserChose = false;
+        patch.courseHoursBalance = 0;
+        patch.coachCourseBalanceReady = true;
+        patch.coachCourseBalanceHint = '';
+      }
+    }
+    if (nextHoldIds.length > 0) {
+      patch.coachHoldIds = nextHoldIds;
+    }
+
+    const sessionYuan = sessionMemberPriceFromMeta(m);
+    if (sessionYuan != null) {
+      const courtId = Number(first.courtId);
+      const courts = this.data.courts || [];
+      const court = courts.find((c) => c.id === courtId);
+      const courtName = court && court.name ? String(court.name) : `${courtId}号场`;
+      const timeSlots = bs.map((s, i) => ({
+        slotIndex: Number(s.slotIndex),
+        time: this.getTimeSlotTime(Number(s.slotIndex)),
+        price: i === 0 ? sessionYuan : 0,
+      }));
+      patch.totalPrice = sessionYuan;
+      patch.orderItems = [
+        {
+          courtId,
+          courtName,
+          timeSlots: this.mergeTimeSlots(timeSlots),
+          totalPrice: sessionYuan,
+        },
+      ];
+      patch.coachSlotPrices = bs.map((_, i) => (i === 0 ? sessionYuan : 0));
+    }
+
+    const lessonKeyChanged = nextLessonKey && nextLessonKey !== prevLessonKey;
+    this.setData(patch, () => {
+      this.recomputeCoachPayAmounts();
+      this.updateFooterButtonText();
+      if (lessonKeyChanged || !this.data.coachCourseBalanceReady) {
+        this.loadCoachCourseHoursBalance();
+      }
+    });
+  },
+
   onShow() {
     this.syncCampusName();
     this.loadCoachCourseHoursBalance();
@@ -597,6 +873,7 @@ Page({
         .map((p) => (p && p.displayName ? String(p.displayName).trim() : ''))
         .filter(Boolean)
         .join('、');
+      this.hydrateCoachCoursePricingFromMeta(metaMap);
       this.setData({
         coachSessionRosterReady: true,
         coachSessionJoined: m.joinedCount != null ? Number(m.joinedCount) : 0,
@@ -616,6 +893,10 @@ Page({
   selectPayMethod(e) {
     const method = e.currentTarget.dataset.method;
     if (method !== 'course_hours' && method !== 'wechat' && method !== 'mixed') return;
+    if (this.data.coachPayWechatOnly && method !== 'wechat') {
+      wx.showToast({ title: '团课/畅打仅支持微信支付', icon: 'none' });
+      return;
+    }
     const need = this.data.requiredCourseHours || 0;
     const bal = Math.floor(Number(this.data.courseHoursBalance) || 0);
     if (method === 'course_hours') {
@@ -705,6 +986,28 @@ Page({
 
   async loadCoachCourseHoursBalance() {
     if (!this.data.isCoachCourseOrder || !this.data.lessonKey) return;
+    if (
+      this.data.coachPayWechatOnly ||
+      isCoachWechatOnlyLessonKey(this.data.lessonKey)
+    ) {
+      this.setData(
+        {
+          coachPayWechatOnly: true,
+          courseHoursBalance: 0,
+          payMethod: 'wechat',
+          coachPayUserChose: false,
+          coachCourseBalanceReady: true,
+          coachCourseBalanceHint: '',
+          coachHoursDeductForPay: 0,
+          comboCashYuan: Number(this.data.totalPrice) || 0,
+        },
+        () => {
+          this.recomputeCoachPayAmounts();
+          this.updateFooterButtonText();
+        },
+      );
+      return;
+    }
     const app = getApp();
     if (!app || !app.checkLogin()) {
       this.setData(
@@ -745,7 +1048,7 @@ Page({
       const key = this.data.lessonKey;
       rows.forEach((r) => {
         if (String(r.lessonKey || '').trim() === key) {
-          hours = Number(r.hours) || 0;
+          hours += Number(r.hours) || 0;
         }
       });
       const need = this.data.requiredCourseHours || 0;
@@ -1455,6 +1758,20 @@ Page({
       wx.showToast({
         title: this.data.coachSessionFull ? '该课节名额已满' : '您已在该课节名单中',
         icon: 'none',
+      });
+      return;
+    }
+
+    if (
+      this.data.orderType === 'court' &&
+      this.data.isCoachCourseOrder &&
+      (this.data.coachPayWechatOnly || isCoachWechatOnlyLessonKey(this.data.lessonKey)) &&
+      this.data.payMethod !== 'wechat'
+    ) {
+      wx.showToast({ title: '团课/畅打仅支持微信支付', icon: 'none' });
+      this.setData({ payMethod: 'wechat' }, () => {
+        this.recomputeCoachPayAmounts();
+        this.updateFooterButtonText();
       });
       return;
     }

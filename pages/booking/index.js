@@ -10,6 +10,7 @@ const {
   estimateBookingHeaderHeightPx,
 } = require('../../utils/bookingLayout');
 const { applyCoachSessionFlatVenuePrice } = require('../../utils/coachSessionVenuePrice');
+const { buildLessonKey } = require('../../utils/lessonKey');
 const lottie = require('lottie-miniprogram');
 const loadingAnimationData = require('../../assets/images/loading.js');
 const { preventTouchMove } = require('../../utils/preventTouchMove');
@@ -1007,12 +1008,16 @@ Page({
     for (let k = 0; k < span; k += 1) {
       bookedSlots.push({ courtId, slotIndex: startIndex + k });
     }
+    const lessonType = ds.lessontype || 'experience';
+    const pairMode = ds.pairmode || '1v1';
+    const groupMode = ds.groupmode || '';
     const coachPayload = {
       holdIds,
       bookedSlots,
-      lessonType: ds.lessontype || 'experience',
-      pairMode: ds.pairmode || '1v1',
-      groupMode: ds.groupmode || '',
+      lessonType,
+      pairMode,
+      groupMode,
+      lessonKey: buildLessonKey(lessonType, pairMode, groupMode),
       capacityLabel: ds.purpose || '',
       coachName: ds.coachname != null ? String(ds.coachname).trim() : '',
     };

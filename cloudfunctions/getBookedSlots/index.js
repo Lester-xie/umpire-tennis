@@ -42,7 +42,7 @@ function defaultCapacityLimit(lessonType, pairMode, groupMode) {
   if (lt === 'group') {
     const gm = String(groupMode || '').trim().toLowerCase()
     if (gm.includes('1v2')) return 1
-    return 5
+    return 6
   }
   if (lt === 'open_play') {
     const gm = String(groupMode || '').trim().toLowerCase()
@@ -88,9 +88,9 @@ function sessionHoldIdsForSlotKey(slotKey, sessionsPaid) {
 
 function defaultLimitFromLessonKey(lk) {
   const s = String(lk || '').trim()
-  if (!s) return 5
+  if (!s) return 6
   if (s.includes('1v2')) return 1
-  if (s.startsWith('group:')) return 5
+  if (s.startsWith('group:')) return 6
   if (s.startsWith('open_play:')) return 6
   return 1
 }

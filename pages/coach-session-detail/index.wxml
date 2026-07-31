@@ -77,4 +77,26 @@
       <text class="footer-btn-text footer-btn-text--outline">取消报名</text>
     </view>
   </view>
+
+  <view
+    class="login-modal-mask"
+    wx:if="{{showPhoneAuthModal}}"
+    catchtouchmove="preventTouchMove"
+    catchtap="handleClosePhoneAuthModal"
+  >
+    <view class="login-modal" catchtap="" catchtouchmove="preventTouchMove">
+      <view class="login-modal-title">手机号登录</view>
+      <view class="login-modal-desc">报名需先授权手机号；已注册用户将直接登录</view>
+      <view class="login-modal-btns">
+        <view class="login-modal-btn cancel" bindtap="handleClosePhoneAuthModal">取消</view>
+        <button
+          class="login-modal-btn confirm"
+          open-type="getPhoneNumber"
+          bindgetphonenumber="onPhoneRegister"
+        >
+          授权手机号
+        </button>
+      </view>
+    </view>
+  </view>
 </view>

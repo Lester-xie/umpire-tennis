@@ -61,5 +61,6 @@
     "lottie-loading": "/components/lottie-loading/index"
   },
   "style": "v2",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "requiredPrivateInfos": ["getLocation"]
 }

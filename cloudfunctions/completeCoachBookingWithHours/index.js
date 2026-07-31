@@ -55,7 +55,7 @@ function defaultCapacityLimit(lessonType, pairMode, groupMode) {
   if (lt === 'group') {
     const gm = String(groupMode || '').trim().toLowerCase()
     if (gm.includes('1v2')) return 1
-    return 5
+    return 6
   }
   if (lt === 'open_play') {
     const gm = String(groupMode || '').trim().toLowerCase()
@@ -225,6 +225,11 @@ exports.main = async (event) => {
   const lessonKeyClient = String(snapshot.lessonKey || '').trim()
   if (!lessonKeyClient) {
     return { ok: false, errMsg: '缺少课程类型' }
+  }
+
+  const lkLower = lessonKeyClient.toLowerCase()
+  if (lkLower.startsWith('group:') || lkLower.startsWith('open_play:')) {
+    return { ok: false, errMsg: '团课/畅打仅支持微信支付' }
   }
 
   if (isExperienceLessonKeyHours(lessonKeyClient)) {
