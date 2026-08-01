@@ -53,8 +53,8 @@
     ]
   },
   "permission": {
-    "scope.userLocation": {
-      "desc": "用于展示附近场馆与距离信息"
+    "scope.userFuzzyLocation": {
+      "desc": "用于估算与各网球场馆的大致距离，便于选择附近场馆"
     }
   },
   "usingComponents": {
@@ -62,5 +62,5 @@
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json",
-  "requiredPrivateInfos": ["getLocation"]
+  "requiredPrivateInfos": ["getFuzzyLocation"]
 }

@@ -148,18 +148,32 @@ Page({
   },
 
   getUserLocation() {
-    wx.getLocation({
-      type: 'wgs84',
-      success: (res) => {
-        const userLoc = { latitude: res.latitude, longitude: res.longitude };
-        this.setData({ userLocation: userLoc });
-        this.setMapMarkers(this.data.selectedVenueId);
-        this.updateDistances();
-      },
-      fail: () => {
-        // 仅保留当前 venues，不强制覆盖
-      },
-    });
+    if (typeof wx.getFuzzyLocation !== 'function') {
+      return;
+    }
+    const run = () => {
+      wx.getFuzzyLocation({
+        type: 'wgs84',
+        success: (res) => {
+          const userLoc = { latitude: res.latitude, longitude: res.longitude };
+          this.setData({ userLocation: userLoc });
+          this.setMapMarkers(this.data.selectedVenueId);
+          this.updateDistances();
+        },
+        fail: (err) => {
+          /** 未在公众平台开通 getFuzzyLocation 时会报 not authorized，不影响选场 */
+          console.warn('getFuzzyLocation fail', err && (err.errMsg || err));
+        },
+      });
+    };
+    if (typeof wx.requirePrivacyAuthorize === 'function') {
+      wx.requirePrivacyAuthorize({
+        success: run,
+        fail: () => {},
+      });
+      return;
+    }
+    run();
   },
 
   updateDistances() {

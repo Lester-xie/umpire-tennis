@@ -1438,9 +1438,7 @@ Page({
     }
 
     /** 普通订场占用校验由 pay / completeCourtBookingWithVouchers 云函数负责，不在支付前调 getBookedSlots */
-    /** 购买课时：测试用 1 分；订场等仍按实付金额 */
-    const totalFee =
-      orderType === 'goods' ? 1 : Math.max(1, Math.round(payYuan * 100));
+    const totalFee = Math.max(1, Math.round(payYuan * 100));
 
     const payPayload = {
       totalFee,
