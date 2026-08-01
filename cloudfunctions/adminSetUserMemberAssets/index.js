@@ -115,12 +115,36 @@ async function findCourseHoursDoc({ phone, venueId, lessonKey, docId }) {
   return hit.data && hit.data[0] ? hit.data[0] : null;
 }
 
+async function findMonthCardDoc({ phone, venueId, docId }) {
+  if (docId) {
+    try {
+      const doc = await db.collection('db_member_venue_month_card').doc(String(docId).trim()).get();
+      const row = doc.data;
+      if (!row) return null;
+      if (String(row.phone || '').trim() !== phone) return null;
+      return row;
+    } catch (e) {
+      return null;
+    }
+  }
+  const venueIds = venueIdInValues(venueId);
+  if (!venueIds.length) return null;
+  const hit = await db
+    .collection('db_member_venue_month_card')
+    .where({ phone, venueId: _.in(venueIds) })
+    .limit(1)
+    .get();
+  return hit.data && hit.data[0] ? hit.data[0] : null;
+}
+
 /**
  * event: {
  *   targetPhone: string,
  *   balances?: Array<{ docId?: string, venueId: string, balanceYuan: number }>,
  *   courseHours?: Array<{ docId?: string, venueId: string, lessonKey: string, hours: number, unitPriceYuan?: number }>,
+ *   monthCards?: Array<{ docId?: string, venueId: string, expiresAt: number|null }>,
  * }
+ * monthCards.expiresAt 为 null/0 时表示清除该场馆月卡
  */
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext();
@@ -142,13 +166,15 @@ exports.main = async (event) => {
 
   const balances = Array.isArray(event && event.balances) ? event.balances : [];
   const courseHours = Array.isArray(event && event.courseHours) ? event.courseHours : [];
-  if (balances.length === 0 && courseHours.length === 0) {
-    return { ok: false, errMsg: '未指定要保存的储值或课时' };
+  const monthCards = Array.isArray(event && event.monthCards) ? event.monthCards : [];
+  if (balances.length === 0 && courseHours.length === 0 && monthCards.length === 0) {
+    return { ok: false, errMsg: '未指定要保存的储值、课时或月卡' };
   }
 
   const now = Date.now();
   const balanceUpdates = [];
   const courseHourUpdates = [];
+  const monthCardUpdates = [];
 
   try {
     for (let i = 0; i < balances.length; i += 1) {
@@ -246,6 +272,54 @@ exports.main = async (event) => {
       }
     }
 
+    for (let i = 0; i < monthCards.length; i += 1) {
+      const item = monthCards[i] || {};
+      const venueId = String(item.venueId || '').trim();
+      const docId = item.docId != null ? String(item.docId).trim() : '';
+      const clear = item.expiresAt == null || item.expiresAt === '' || Number(item.expiresAt) <= 0;
+      const expiresAt = clear ? 0 : Math.floor(Number(item.expiresAt));
+      if (!venueId) {
+        return { ok: false, errMsg: `月卡第 ${i + 1} 项缺少场馆` };
+      }
+      if (!clear && (!Number.isFinite(expiresAt) || expiresAt <= 0)) {
+        return { ok: false, errMsg: `月卡第 ${i + 1} 项到期时间无效` };
+      }
+      const existing = await findMonthCardDoc({ phone: targetPhone, venueId, docId });
+      if (docId && !existing) {
+        return { ok: false, errMsg: `月卡第 ${i + 1} 项记录不存在或无权修改` };
+      }
+      if (clear) {
+        if (existing && existing._id) {
+          await db.collection('db_member_venue_month_card').doc(existing._id).remove();
+          monthCardUpdates.push({ docId: existing._id, venueId, cleared: true });
+        } else {
+          monthCardUpdates.push({ venueId, cleared: true, noop: true });
+        }
+        continue;
+      }
+      if (existing && existing._id) {
+        await db.collection('db_member_venue_month_card').doc(existing._id).update({
+          data: {
+            venueId: existing.venueId != null ? existing.venueId : venueId,
+            expiresAt,
+            updatedAt: now,
+          },
+        });
+        monthCardUpdates.push({ docId: existing._id, venueId, expiresAt });
+      } else {
+        const addRes = await db.collection('db_member_venue_month_card').add({
+          data: {
+            phone: targetPhone,
+            venueId,
+            expiresAt,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+        monthCardUpdates.push({ docId: addRes._id, venueId, expiresAt, created: true });
+      }
+    }
+
     await writeAudit({
       adminOpenid: openid,
       adminPhone: admin.phone,
@@ -254,6 +328,7 @@ exports.main = async (event) => {
         targetPhone,
         balanceUpdates,
         courseHourUpdates,
+        monthCardUpdates,
       },
     });
 

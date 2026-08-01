@@ -146,38 +146,44 @@
 .profile-reward-section {
   margin-bottom: 28rpx;
   width: 100%;
+  display: flex;
+  gap: 20rpx;
   padding-right: 8rpx;
   padding-bottom: 8rpx;
   box-sizing: border-box;
 }
 
-.profile-reward-section card + card {
-  margin-top: 20rpx;
-  display: block;
+.profile-reward-section > card {
+  flex: 1;
+  min-width: 0;
 }
 
 .profile-reward-card {
   display: flex;
   align-items: center;
-  padding: 28rpx 28rpx 28rpx 32rpx;
+  padding: 24rpx 20rpx;
   box-sizing: border-box;
   line-height: normal;
+  gap: 14rpx;
+}
+
+.profile-reward-card--hover {
+  opacity: 0.92;
 }
 
 .profile-reward-icon-wrap {
-  width: 88rpx;
-  height: 88rpx;
-  border-radius: 20rpx;
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 16rpx;
   background: linear-gradient(145deg, #e8f5e9 0%, #c8e6c9 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 24rpx;
   flex-shrink: 0;
 }
 
 .profile-reward-icon-star {
-  font-size: 44rpx;
+  font-size: 36rpx;
   color: #ffc107;
   line-height: 1;
 }
@@ -186,10 +192,52 @@
   background: linear-gradient(145deg, #fff3e0 0%, #ffe0b2 100%);
 }
 
+.profile-reward-icon-wrap--month {
+  background: linear-gradient(145deg, #e3f2fd 0%, #bbdefb 100%);
+}
+
 .profile-reward-card--balance .profile-reward-icon-star {
   color: #e65100;
-  font-size: 40rpx;
+  font-size: 32rpx;
   font-weight: 700;
+}
+
+.profile-reward-card--month .profile-reward-icon-star {
+  color: #1565c0;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.profile-month-card-section {
+  margin-bottom: 28rpx;
+  width: 100%;
+  padding-right: 8rpx;
+  padding-bottom: 8rpx;
+  box-sizing: border-box;
+}
+
+.profile-reward-card--month {
+  padding: 28rpx 28rpx 28rpx 24rpx;
+  gap: 20rpx;
+}
+
+.profile-reward-num--date {
+  font-size: 30rpx;
+}
+
+.profile-month-card-btn {
+  flex-shrink: 0;
+  padding: 16rpx 32rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(180deg, #42a5f5 0%, #1565c0 100%);
+  border-radius: 999rpx;
+  box-shadow: 0 6rpx 20rpx rgba(21, 101, 192, 0.28);
+}
+
+.profile-month-card-btn:active {
+  opacity: 0.92;
 }
 
 .profile-reward-text {
@@ -199,49 +247,29 @@
 
 .profile-reward-label {
   display: block;
-  font-size: 26rpx;
+  font-size: 24rpx;
   color: #666;
-  margin-bottom: 8rpx;
+  margin-bottom: 6rpx;
 }
 
 .profile-reward-value-row {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 8rpx;
-}
-
-.profile-reward-star {
-  font-size: 28rpx;
-  color: #ffc107;
+  gap: 6rpx;
 }
 
 .profile-reward-num {
-  font-size: 44rpx;
+  font-size: 36rpx;
   font-weight: 700;
   color: #1a1a1a;
   line-height: 1.1;
 }
 
 .profile-reward-unit {
-  font-size: 26rpx;
+  font-size: 22rpx;
   color: #888;
   font-weight: 500;
-}
-
-.profile-reward-btn {
-  flex-shrink: 0;
-  padding: 18rpx 36rpx;
-  font-size: 26rpx;
-  font-weight: 600;
-  color: #fff;
-  background: linear-gradient(180deg, #ff9f43 0%, #e67e22 100%);
-  border-radius: 999rpx;
-  box-shadow: 0 6rpx 20rpx rgba(230, 126, 34, 0.35);
-}
-
-.profile-reward-btn:active {
-  opacity: 0.92;
 }
 
 /* 菜单 */

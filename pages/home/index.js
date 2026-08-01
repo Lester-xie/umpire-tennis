@@ -16,6 +16,10 @@ Page({
     wx.navigateTo({ url: '/pages/stored-value/index' });
   },
 
+  goMonthCard() {
+    wx.navigateTo({ url: '/pages/month-card/index' });
+  },
+
   onReady() {
     // 页面渲染完成后计算 header 高度（只计算 title 部分）
     this.calculateHeaderHeight();

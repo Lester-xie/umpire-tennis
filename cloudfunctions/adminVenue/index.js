@@ -267,6 +267,13 @@ function normalizeVenuePayload(body) {
   if (!svNorm.omit && svNorm.list != null) {
     data.storedValuePlans = svNorm.list;
   }
+  const mcNorm = normalizeMonthCard(body.monthCard);
+  if (!mcNorm.ok) {
+    return mcNorm;
+  }
+  if (!mcNorm.omit) {
+    data.monthCard = mcNorm.value;
+  }
   return { ok: true, data };
 }
 
@@ -303,6 +310,48 @@ function normalizeStoredValuePlans(raw) {
     });
   }
   return { ok: true, omit: false, list: out };
+}
+
+/** 场馆月卡：priceYuan 售价，enabled 上架，days 有效天数，windowStartHour/windowEndHour 每日生效时段 */
+function normalizeMonthCard(raw) {
+  if (raw === undefined) {
+    return { ok: true, omit: true, value: null };
+  }
+  if (raw === null) {
+    return { ok: true, omit: false, value: null };
+  }
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, errMsg: 'monthCard 须为对象' };
+  }
+  const priceYuan = Math.round(Number(raw.priceYuan) * 100) / 100;
+  if (!Number.isFinite(priceYuan) || priceYuan <= 0) {
+    return { ok: false, errMsg: '月卡价格无效' };
+  }
+  let days = Math.floor(Number(raw.days));
+  if (!Number.isFinite(days) || days < 1) days = 30;
+  if (days > 366) {
+    return { ok: false, errMsg: '月卡有效天数不能超过 366' };
+  }
+  let windowStartHour = Math.floor(Number(raw.windowStartHour));
+  let windowEndHour = Math.floor(Number(raw.windowEndHour));
+  if (!Number.isFinite(windowStartHour)) windowStartHour = 9;
+  if (!Number.isFinite(windowEndHour)) windowEndHour = 12;
+  if (windowStartHour < 8) windowStartHour = 8;
+  if (windowEndHour > 22) windowEndHour = 22;
+  if (windowEndHour <= windowStartHour) {
+    return { ok: false, errMsg: '月卡生效结束时间须晚于开始时间' };
+  }
+  return {
+    ok: true,
+    omit: false,
+    value: {
+      priceYuan,
+      enabled: raw.enabled !== false,
+      days,
+      windowStartHour,
+      windowEndHour,
+    },
+  };
 }
 
 /**

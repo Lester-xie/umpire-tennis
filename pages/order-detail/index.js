@@ -19,8 +19,10 @@ const {
   getBookedSlots,
   requestWechatPay,
   listMemberVenueBalance,
+  listMemberVenueMonthCard,
   markProfileSummaryStale,
   refreshSelectedVenueFromCloud,
+  getVenues,
 } = require('../../api/tennisDb');
 const { buildLessonKey, formatLessonKeyDisplay } = require('../../utils/lessonKey');
 const { lessonKeyFromTypeMapFormat, splitCourseDescriptionLines } = require('../../utils/courseCatalog');
@@ -33,6 +35,30 @@ const {
   defaultCourtPayMethod,
 } = require('../../utils/bookingVoucherMatch');
 const { roundYuan, formatYuanText } = require('../../utils/storedValuePlans');
+const { normalizeVenueId } = require('../../utils/venueId');
+const {
+  normalizeMonthCard,
+  monthCardWindowLabel,
+  pickMonthCardFreeSlot,
+} = require('../../utils/monthCard');
+
+function buildCourtOrderSlotPrices(bookedSlots, courts) {
+  const list = [];
+  (bookedSlots || []).forEach((s) => {
+    const courtId = Number(s.courtId);
+    const slotIndex = Number(s.slotIndex);
+    if (!Number.isFinite(courtId) || !Number.isFinite(slotIndex)) return;
+    const court = (courts || []).find((c) => Number(c.id) === courtId);
+    const slotData = court && court.slots && court.slots[slotIndex];
+    list.push({
+      courtId,
+      slotIndex,
+      slotKey: `${courtId}-${slotIndex}`,
+      priceYuan: roundYuan(slotData && slotData.price),
+    });
+  });
+  return list;
+}
 const { preventTouchMove } = require('../../utils/preventTouchMove');
 const {
   attachPageMemberAssetRealtime,
@@ -165,8 +191,18 @@ Page({
     courtPayUserChose: false,
     storedBalanceDeductYuan: 0,
     wechatDueYuan: 0,
+    /** 普通订场：订单价每格（VIP/会员价），月卡免费按此抵扣 */
+    courtOrderSlotPrices: [],
+    monthCardEligible: false,
+    monthCardWindowLabel: '',
+    monthCardFreeUsedToday: false,
+    monthCardUseFree: false,
+    monthCardFreeSlotKey: '',
+    monthCardDeductYuan: 0,
+    monthCardHint: '',
   },
   _loadingTaskCount: 0,
+  _monthCardConfig: null,
 
   parseBookedSlotsCompact(raw) {
     const s = String(raw || '').trim();
@@ -414,6 +450,7 @@ Page({
         selectedDate,
       },
     );
+    const courtOrderSlotPrices = buildCourtOrderSlotPrices(bookedSlots, courts);
 
     this.setData({
       orderDate: selectedDate,
@@ -424,6 +461,7 @@ Page({
       totalPrice: totalPrice,
       venueId: venueId,
       courtSlotPrices,
+      courtOrderSlotPrices,
       bookingVouchers: [],
       voucherDeductionYuan: 0,
       cashDueYuan: totalPrice,
@@ -529,18 +567,44 @@ Page({
 
   recomputeCourtPayAmounts() {
     if (this.data.orderType !== 'court' || this.data.isCoachCourseOrder) return;
+    let monthCardDeductYuan = 0;
+    let monthCardFreeSlotKey = '';
+    let monthCardUseFree = !!this.data.monthCardUseFree;
+    if (monthCardUseFree && this._monthCardConfig) {
+      const picked = pickMonthCardFreeSlot(
+        this.data.courtOrderSlotPrices,
+        this.data.bookingVouchers,
+        this._monthCardConfig,
+      );
+      if (picked) {
+        monthCardDeductYuan = picked.deductYuan;
+        monthCardFreeSlotKey = picked.slotKey;
+      } else {
+        monthCardUseFree = false;
+      }
+    }
     const pay = recalcCourtPlainPayment({
       totalPriceYuan: this.data.totalPrice,
       vouchers: this.data.bookingVouchers,
       courtPayMethod: this.data.courtPayMethod,
       storedBalanceYuan: this.data.venueStoredBalanceYuan,
+      monthCardDeductYuan,
     });
     this.setData({
       voucherDeductionYuan: pay.voucherDeductionYuan,
+      monthCardUseFree,
+      monthCardDeductYuan: pay.monthCardDeductYuan,
+      monthCardFreeSlotKey,
       cashDueYuan: pay.cashDueYuan,
       storedBalanceDeductYuan: pay.storedBalanceDeductYuan,
       wechatDueYuan: pay.wechatDueYuan,
     }, () => this.updateFooterButtonText());
+  },
+
+  toggleMonthCardFree() {
+    if (!this.data.monthCardEligible || this.data.monthCardFreeUsedToday) return;
+    const next = !this.data.monthCardUseFree;
+    this.setData({ monthCardUseFree: next }, () => this.recomputeCourtPayAmounts());
   },
 
   selectCourtPayMethod(e) {
@@ -789,6 +853,7 @@ Page({
     this.syncCampusName();
     this.loadCoachCourseHoursBalance();
     this.loadVenueStoredBalance();
+    this.loadMonthCardBenefit();
     this.loadCoachSessionRoster();
     this.updateFooterButtonText();
     this._memberAssetWatchSessionGen = this._memberAssetWatchSessionGen || 0;
@@ -802,7 +867,82 @@ Page({
   handleMemberAssetRealtimeChange() {
     this.loadCoachCourseHoursBalance();
     this.loadVenueStoredBalance();
+    this.loadMonthCardBenefit();
     this.updateFooterButtonText();
+  },
+
+  async loadMonthCardBenefit() {
+    if (this.data.orderType !== 'court' || this.data.isCoachCourseOrder || !this.data.venueId) {
+      return;
+    }
+    const app = getApp();
+    if (!app || !app.checkLogin()) {
+      this._monthCardConfig = null;
+      this.setData({
+        monthCardEligible: false,
+        monthCardUseFree: false,
+        monthCardFreeUsedToday: false,
+        monthCardHint: '',
+        monthCardWindowLabel: '',
+        monthCardDeductYuan: 0,
+        monthCardFreeSlotKey: '',
+      }, () => this.recomputeCourtPayAmounts());
+      return;
+    }
+    try {
+      let venueMonthCard = null;
+      const selected = app.globalData && app.globalData.selectedVenue;
+      if (selected && normalizeVenueId(selected.id) === normalizeVenueId(this.data.venueId)) {
+        venueMonthCard = normalizeMonthCard(selected.monthCard);
+      }
+      if (!venueMonthCard) {
+        const venuesRes = await getVenues();
+        const rows = (venuesRes && venuesRes.data) || [];
+        const hit = rows.find((v) => normalizeVenueId(v._id) === normalizeVenueId(this.data.venueId));
+        venueMonthCard = normalizeMonthCard(hit && hit.monthCard);
+      }
+      this._monthCardConfig = venueMonthCard;
+
+      const mcRes = await listMemberVenueMonthCard({
+        venueId: this.data.venueId,
+        orderDate: this.data.orderDate,
+      });
+      const result = (mcRes && mcRes.result) || {};
+      const rows = Array.isArray(result.data) ? result.data : [];
+      const row = rows[0];
+      const active = !!(row && Number(row.expiresAt) > Date.now());
+      const freeUsedOnDate = !!result.freeUsedOnDate;
+      const windowSlots = pickMonthCardFreeSlot(
+        this.data.courtOrderSlotPrices,
+        [],
+        venueMonthCard,
+      );
+      const eligible = !!(active && venueMonthCard && windowSlots);
+      let monthCardHint = '';
+      if (active && venueMonthCard && !windowSlots) {
+        monthCardHint = `月卡生效时段为 ${monthCardWindowLabel(venueMonthCard)}，当前所选时段不可用免费小时`;
+      } else if (active && freeUsedOnDate) {
+        monthCardHint = '当日月卡免费 1 小时已使用';
+      } else if (eligible) {
+        monthCardHint = `生效时段 ${monthCardWindowLabel(venueMonthCard)}，每天可免费订 1 小时`;
+      }
+
+      const useFree = eligible && !freeUsedOnDate && this.data.monthCardUseFree;
+      this.setData({
+        monthCardEligible: eligible && !freeUsedOnDate,
+        monthCardFreeUsedToday: freeUsedOnDate,
+        monthCardUseFree: useFree,
+        monthCardWindowLabel: venueMonthCard ? monthCardWindowLabel(venueMonthCard) : '',
+        monthCardHint,
+      }, () => this.recomputeCourtPayAmounts());
+    } catch (e) {
+      console.error('loadMonthCardBenefit', e);
+      this._monthCardConfig = null;
+      this.setData({
+        monthCardEligible: false,
+        monthCardHint: '',
+      }, () => this.recomputeCourtPayAmounts());
+    }
   },
 
   async loadVenueStoredBalance() {
@@ -1135,13 +1275,26 @@ Page({
     if (this.data.orderType === 'court' && !this.data.isCoachCourseOrder) {
       const wechatDue = roundYuan(this.data.wechatDueYuan);
       const balanceDeduct = roundYuan(this.data.storedBalanceDeductYuan);
+      const monthCardDeduct = roundYuan(this.data.monthCardDeductYuan);
       if (wechatDue <= 0.009) {
         if (balanceDeduct > 0 && (this.data.bookingVouchers || []).length > 0) {
           this.setData({ footerButtonText: '确认支付（券+储值）' });
           return;
         }
+        if (balanceDeduct > 0 && monthCardDeduct > 0) {
+          this.setData({ footerButtonText: '确认支付（月卡+储值）' });
+          return;
+        }
         if (balanceDeduct > 0) {
           this.setData({ footerButtonText: '确认使用储值余额' });
+          return;
+        }
+        if (monthCardDeduct > 0 && (this.data.bookingVouchers || []).length > 0) {
+          this.setData({ footerButtonText: '确认支付（券+月卡）' });
+          return;
+        }
+        if (monthCardDeduct > 0) {
+          this.setData({ footerButtonText: '确认使用月卡免费' });
           return;
         }
         if ((this.data.bookingVouchers || []).length > 0) {
@@ -1530,6 +1683,13 @@ Page({
         voucherDeductionYuan: isCourtPlain ? Number(this.data.voucherDeductionYuan) || 0 : 0,
         storedBalanceDeductYuan: isCourtPlain ? Number(this.data.storedBalanceDeductYuan) || 0 : 0,
         cashDueYuan: isCourtPlain ? Number(this.data.wechatDueYuan) || 0 : Number(this.data.totalPrice),
+        monthCardFree:
+          isCourtPlain && this.data.monthCardUseFree && this.data.monthCardFreeSlotKey
+            ? {
+                slotKey: this.data.monthCardFreeSlotKey,
+                deductYuan: Number(this.data.monthCardDeductYuan) || 0,
+              }
+            : null,
       };
     }
 
@@ -1573,7 +1733,8 @@ Page({
             }
             if (
               !this.data.isCoachCourseOrder &&
-              Number(this.data.storedBalanceDeductYuan) > 0
+              (Number(this.data.storedBalanceDeductYuan) > 0 ||
+                Number(this.data.monthCardDeductYuan) > 0)
             ) {
               markProfileSummaryStale();
             }
@@ -1810,6 +1971,13 @@ Page({
         snapshot,
         vouchers: this.data.bookingVouchers || [],
         storedBalanceDeductYuan: Number(this.data.storedBalanceDeductYuan) || 0,
+        monthCardFree:
+          this.data.monthCardUseFree && this.data.monthCardFreeSlotKey
+            ? {
+                slotKey: this.data.monthCardFreeSlotKey,
+                deductYuan: Number(this.data.monthCardDeductYuan) || 0,
+              }
+            : null,
       });
       this.endLoading();
       const r = cloudRes && cloudRes.result ? cloudRes.result : {};
@@ -1819,6 +1987,9 @@ Page({
           return;
         }
         wx.showToast({ title: r.errMsg || '提交失败', icon: 'none' });
+        if (r.errMsg && String(r.errMsg).indexOf('月卡') >= 0) {
+          this.loadMonthCardBenefit();
+        }
         return;
       }
       try {
@@ -1834,7 +2005,10 @@ Page({
       if (app && app.globalData) {
         app.globalData.shouldClearBookingData = true;
       }
-      if (Number(this.data.storedBalanceDeductYuan) > 0) {
+      if (
+        Number(this.data.storedBalanceDeductYuan) > 0 ||
+        Number(this.data.monthCardDeductYuan) > 0
+      ) {
         markProfileSummaryStale();
       }
       wx.redirectTo({ url: '/pages/booking-success/index' });

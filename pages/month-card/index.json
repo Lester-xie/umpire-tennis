@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "购买月卡",
+  "usingComponents": {
+    "header": "/components/header/header",
+    "lottie-loading": "/components/lottie-loading/index"
+  }
+}

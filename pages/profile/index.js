@@ -17,14 +17,44 @@ const {
   decryptPhoneNumber,
   listAllMemberCourseHours,
   listAllMemberVenueBalances,
+  listAllMemberVenueMonthCards,
   DEFAULT_USER_AVATAR,
 } = require('../../api/tennisDb');
 const { roundYuan, formatYuanText } = require('../../utils/storedValuePlans');
+const { normalizeVenueId } = require('../../utils/venueId');
 const {
   attachPageMemberAssetRealtime,
   detachPageMemberAssetRealtime,
   restartMemberAssetRealtimeWatch,
 } = require('../../utils/memberAssetRealtime');
+
+function formatMonthCardExpiresText(ts) {
+  const n = Number(ts);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  const d = new Date(n);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** 优先当前选中场馆的有效月卡，否则取到期最晚的一张有效月卡 */
+function pickActiveMonthCard(rows) {
+  const now = Date.now();
+  const active = (rows || []).filter((r) => Number(r && r.expiresAt) > now);
+  if (!active.length) return null;
+  const app = typeof getApp === 'function' ? getApp() : null;
+  const selectedId =
+    app && app.globalData && app.globalData.selectedVenue && app.globalData.selectedVenue.id != null
+      ? normalizeVenueId(app.globalData.selectedVenue.id)
+      : '';
+  if (selectedId) {
+    const hit = active.find((r) => normalizeVenueId(r.venueId) === selectedId);
+    if (hit) return hit;
+  }
+  return active.reduce((best, cur) =>
+    (Number(cur.expiresAt) > Number(best.expiresAt) ? cur : best));
+}
 
 function readAvatarUrlCache(fileID) {
   if (!fileID) return '';
@@ -115,10 +145,11 @@ function clearProfileSummaryCache() {
   }
 }
 
-function buildSummaryFromFlags(flags, totalCourseHours, totalStoredBalanceYuan) {
+function buildSummaryFromFlags(flags, totalCourseHours, totalStoredBalanceYuan, monthCardInfo) {
   const isVip = !!flags.isVip;
   const isCoach = !!flags.isCoach;
   const isManager = !!flags.isManager;
+  const hasMonthCard = !!(monthCardInfo && monthCardInfo.hasMonthCard);
   return {
     isVip,
     isCoach,
@@ -129,6 +160,8 @@ function buildSummaryFromFlags(flags, totalCourseHours, totalStoredBalanceYuan) 
     totalCourseHoursText: formatHoursNumberStatic(totalCourseHours),
     totalStoredBalanceYuan,
     totalStoredBalanceText: formatYuanText(totalStoredBalanceYuan),
+    hasMonthCard,
+    monthCardExpiresText: hasMonthCard ? (monthCardInfo.monthCardExpiresText || '') : '',
   };
 }
 
@@ -189,6 +222,9 @@ Page({
     /** 全部场馆储值余额合计 */
     totalStoredBalanceYuan: 0,
     totalStoredBalanceText: '—',
+    /** 有效月卡（当前场馆优先） */
+    hasMonthCard: false,
+    monthCardExpiresText: '',
   },
   _loadingTaskCount: 0,
   _profileSummary: null,
@@ -259,6 +295,8 @@ Page({
         totalCourseHoursText: cached.totalCourseHoursText || '0',
         totalStoredBalanceYuan: Number(cached.totalStoredBalanceYuan) || 0,
         totalStoredBalanceText: cached.totalStoredBalanceText || '0',
+        hasMonthCard: !!cached.hasMonthCard,
+        monthCardExpiresText: cached.monthCardExpiresText || '',
       });
     } else if (!isLoggedIn || !userPhone) {
       Object.assign(patch, {
@@ -271,6 +309,8 @@ Page({
         totalCourseHoursText: '—',
         totalStoredBalanceYuan: 0,
         totalStoredBalanceText: '—',
+        hasMonthCard: false,
+        monthCardExpiresText: '',
       });
     }
 
@@ -317,13 +357,20 @@ Page({
     const firstVisit = !wx.getStorageSync(STORAGE_KEYS.profileVisited);
     const task = (async () => {
       try {
-        const [userAvatar, flags, totalCourseHours, totalStoredBalanceYuan] = await Promise.all([
-          resolveAvatarForUI(userAvatarFileID),
-          this.fetchUserRoleFlags(userPhone),
-          this.fetchTotalCourseHoursSum(),
-          this.fetchTotalStoredBalanceSum(),
-        ]);
-        const summary = buildSummaryFromFlags(flags, totalCourseHours, totalStoredBalanceYuan);
+        const [userAvatar, flags, totalCourseHours, totalStoredBalanceYuan, monthCardInfo] =
+          await Promise.all([
+            resolveAvatarForUI(userAvatarFileID),
+            this.fetchUserRoleFlags(userPhone),
+            this.fetchTotalCourseHoursSum(),
+            this.fetchTotalStoredBalanceSum(),
+            this.fetchActiveMonthCardInfo(),
+          ]);
+        const summary = buildSummaryFromFlags(
+          flags,
+          totalCourseHours,
+          totalStoredBalanceYuan,
+          monthCardInfo,
+        );
         const ts = Date.now();
         this._profileSummary = { phone: userPhone, ts, userAvatar, ...summary };
         writeProfileSummaryCache(userPhone, { userAvatar, ...summary });
@@ -381,6 +428,24 @@ Page({
     } catch (e) {
       console.warn('fetchTotalStoredBalanceSum', e);
       return 0;
+    }
+  },
+
+  async fetchActiveMonthCardInfo() {
+    try {
+      const res = await listAllMemberVenueMonthCards();
+      const rows = (res && res.result && Array.isArray(res.result.data)) ? res.result.data : [];
+      const hit = pickActiveMonthCard(rows);
+      if (!hit) {
+        return { hasMonthCard: false, monthCardExpiresText: '' };
+      }
+      return {
+        hasMonthCard: true,
+        monthCardExpiresText: formatMonthCardExpiresText(hit.expiresAt),
+      };
+    } catch (e) {
+      console.warn('fetchActiveMonthCardInfo', e);
+      return { hasMonthCard: false, monthCardExpiresText: '' };
     }
   },
 
@@ -536,14 +601,16 @@ Page({
         const isVip = !!user.isVip;
         const isCoach = !!user.isCoach;
         const isManager = !!user.isManager;
-        const [totalCourseHours, totalStoredBalanceYuan] = await Promise.all([
+        const [totalCourseHours, totalStoredBalanceYuan, monthCardInfo] = await Promise.all([
           this.fetchTotalCourseHoursSum(),
           this.fetchTotalStoredBalanceSum(),
+          this.fetchActiveMonthCardInfo(),
         ]);
         const summary = buildSummaryFromFlags(
           { isVip, isCoach, isManager },
           totalCourseHours,
           totalStoredBalanceYuan,
+          monthCardInfo,
         );
         writeProfileSummaryCache(phone, { userAvatar: resolvedAvatar, ...summary });
         this._profileSummary = { phone, ts: Date.now(), userAvatar: resolvedAvatar, ...summary };
@@ -639,6 +706,14 @@ Page({
     wx.navigateTo({ url: '/pages/profile-stored-value/index' });
   },
 
+  handleMonthCardRenewTap() {
+    if (!this.data.isLoggedIn) {
+      wx.showToast({ title: '请先登录', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({ url: '/pages/month-card/index' });
+  },
+
   /** 教练或管理员：进入教练约场页（需已选场馆） */
   handleCoachBookCourt() {
     if (!this.data.isCoach && !this.data.isManager) return;
@@ -703,6 +778,8 @@ Page({
           totalCourseHoursText: '—',
           totalStoredBalanceYuan: 0,
           totalStoredBalanceText: '—',
+          hasMonthCard: false,
+          monthCardExpiresText: '',
         });
       },
     });

@@ -26,8 +26,9 @@ Page({
   _loadingTaskCount: 0,
 
   onLoad(options) {
-    /** 从预订页进入：选场后 navigateBack，不跳首页 */
-    this.returnToBooking = !!(options && options.from === 'booking');
+    /** 从预订/储值/月卡等进入：选场后 navigateBack，不跳首页 */
+    const from = options && options.from != null ? String(options.from) : '';
+    this.returnToCaller = from === 'booking' || from === 'storedValue' || from === 'monthCard';
 
     const selected = wx.getStorageSync(STORAGE_KEYS.selectedVenue) || null;
     const selectedVenueId = (selected && selected.id) ? selected.id : '';
@@ -210,7 +211,7 @@ Page({
     });
     wx.setStorageSync(STORAGE_KEYS.selectedVenue, venue);
     getApp().globalData.selectedVenue = venue;
-    if (this.returnToBooking) {
+    if (this.returnToCaller) {
       wx.navigateBack();
       return;
     }

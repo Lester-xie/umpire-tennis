@@ -303,6 +303,28 @@ function listMemberVenueBalance({ venueId } = {}) {
   });
 }
 
+/** 会员单场馆月卡；可传 orderDate 查询当日是否已用免费 1 小时 */
+function listMemberVenueMonthCard({ venueId, orderDate } = {}) {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'listMemberVenueMonthCard',
+    data: {
+      phone,
+      venueId: String(venueId || '').trim(),
+      orderDate: orderDate != null ? String(orderDate).trim() : '',
+    },
+  });
+}
+
+/** 会员各场馆月卡 */
+function listAllMemberVenueMonthCards() {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'listMemberVenueMonthCard',
+    data: { phone, allVenues: true },
+  });
+}
+
 /**
  * 体验课课时包原路退款（须已登录且手机号与 openid 绑定）
  * @param {{ venueId: string, lessonKey: string }} payload
@@ -555,6 +577,8 @@ module.exports = {
   listAllMemberCourseHours,
   listAllMemberVenueBalances,
   listMemberVenueBalance,
+  listMemberVenueMonthCard,
+  listAllMemberVenueMonthCards,
   refundExperienceCoursePurchase,
   completeCoachBookingWithHours,
   getBookedSlots,

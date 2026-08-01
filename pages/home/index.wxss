@@ -29,26 +29,67 @@
 
 .stored-value-entry-container {
   margin-top: 40rpx;
+  display: flex;
+  gap: 20rpx;
+  padding-right: 8rpx;
+  padding-bottom: 8rpx;
+  box-sizing: border-box;
+}
+
+.stored-value-entry-container > card {
+  flex: 1;
+  min-width: 0;
 }
 
 .stored-value-entry {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin: 24rpx 0;
-  padding: 28rpx 32rpx;
-  gap: 24rpx;
+  margin: 0;
+  padding: 28rpx 24rpx;
+  gap: 16rpx;
+  box-sizing: border-box;
+  line-height: normal;
+}
+
+.stored-value-entry-icon-wrap {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 18rpx;
+  background: linear-gradient(145deg, #e8f5e9 0%, #c8e6c9 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stored-value-entry-icon-wrap--balance {
+  background: linear-gradient(145deg, #fff3e0 0%, #ffe0b2 100%);
+}
+
+.stored-value-entry-icon-wrap--month {
+  background: linear-gradient(145deg, #e3f2fd 0%, #bbdefb 100%);
+}
+
+.stored-value-entry-icon {
+  font-size: 36rpx;
+  font-weight: 700;
+  line-height: 1;
+  color: #2d6a4f;
+}
+
+.stored-value-entry-icon-wrap--balance .stored-value-entry-icon {
+  color: #e65100;
+  font-size: 34rpx;
+}
+
+.stored-value-entry-icon-wrap--month .stored-value-entry-icon {
+  color: #1565c0;
+  font-size: 32rpx;
 }
 
 .stored-value-entry-main {
   flex: 1;
   min-width: 0;
-}
-
-.stored-value-entry-img {
-  width: 160rpx;
-  height: 120rpx;
-  flex-shrink: 0;
 }
 
 .stored-value-entry--hover {
@@ -57,8 +98,9 @@
 
 .stored-value-entry-title {
   display: block;
-  font-size: 42rpx;
+  font-size: 30rpx;
   font-weight: 700;
   color: #134e35;
+  line-height: 1.2;
 }
 

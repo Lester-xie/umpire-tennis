@@ -40,13 +40,49 @@ function findHoursForVenueAndKey(courseHours, venueId, lessonKey) {
   );
 }
 
+function findMonthCardForVenue(monthCards, venueId) {
+  return (monthCards || []).find((row) => venueIdLooseEqual(row.venueId, venueId)) || null;
+}
+
+function formatDateInputFromTs(ts) {
+  const n = Number(ts);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  const d = new Date(n);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** YYYY-MM-DD → 当天 23:59:59.999 本地时间戳；空串返回 0（清除） */
+function parseExpiresAtFromDateInput(str) {
+  const s = String(str || '').trim();
+  if (!s) return 0;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return NaN;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const dt = new Date(y, mo - 1, d, 23, 59, 59, 999);
+  if (Number.isNaN(dt.getTime())) return NaN;
+  return dt.getTime();
+}
+
+function todayDateInput() {
+  return formatDateInputFromTs(Date.now());
+}
+
 function buildVenueAssetFields(venueId, assetCache) {
   const vid = normalizeVenueId(venueId);
   const balances = (assetCache && assetCache.balances) || [];
   const courseHours = filterManagedCourseHours((assetCache && assetCache.courseHours) || []);
+  const monthCards = (assetCache && assetCache.monthCards) || [];
   const bal = findBalanceForVenue(balances, vid);
   const h1 = findHoursForVenueAndKey(courseHours, vid, 'regular:1v1');
   const h2 = findHoursForVenueAndKey(courseHours, vid, 'regular:1v2');
+  const mc = findMonthCardForVenue(monthCards, vid);
+  const monthCardExpiresInput = formatDateInputFromTs(mc ? mc.expiresAt : 0);
   return {
     venueAssetsReady: !!vid,
     balanceDocId: bal && bal.docId ? String(bal.docId) : '',
@@ -57,6 +93,9 @@ function buildVenueAssetFields(venueId, assetCache) {
     hour1v2DocId: h2 && h2.docId ? String(h2.docId) : '',
     hour1v2Input: String(Math.max(0, Math.floor(Number(h2 ? h2.hours : 0)))),
     hour1v2UnitPriceInput: String(roundYuan(h2 ? h2.unitPriceYuan : 0)),
+    monthCardDocId: mc && mc.docId ? String(mc.docId) : '',
+    monthCardExpiresInput,
+    monthCardPickerValue: monthCardExpiresInput || todayDateInput(),
   };
 }
 
@@ -88,6 +127,9 @@ Page({
     hour1v2Input: '0',
     hour1v2UnitPriceInput: '0',
     hour1v2Label: formatLessonKeyDisplay('regular:1v2'),
+    monthCardDocId: '',
+    monthCardExpiresInput: '',
+    monthCardPickerValue: todayDateInput(),
   },
 
   onLoad() {
@@ -157,6 +199,9 @@ Page({
       hour1v2DocId: '',
       hour1v2Input: '0',
       hour1v2UnitPriceInput: '0',
+      monthCardDocId: '',
+      monthCardExpiresInput: '',
+      monthCardPickerValue: todayDateInput(),
     });
   },
 
@@ -229,7 +274,7 @@ Page({
         avatarDisplayUrl = resolved || DEFAULT_USER_AVATAR;
       }
 
-      this._assetCache = assets.data || { balances: [], courseHours: [] };
+      this._assetCache = assets.data || { balances: [], courseHours: [], monthCards: [] };
       const venueOptions = this.data.venueOptions || [];
       let selectedVenueIndex = this.data.selectedVenueIndex;
       if (selectedVenueIndex < 0 || selectedVenueIndex >= venueOptions.length) {
@@ -276,6 +321,21 @@ Page({
 
   onHour1v2UnitPriceInput(e) {
     this.setData({ hour1v2UnitPriceInput: e.detail.value || '' });
+  },
+
+  onMonthCardExpiresChange(e) {
+    const monthCardExpiresInput = String((e.detail && e.detail.value) || '').trim();
+    this.setData({
+      monthCardExpiresInput,
+      monthCardPickerValue: monthCardExpiresInput || todayDateInput(),
+    });
+  },
+
+  onClearMonthCard() {
+    this.setData({
+      monthCardExpiresInput: '',
+      monthCardPickerValue: todayDateInput(),
+    });
   },
 
   assertQueriedPhone() {
@@ -327,6 +387,12 @@ Page({
       return;
     }
 
+    const monthCardExpiresAt = parseExpiresAtFromDateInput(this.data.monthCardExpiresInput);
+    if (Number.isNaN(monthCardExpiresAt)) {
+      wx.showToast({ title: '月卡到期日无效', icon: 'none' });
+      return;
+    }
+
     this.setData({ saving: true });
     wx.showLoading({ title: '保存中', mask: true });
     try {
@@ -361,6 +427,13 @@ Page({
               unitPriceYuan: hour1v2UnitPriceYuan,
             },
           ],
+          monthCards: [
+            {
+              docId: this.data.monthCardDocId || '',
+              venueId,
+              expiresAt: monthCardExpiresAt > 0 ? monthCardExpiresAt : null,
+            },
+          ],
         }),
       ]);
       wx.hideLoading();
@@ -381,7 +454,7 @@ Page({
       const refreshRes = await adminGetUserMemberAssets({ phone: queriedPhone });
       const refreshed = (refreshRes && refreshRes.result) || {};
       if (refreshed.ok) {
-        this._assetCache = refreshed.data || { balances: [], courseHours: [] };
+        this._assetCache = refreshed.data || { balances: [], courseHours: [], monthCards: [] };
         this.setData(buildVenueAssetFields(venueId, this._assetCache));
       }
     } catch (e) {

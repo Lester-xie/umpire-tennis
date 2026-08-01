@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "月卡管理",
+  "usingComponents": {
+    "header": "/components/header/header"
+  }
+}

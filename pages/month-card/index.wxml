@@ -1,0 +1,54 @@
+<view class="stored-page">
+  <lottie-loading visible="{{lottieLoadingVisible}}" />
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="购买月卡" />
+  </view>
+  <scroll-view
+    class="content-scroll"
+    scroll-y="true"
+    enhanced="{{true}}"
+    show-scrollbar="{{false}}"
+    style="margin-top: {{headerHeight}}px; height: {{contentHeight}}px;"
+  >
+    <view class="content-wrapper">
+      <view class="venue-bar">
+        <view class="venue-bar-main">
+          <view>
+            <text class="venue-bar-label">当前场馆</text>
+            <text class="venue-bar-name">{{venueName || '未选择场馆'}}</text>
+          </view>
+          <view class="venue-switch" bindtap="onSwitchVenue">切换场馆</view>
+        </view>
+        <view class="hint-banner" wx:if="{{isLoggedIn}}">
+          月卡仅在本场馆使用；有效期内续费将在原到期日上顺延。
+        </view>
+        <view class="hint-banner" wx:if="{{isLoggedIn && expiresText}}">
+          当前有效期至 {{expiresText}}
+        </view>
+      </view>
+
+      <block wx:if="{{hasCard}}">
+        <view class="plan-card">
+          <text class="plan-title">{{cardLabel}}</text>
+          <text class="plan-sub">购买后立即生效，有效期 {{days}} 天</text>
+          <text class="plan-sub" wx:if="{{windowLabel}}">每日 {{windowLabel}} 可免费订场 1 小时</text>
+          <view class="plan-price-row">
+            <text class="plan-pay">¥{{priceText}}</text>
+          </view>
+          <view
+            class="plan-btn {{isLoggedIn && !paying ? '' : 'plan-btn--disabled'}}"
+            bindtap="onBuyTap"
+          >立即购买</view>
+        </view>
+      </block>
+
+      <view class="empty-card" wx:else>
+        <text wx:if="{{!venueId}}">请先在首页选择场馆</text>
+        <text wx:else>该场馆暂未上架月卡，请联系场馆工作人员</text>
+        <view wx:if="{{!venueId}}" class="empty-link" bindtap="onSwitchVenue">去选择场馆</view>
+      </view>
+
+      <view class="placeholder" style="height: {{placeholderHeight}}px;"></view>
+    </view>
+  </scroll-view>
+</view>

@@ -1,0 +1,69 @@
+<view class="admin-sub-page">
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="月卡管理" />
+  </view>
+  <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
+    <view wx:if="{{loading}}" class="muted">加载中…</view>
+    <block wx:else>
+      <view class="venue-name-hint" wx:if="{{name}}">场馆：{{name}}</view>
+
+      <view class="field">
+        <view class="plan-card">
+          <view class="plan-price-row">
+            <text class="plan-mini-label">月卡价格（元）</text>
+            <input
+              class="plan-in"
+              type="digit"
+              placeholder="如 299"
+              value="{{priceYuan}}"
+              bindinput="onPriceYuan"
+            />
+          </view>
+          <view class="plan-price-row">
+            <text class="plan-mini-label">有效天数</text>
+            <input
+              class="plan-in"
+              type="number"
+              placeholder="默认 30"
+              value="{{days}}"
+              bindinput="onDays"
+            />
+          </view>
+          <view class="plan-price-row">
+            <text class="plan-mini-label">生效开始</text>
+            <picker
+              mode="selector"
+              range="{{hourLabels}}"
+              value="{{windowStartIndex}}"
+              bindchange="onWindowStartChange"
+            >
+              <view class="plan-pick">{{windowStartLabel}}</view>
+            </picker>
+          </view>
+          <view class="plan-price-row">
+            <text class="plan-mini-label">生效结束</text>
+            <picker
+              mode="selector"
+              range="{{hourLabels}}"
+              value="{{windowEndIndex}}"
+              bindchange="onWindowEndChange"
+            >
+              <view class="plan-pick">{{windowEndLabel}}</view>
+            </picker>
+          </view>
+          <view class="plan-hint">
+            每日 {{windowStartLabel}}–{{windowEndLabel}} 内，持卡会员可免费预订 1 小时场地（每天限用 1 次）。
+          </view>
+          <view class="plan-enabled-row">
+            <text class="plan-enabled-label">上架展示</text>
+            <switch checked="{{enabled}}" color="#134e35" bindchange="onEnabledChange" />
+          </view>
+          <view class="plan-preview" wx:if="{{previewLabel}}">{{previewLabel}}</view>
+        </view>
+      </view>
+
+      <button class="submit-btn" bindtap="onSave">保存</button>
+    </block>
+    <view class="footer-space"></view>
+  </scroll-view>
+</view>

@@ -1,0 +1,20 @@
+@import '../admin-venue-stored-value/index.wxss';
+
+.plan-pick {
+  flex: 1;
+  height: 72rpx;
+  line-height: 72rpx;
+  padding: 0 20rpx;
+  background: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid #dce8e0;
+  font-size: 28rpx;
+  color: #134e35;
+}
+
+.plan-hint {
+  margin-top: 16rpx;
+  font-size: 22rpx;
+  color: #5a7a68;
+  line-height: 1.5;
+}

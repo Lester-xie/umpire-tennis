@@ -124,6 +124,22 @@
             <text class="asset-unit">元/节</text>
           </view>
         </view>
+
+        <view class="asset-block">
+          <view class="asset-input-row">
+            <text class="asset-input-label">月卡到期</text>
+            <picker mode="date" value="{{monthCardPickerValue}}" bindchange="onMonthCardExpiresChange">
+              <view class="asset-date-pick {{monthCardExpiresInput ? '' : 'asset-date-pick--empty'}}">
+                {{monthCardExpiresInput || '未开通（点选日期开通）'}}
+              </view>
+            </picker>
+          </view>
+          <view
+            wx:if="{{monthCardExpiresInput}}"
+            class="asset-clear-link"
+            bindtap="onClearMonthCard"
+          >清除月卡</view>
+        </view>
       </view>
 
       <button

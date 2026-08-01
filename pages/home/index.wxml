@@ -9,14 +9,22 @@
       <view class="stored-value-entry-container">
         <card bindtap="goStoredValue">
           <view class="stored-value-entry" hover-class="stored-value-entry--hover">
+            <view class="stored-value-entry-icon-wrap stored-value-entry-icon-wrap--balance">
+              <text class="stored-value-entry-icon">¥</text>
+            </view>
             <view class="stored-value-entry-main">
               <text class="stored-value-entry-title">场地储值</text>
             </view>
-            <image
-              class="stored-value-entry-img"
-              src="/assets/images/tennis-index.png"
-              mode="aspectFit"
-            />
+          </view>
+        </card>
+        <card bindtap="goMonthCard">
+          <view class="stored-value-entry" hover-class="stored-value-entry--hover">
+            <view class="stored-value-entry-icon-wrap stored-value-entry-icon-wrap--month">
+              <text class="stored-value-entry-icon">月</text>
+            </view>
+            <view class="stored-value-entry-main">
+              <text class="stored-value-entry-title">月卡购买</text>
+            </view>
           </view>
         </card>
       </view>

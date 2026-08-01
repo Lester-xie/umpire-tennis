@@ -543,6 +543,64 @@ exports.main = async (event, context) => {
       const storedBalanceDeductYuan =
         bookingSubtype === 'coach_course' ? 0 : clientStoredDeduct;
 
+      let monthCardFree = null;
+      let monthCardDeductYuan = 0;
+      let monthCardFreeSlotKey = '';
+      if (bookingSubtype !== 'coach_course' && event.booking.monthCardFree) {
+        const { assertAndNormalizeMonthCardFree } = require('./monthCardFreeHour');
+        const mcGate = await assertAndNormalizeMonthCardFree({
+          db,
+          _,
+          phone: bookingPhone,
+          venueId: event.booking.venueId,
+          orderDate: event.booking.orderDate,
+          monthCardFree: event.booking.monthCardFree,
+        });
+        if (!mcGate.ok) {
+          return {
+            returnCode: 'FAIL',
+            returnMsg: mcGate.errMsg || '月卡校验失败',
+            payment: undefined,
+          };
+        }
+        monthCardFree = mcGate.monthCardFree;
+        if (monthCardFree) {
+          monthCardDeductYuan = Number(monthCardFree.deductYuan) || 0;
+          monthCardFreeSlotKey = monthCardFree.slotKey;
+          const slots = Array.isArray(event.booking.bookedSlots) ? event.booking.bookedSlots : [];
+          const inOrder = slots.some(
+            (s) => `${Number(s.courtId)}-${Number(s.slotIndex)}` === monthCardFreeSlotKey,
+          );
+          if (!inOrder) {
+            return {
+              returnCode: 'FAIL',
+              returnMsg: '月卡免费时段不在本单内',
+              payment: undefined,
+            };
+          }
+        }
+      }
+
+      let paymentMethod = 'wechat_pending';
+      const hasVouchers =
+        Array.isArray(event.booking.bookingVouchers) &&
+        event.booking.bookingVouchers.length > 0;
+      if (monthCardFree && hasVouchers && storedBalanceDeductYuan > 0) {
+        paymentMethod = 'month_card_voucher_balance_mixed';
+      } else if (monthCardFree && hasVouchers) {
+        paymentMethod = 'month_card_voucher_mixed';
+      } else if (monthCardFree && storedBalanceDeductYuan > 0) {
+        paymentMethod = 'month_card_balance_mixed';
+      } else if (monthCardFree) {
+        paymentMethod = 'month_card_mixed';
+      } else if (hasVouchers && storedBalanceDeductYuan > 0) {
+        paymentMethod = 'voucher_balance_mixed';
+      } else if (hasVouchers) {
+        paymentMethod = 'voucher_mixed';
+      } else if (storedBalanceDeductYuan > 0) {
+        paymentMethod = 'balance_mixed';
+      }
+
       await db.collection('db_booking').add({
         data: {
           phone: bookingPhone,
@@ -564,6 +622,8 @@ exports.main = async (event, context) => {
             ? event.booking.bookingVouchers
             : [],
           voucherDeductionYuan: Number(event.booking.voucherDeductionYuan) || 0,
+          monthCardDeductYuan,
+          monthCardFreeSlotKey,
           storedBalanceDeductYuan,
           cashDueYuan:
             event.booking.cashDueYuan != null
@@ -581,15 +641,7 @@ exports.main = async (event, context) => {
             event.booking.memberDisplayName != null
               ? String(event.booking.memberDisplayName).trim().slice(0, 40)
               : '',
-          paymentMethod:
-            Array.isArray(event.booking.bookingVouchers) &&
-            event.booking.bookingVouchers.length > 0
-              ? storedBalanceDeductYuan > 0
-                ? 'voucher_balance_mixed'
-                : 'voucher_mixed'
-              : storedBalanceDeductYuan > 0
-                ? 'balance_mixed'
-                : 'wechat_pending',
+          paymentMethod,
           createdAt: Date.now(),
         },
       });
@@ -684,6 +736,46 @@ exports.main = async (event, context) => {
       return {
         returnCode: 'FAIL',
         returnMsg: '储值订单保存失败，请重试',
+        payment: undefined,
+      };
+    }
+  }
+
+  // 场馆月卡：统一下单成功后写 db_month_card_purchase（pending），支付结果由 payCallback 写入 db_member_venue_month_card
+  if (res.returnCode === 'SUCCESS' && event.monthCardPurchase && event.monthCardPurchase.type === 'venue_month_card') {
+    const mp = event.monthCardPurchase;
+    const phone = String(mp.phone || '').trim();
+    const venueId = String(mp.venueId || '').trim();
+    const priceYuan = Math.round(Number(mp.priceYuan) * 100) / 100;
+    let days = Math.floor(Number(mp.days));
+    if (!Number.isFinite(days) || days < 1) days = 30;
+    if (days > 366) days = 366;
+    if (!phone || !venueId || priceYuan <= 0) {
+      return {
+        returnCode: 'FAIL',
+        returnMsg: '月卡参数无效',
+        payment: undefined,
+      };
+    }
+    try {
+      await db.collection('db_month_card_purchase').add({
+        data: {
+          phone,
+          venueId,
+          venueName: mp.venueName != null ? String(mp.venueName).trim() : '',
+          outTradeNo,
+          totalFee,
+          priceYuan,
+          days,
+          status: 'pending',
+          createdAt: Date.now(),
+        },
+      });
+    } catch (err) {
+      console.error('db_month_card_purchase 写入失败', err);
+      return {
+        returnCode: 'FAIL',
+        returnMsg: '月卡订单保存失败，请重试',
         payment: undefined,
       };
     }

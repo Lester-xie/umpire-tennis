@@ -58,9 +58,15 @@
 
 .field-textarea {
   width: 100%;
+  box-sizing: border-box;
   min-height: 120rpx;
+  padding: 22rpx 24rpx;
   font-size: 28rpx;
+  line-height: 1.45;
   color: #1a1a1a;
+  background: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid #e8ecf4;
 }
 
 .picker-display {

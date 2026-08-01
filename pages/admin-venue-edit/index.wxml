@@ -60,6 +60,10 @@
           <text class="manage-entry-text">储值卡管理</text>
           <text class="manage-entry-arrow">›</text>
         </navigator>
+        <navigator url="/pages/admin-venue-month-card/index?id={{venueId}}" class="manage-entry" hover-class="manage-entry--hover">
+          <text class="manage-entry-text">月卡管理</text>
+          <text class="manage-entry-arrow">›</text>
+        </navigator>
       </view>
 
       <view class="field" wx:if="{{isNew}}">

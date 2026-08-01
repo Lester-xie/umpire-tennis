@@ -6,6 +6,7 @@ page {
 
 /**
  * 原生 input 在部分机型上仅设 padding 会高度塌陷，需 min-height + line-height + box-sizing。
+ * 微信基础库默认无边框，管理台表单输入需显式设置 border / background。
  * 各页可在此基础上覆盖 font-size、border 等。
  */
 .field-input {
@@ -16,6 +17,9 @@ page {
   font-size: 28rpx;
   line-height: 44rpx;
   color: #1a1a1a;
+  background: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid #e8ecf4;
 }
 
 .court-name-input {
@@ -28,6 +32,7 @@ page {
   color: #1a1a1a;
   background: #fff;
   border-radius: 12rpx;
+  border: 1rpx solid #e8ecf4;
 }
 
 .tm-format-input {
@@ -40,6 +45,7 @@ page {
   color: #1a1a1a;
   background: #fff;
   border-radius: 12rpx;
+  border: 1rpx solid #e8ecf4;
 }
 
 .tm-input-sm,
@@ -51,6 +57,8 @@ page {
   line-height: 40rpx;
   color: #1a1a1a;
   background: #fff;
+  border-radius: 10rpx;
+  border: 1rpx solid #e0e0e0;
 }
 
 .sp-in {
@@ -63,6 +71,7 @@ page {
   color: #1a1a1a;
   background: #fff;
   border-radius: 12rpx;
+  border: 1rpx solid #e8ecf4;
 }
 
 .phone-input {
@@ -70,6 +79,9 @@ page {
   min-height: 88rpx;
   padding: 20rpx 24rpx;
   line-height: 44rpx;
+  background: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid #e8ecf4;
 }
 
 /* 管理台：封面图上传与预览 */

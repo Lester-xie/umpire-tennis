@@ -4,6 +4,7 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
 const _ = db.command;
+const { assertAndNormalizeMonthCardFree } = require('./monthCardFreeHour');
 
 function normalizeOrderDate(raw) {
   const s = String(raw || '').trim();
@@ -157,9 +158,6 @@ exports.main = async (event, context) => {
   if (!openid || !phone || !snapshot) {
     return { ok: false, errMsg: '参数不完整' };
   }
-  if (!vouchers.length && storedBalanceDeductYuan <= 0) {
-    return { ok: false, errMsg: '请使用团购券或储值余额完成支付' };
-  }
 
   const bookedSlots = Array.isArray(snapshot.bookedSlots) ? snapshot.bookedSlots : [];
   const slotPrices = Array.isArray(snapshot.slotPrices) ? snapshot.slotPrices : [];
@@ -168,6 +166,22 @@ exports.main = async (event, context) => {
   }
   if (vouchers.length > bookedSlots.length) {
     return { ok: false, errMsg: '团购券数量不能超过预订小时数' };
+  }
+
+  const mcGate = await assertAndNormalizeMonthCardFree({
+    db,
+    _,
+    phone,
+    venueId: snapshot.venueId,
+    orderDate: snapshot.orderDate,
+    monthCardFree: event && event.monthCardFree,
+  });
+  if (!mcGate.ok) return mcGate;
+  const monthCardFree = mcGate.monthCardFree;
+  const monthCardDeductYuan = monthCardFree ? roundYuan(monthCardFree.deductYuan) : 0;
+
+  if (!vouchers.length && storedBalanceDeductYuan <= 0 && !monthCardFree) {
+    return { ok: false, errMsg: '请使用团购券、月卡或储值余额完成支付' };
   }
 
   const totalPrice = roundYuan(snapshot.totalPrice);
@@ -191,15 +205,32 @@ exports.main = async (event, context) => {
     voucherSum += priceYuan;
   }
   voucherSum = roundYuan(voucherSum);
+
+  if (monthCardFree) {
+    if (usedSlotKeys.has(monthCardFree.slotKey)) {
+      return { ok: false, errMsg: '月卡免费时段与团购券冲突' };
+    }
+    const inOrder = bookedSlots.some(
+      (s) => `${Number(s.courtId)}-${Number(s.slotIndex)}` === monthCardFree.slotKey,
+    );
+    if (!inOrder) {
+      return { ok: false, errMsg: '月卡免费时段不在本单内' };
+    }
+  }
+
   const cashAfterVoucher = roundYuan(totalPrice - voucherSum);
-  if (storedBalanceDeductYuan > cashAfterVoucher + 0.011) {
+  const cashAfterMonthCard = roundYuan(Math.max(0, cashAfterVoucher - monthCardDeductYuan));
+  if (monthCardDeductYuan > cashAfterVoucher + 0.011) {
+    return { ok: false, errMsg: '月卡抵扣金额超出应付' };
+  }
+  if (storedBalanceDeductYuan > cashAfterMonthCard + 0.011) {
     return { ok: false, errMsg: '储值抵扣金额超出应付' };
   }
-  const remain = roundYuan(totalPrice - voucherSum - storedBalanceDeductYuan);
+  const remain = roundYuan(totalPrice - voucherSum - monthCardDeductYuan - storedBalanceDeductYuan);
   if (remain > 0.009) {
     return { ok: false, errMsg: '尚有未支付金额，请使用微信支付' };
   }
-  if (storedBalanceDeductYuan <= 0 && cashAfterVoucher > 0.009) {
+  if (storedBalanceDeductYuan <= 0 && cashAfterMonthCard > 0.009) {
     return { ok: false, errMsg: '尚有未抵扣金额，请使用混合支付' };
   }
 
@@ -236,6 +267,21 @@ exports.main = async (event, context) => {
 
   const outTradeNo = generateOutTradeNo();
 
+  let paymentMethod = 'balance';
+  if (monthCardFree && vouchers.length && storedBalanceDeductYuan > 0) {
+    paymentMethod = 'month_card_voucher_balance';
+  } else if (monthCardFree && vouchers.length) {
+    paymentMethod = 'month_card_voucher';
+  } else if (monthCardFree && storedBalanceDeductYuan > 0) {
+    paymentMethod = 'month_card_balance';
+  } else if (monthCardFree) {
+    paymentMethod = 'month_card';
+  } else if (vouchers.length && storedBalanceDeductYuan > 0) {
+    paymentMethod = 'voucher_balance';
+  } else if (vouchers.length) {
+    paymentMethod = 'voucher';
+  }
+
   try {
     await db.collection('db_booking').add({
       data: {
@@ -253,16 +299,13 @@ exports.main = async (event, context) => {
         bookedSlots,
         totalPrice,
         voucherDeductionYuan: voucherSum,
+        monthCardDeductYuan,
+        monthCardFreeSlotKey: monthCardFree ? monthCardFree.slotKey : '',
         storedBalanceDeductYuan,
         cashDueYuan: 0,
         bookingVouchers: vouchers,
         bookingSubtype: '',
-        paymentMethod:
-          vouchers.length && storedBalanceDeductYuan > 0
-            ? 'voucher_balance'
-            : vouchers.length
-              ? 'voucher'
-              : 'balance',
+        paymentMethod,
         voucherConsumeStatus: vouchers.length ? 'pending' : '',
         paidAt: now,
         createdAt: now,

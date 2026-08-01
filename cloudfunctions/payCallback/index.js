@@ -11,6 +11,7 @@ const {
   mergeUnitPriceYuan,
   allocateLessonUnits,
 } = require('./courseHourUnit')
+const { assertAndNormalizeMonthCardFree } = require('./monthCardFreeHour')
 
 function normalizeOrderDateCb(raw) {
   const s = String(raw || '').trim()
@@ -450,6 +451,28 @@ async function markBookingPaid({ outTradeNo, transactionId, timeEnd }) {
     return
   }
 
+  if (String(booking.monthCardFreeSlotKey || '').trim()) {
+    const mcGate = await assertAndNormalizeMonthCardFree({
+      db,
+      _,
+      phone: booking.phone,
+      venueId: booking.venueId,
+      orderDate: booking.orderDate,
+      monthCardFree: {
+        slotKey: booking.monthCardFreeSlotKey,
+        deductYuan: booking.monthCardDeductYuan,
+      },
+      excludeOutTradeNo: outTradeNo,
+    })
+    if (!mcGate.ok) {
+      console.error('markBookingPaid: 月卡校验失败，回退 pending', outTradeNo, mcGate.errMsg)
+      await coll.doc(_id).update({
+        data: { status: 'pending', updatedAt: now },
+      })
+      return
+    }
+  }
+
   const deductResult = await tryDeductCoachCourseHoursForBooking(booking, now)
   if (!deductResult.ok) {
     console.error('markBookingPaid: 课时扣减失败，回退 pending', outTradeNo)
@@ -668,6 +691,71 @@ async function markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, 
 }
 
 /**
+ * 场馆月卡支付成功：标记 db_month_card_purchase 已付，并延长/写入 db_member_venue_month_card
+ */
+async function markMonthCardPurchasePaidAndGrant({ outTradeNo, transactionId, timeEnd }) {
+  if (!outTradeNo) return;
+  const coll = db.collection('db_month_card_purchase');
+  const exist = await coll.where({ outTradeNo }).limit(1).get();
+  if (!exist.data || exist.data.length === 0) {
+    return;
+  }
+  const row = exist.data[0];
+  const _id = row._id;
+  const st = String(row.status || '');
+  if (st === 'paid') {
+    return;
+  }
+  const phone = String(row.phone || '').trim();
+  const venueId = String(row.venueId || '').trim();
+  let days = Math.floor(Number(row.days));
+  if (!Number.isFinite(days) || days < 1) days = 30;
+  if (!phone || !venueId) {
+    console.error('markMonthCardPurchasePaid: 参数无效', outTradeNo);
+    return;
+  }
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  await coll.doc(_id).update({
+    data: {
+      status: 'paid',
+      transactionId: transactionId || '',
+      timeEnd: timeEnd || '',
+      paidAt: now,
+      updatedAt: now,
+    },
+  });
+
+  const mcColl = db.collection('db_member_venue_month_card');
+  const mcHit = await mcColl.where({ phone, venueId }).limit(1).get();
+  const prev = mcHit.data && mcHit.data[0] ? mcHit.data[0] : null;
+  const base = prev && Number(prev.expiresAt) > now ? Number(prev.expiresAt) : now;
+  const expiresAt = base + days * dayMs;
+  if (prev && prev._id) {
+    await mcColl.doc(prev._id).update({
+      data: {
+        expiresAt,
+        lastOutTradeNo: outTradeNo,
+        lastDays: days,
+        updatedAt: now,
+      },
+    });
+  } else {
+    await mcColl.add({
+      data: {
+        phone,
+        venueId,
+        expiresAt,
+        lastOutTradeNo: outTradeNo,
+        lastDays: days,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+  }
+}
+
+/**
  * 场馆储值卡支付成功：标记 db_stored_value_purchase 已付，并累加 db_member_venue_balance
  */
 async function markStoredValuePurchasePaidAndGrantBalance({ outTradeNo, transactionId, timeEnd }) {
@@ -778,7 +866,12 @@ exports.main = async (event, context) => {
         if (svHit.data && svHit.data.length > 0) {
           await markStoredValuePurchasePaidAndGrantBalance({ outTradeNo, transactionId, timeEnd });
         } else {
-          await markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, timeEnd });
+          const mcHit = await db.collection('db_month_card_purchase').where({ outTradeNo }).limit(1).get();
+          if (mcHit.data && mcHit.data.length > 0) {
+            await markMonthCardPurchasePaidAndGrant({ outTradeNo, transactionId, timeEnd });
+          } else {
+            await markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, timeEnd });
+          }
         }
       }
     } catch (err) {

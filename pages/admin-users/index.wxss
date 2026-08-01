@@ -262,3 +262,33 @@
   min-width: 0;
   text-align: left;
 }
+
+.asset-date-pick {
+  flex: 1;
+  min-width: 0;
+  min-height: 88rpx;
+  padding: 22rpx 24rpx;
+  box-sizing: border-box;
+  font-size: 28rpx;
+  line-height: 44rpx;
+  color: #1a1a1a;
+  background: #fff;
+  border-radius: 12rpx;
+  border: 1rpx solid #e8ecf4;
+}
+
+.asset-date-pick--empty {
+  color: #999;
+}
+
+.asset-input-row picker {
+  flex: 1;
+  min-width: 0;
+}
+
+.asset-clear-link {
+  margin-top: 12rpx;
+  padding-left: 180rpx;
+  font-size: 26rpx;
+  color: #c62828;
+}

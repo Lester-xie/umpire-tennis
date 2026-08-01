@@ -58,24 +58,22 @@
 
       <!-- 奖励/课时卡片 -->
       <view class="profile-reward-section">
-        <card>
-          <view class="profile-reward-card">
+        <card bindtap="handleRedeemTap">
+          <view class="profile-reward-card" hover-class="profile-reward-card--hover">
             <view class="profile-reward-icon-wrap">
               <text class="profile-reward-icon-star">★</text>
             </view>
             <view class="profile-reward-text">
               <text class="profile-reward-label">剩余课时</text>
               <view class="profile-reward-value-row">
-                <text class="profile-reward-star">★</text>
                 <text class="profile-reward-num">{{isLoggedIn ? totalCourseHoursText : '—'}}</text>
                 <text class="profile-reward-unit" wx:if="{{isLoggedIn}}">小时</text>
               </view>
             </view>
-            <view class="profile-reward-btn" bindtap="handleRedeemTap">查看</view>
           </view>
         </card>
-        <card>
-          <view class="profile-reward-card profile-reward-card--balance">
+        <card bindtap="handleStoredValueTap">
+          <view class="profile-reward-card profile-reward-card--balance" hover-class="profile-reward-card--hover">
             <view class="profile-reward-icon-wrap profile-reward-icon-wrap--balance">
               <text class="profile-reward-icon-star">¥</text>
             </view>
@@ -86,7 +84,24 @@
                 <text class="profile-reward-unit" wx:if="{{isLoggedIn}}">元</text>
               </view>
             </view>
-            <view class="profile-reward-btn" bindtap="handleStoredValueTap">查看</view>
+          </view>
+        </card>
+      </view>
+
+      <view class="profile-month-card-section" wx:if="{{isLoggedIn && hasMonthCard}}">
+        <card>
+          <view class="profile-reward-card profile-reward-card--month">
+            <view class="profile-reward-icon-wrap profile-reward-icon-wrap--month">
+              <text class="profile-reward-icon-star">月</text>
+            </view>
+            <view class="profile-reward-text">
+              <text class="profile-reward-label">场馆月卡</text>
+              <view class="profile-reward-value-row">
+                <text class="profile-reward-num profile-reward-num--date">{{monthCardExpiresText}}</text>
+                <text class="profile-reward-unit">到期</text>
+              </view>
+            </view>
+            <view class="profile-month-card-btn" catchtap="handleMonthCardRenewTap">续费</view>
           </view>
         </card>
       </view>
