@@ -15,7 +15,7 @@
         ></image>
         <image
           class="logo"
-          src="/assets/images/logo2.png"
+          src="/assets/images/logo.png"
           mode="aspectFit"
         ></image>
       </view>
