@@ -1,3 +1,7 @@
+/** 与 welcome 页一致：未授权手机号且未看过欢迎页时需先走欢迎流程 */
+const STORAGE_USER_PHONE = 'user_phone';
+const STORAGE_WELCOME_SEEN = 'welcome_seen';
+
 Page({
   data: {
     headerHeight: 0, // header 高度
@@ -5,7 +9,14 @@ Page({
     placeholderHeight: 0,
     courseLoadingVisible: false,
   },
-  onLoad() {},
+  onLoad() {
+    // 小程序码等可直达首页；首次用户仍先进入欢迎页
+    const phone = wx.getStorageSync(STORAGE_USER_PHONE);
+    const seen = wx.getStorageSync(STORAGE_WELCOME_SEEN);
+    if (!phone && !seen) {
+      wx.reLaunch({ url: '/pages/welcome/index' });
+    }
+  },
 
   onCourseLoading(e) {
     const loading = e.detail && e.detail.loading;
