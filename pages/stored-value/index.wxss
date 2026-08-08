@@ -65,6 +65,13 @@
   border-radius: 20rpx;
 }
 
+.section-title {
+  margin: 8rpx 8rpx 16rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #134e35;
+}
+
 .plan-card {
   margin-bottom: 20rpx;
   padding: 32rpx 28rpx;

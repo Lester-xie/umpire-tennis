@@ -12,6 +12,10 @@ const {
   allocateLessonUnits,
 } = require('./courseHourUnit')
 const { assertAndNormalizeMonthCardFree } = require('./monthCardFreeHour')
+const {
+  assertAndNormalizeSessionCard,
+  tryDeductSessionCardTimes,
+} = require('./sessionCardDeduct')
 
 function normalizeOrderDateCb(raw) {
   const s = String(raw || '').trim()
@@ -473,6 +477,30 @@ async function markBookingPaid({ outTradeNo, transactionId, timeEnd }) {
     }
   }
 
+  const sessionTimes = Math.floor(Number(booking.sessionCardDeductTimes) || 0)
+  if (sessionTimes > 0 && String(booking.bookingSubtype || '').trim() !== 'coach_course') {
+    const scGate = await assertAndNormalizeSessionCard({
+      db,
+      phone: booking.phone,
+      venueId: booking.venueId,
+      bookedSlots: Array.isArray(booking.bookedSlots) ? booking.bookedSlots : [],
+      vouchers: Array.isArray(booking.bookingVouchers) ? booking.bookingVouchers : [],
+      monthCardFreeSlotKey: booking.monthCardFreeSlotKey,
+      sessionCard: {
+        slotKeys: Array.isArray(booking.sessionCardSlotKeys) ? booking.sessionCardSlotKeys : [],
+        deductTimes: sessionTimes,
+        deductYuan: booking.sessionCardDeductYuan,
+      },
+    })
+    if (!scGate.ok) {
+      console.error('markBookingPaid: 次卡校验失败，回退 pending', outTradeNo, scGate.errMsg)
+      await coll.doc(_id).update({
+        data: { status: 'pending', updatedAt: now },
+      })
+      return
+    }
+  }
+
   const deductResult = await tryDeductCoachCourseHoursForBooking(booking, now)
   if (!deductResult.ok) {
     console.error('markBookingPaid: 课时扣减失败，回退 pending', outTradeNo)
@@ -482,9 +510,45 @@ async function markBookingPaid({ outTradeNo, transactionId, timeEnd }) {
     return
   }
 
+  if (sessionTimes > 0 && String(booking.bookingSubtype || '').trim() !== 'coach_course') {
+    const scDeduct = await tryDeductSessionCardTimes({
+      db,
+      _,
+      phone: booking.phone,
+      venueId: booking.venueId,
+      deductTimes: sessionTimes,
+      now,
+    })
+    if (!scDeduct.ok) {
+      console.error('markBookingPaid: 次卡扣减失败，回退 pending', outTradeNo)
+      await coll.doc(_id).update({
+        data: { status: 'pending', updatedAt: now },
+      })
+      return
+    }
+  }
+
   const balanceOk = await tryDeductStoredBalanceForBooking(booking, now)
   if (!balanceOk) {
     console.error('markBookingPaid: 储值扣减失败，回退 pending', outTradeNo)
+    if (sessionTimes > 0 && String(booking.bookingSubtype || '').trim() !== 'coach_course') {
+      try {
+        await db
+          .collection('db_member_venue_session_card')
+          .where({
+            phone: String(booking.phone || '').trim(),
+            venueId: String(booking.venueId || '').trim(),
+          })
+          .update({
+            data: {
+              remainingTimes: _.inc(sessionTimes),
+              updatedAt: now,
+            },
+          })
+      } catch (rollbackErr) {
+        console.error('markBookingPaid: 次卡回滚失败', outTradeNo, rollbackErr)
+      }
+    }
     await coll.doc(_id).update({
       data: { status: 'pending', updatedAt: now },
     })
@@ -756,6 +820,64 @@ async function markMonthCardPurchasePaidAndGrant({ outTradeNo, transactionId, ti
 }
 
 /**
+ * 场馆次卡支付成功：标记 db_session_card_purchase 已付，并累加 db_member_venue_session_card.remainingTimes
+ */
+async function markSessionCardPurchasePaidAndGrant({ outTradeNo, transactionId, timeEnd }) {
+  if (!outTradeNo) return
+  const coll = db.collection('db_session_card_purchase')
+  const exist = await coll.where({ outTradeNo }).limit(1).get()
+  if (!exist.data || exist.data.length === 0) {
+    return
+  }
+  const row = exist.data[0]
+  const _id = row._id
+  const st = String(row.status || '')
+  if (st === 'paid') {
+    return
+  }
+  const phone = String(row.phone || '').trim()
+  const venueId = String(row.venueId || '').trim()
+  const grantTimes = Math.floor(Number(row.grantTimes) || 0)
+  if (!phone || !venueId || grantTimes < 1) {
+    console.error('markSessionCardPurchasePaid: 参数无效', outTradeNo)
+    return
+  }
+  const now = Date.now()
+  await coll.doc(_id).update({
+    data: {
+      status: 'paid',
+      transactionId: transactionId || '',
+      timeEnd: timeEnd || '',
+      paidAt: now,
+      updatedAt: now,
+    },
+  })
+
+  const scColl = db.collection('db_member_venue_session_card')
+  const scHit = await scColl.where({ phone, venueId }).limit(1).get()
+  if (scHit.data && scHit.data[0] && scHit.data[0]._id) {
+    await scColl.doc(scHit.data[0]._id).update({
+      data: {
+        remainingTimes: _.inc(grantTimes),
+        lastOutTradeNo: outTradeNo,
+        updatedAt: now,
+      },
+    })
+  } else {
+    await scColl.add({
+      data: {
+        phone,
+        venueId,
+        remainingTimes: grantTimes,
+        lastOutTradeNo: outTradeNo,
+        createdAt: now,
+        updatedAt: now,
+      },
+    })
+  }
+}
+
+/**
  * 场馆储值卡支付成功：标记 db_stored_value_purchase 已付，并累加 db_member_venue_balance
  */
 async function markStoredValuePurchasePaidAndGrantBalance({ outTradeNo, transactionId, timeEnd }) {
@@ -866,11 +988,16 @@ exports.main = async (event, context) => {
         if (svHit.data && svHit.data.length > 0) {
           await markStoredValuePurchasePaidAndGrantBalance({ outTradeNo, transactionId, timeEnd });
         } else {
-          const mcHit = await db.collection('db_month_card_purchase').where({ outTradeNo }).limit(1).get();
-          if (mcHit.data && mcHit.data.length > 0) {
-            await markMonthCardPurchasePaidAndGrant({ outTradeNo, transactionId, timeEnd });
+          const scHit = await db.collection('db_session_card_purchase').where({ outTradeNo }).limit(1).get();
+          if (scHit.data && scHit.data.length > 0) {
+            await markSessionCardPurchasePaidAndGrant({ outTradeNo, transactionId, timeEnd });
           } else {
-            await markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, timeEnd });
+            const mcHit = await db.collection('db_month_card_purchase').where({ outTradeNo }).limit(1).get();
+            if (mcHit.data && mcHit.data.length > 0) {
+              await markMonthCardPurchasePaidAndGrant({ outTradeNo, transactionId, timeEnd });
+            } else {
+              await markCoursePurchasePaidAndGrantHours({ outTradeNo, transactionId, timeEnd });
+            }
           }
         }
       }

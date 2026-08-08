@@ -137,7 +137,10 @@ async function assertStaffCaller(openid) {
   return u;
 }
 
-/** 与订场页一致：14 个时段 8:00–21:00 */
+/**
+ * 落库价表长度：14 格（slotIndex 0=8:00）。
+ * 管理端界面只编 10:00–21:00（12 档），写入时前两档为 0；与会员可预约 10:00–22:00 对齐。
+ */
 const PRICE_SLOT_COUNT = 14;
 
 function normalizeCourtList(raw) {
@@ -284,6 +287,13 @@ function normalizeVenuePayload(body) {
   if (!svNorm.omit && svNorm.list != null) {
     data.storedValuePlans = svNorm.list;
   }
+  const scNorm = normalizeSessionCardPlans(body.sessionCardPlans);
+  if (!scNorm.ok) {
+    return scNorm;
+  }
+  if (!scNorm.omit && scNorm.list != null) {
+    data.sessionCardPlans = scNorm.list;
+  }
   const mcNorm = normalizeMonthCard(body.monthCard);
   if (!mcNorm.ok) {
     return mcNorm;
@@ -292,6 +302,38 @@ function normalizeVenuePayload(body) {
     data.monthCard = mcNorm.value;
   }
   return { ok: true, data };
+}
+
+/** 场馆次卡档位：payYuan 实付，grantTimes 到账次数（1 次 = 订场 1 小时） */
+function normalizeSessionCardPlans(raw) {
+  if (raw === undefined) {
+    return { ok: true, omit: true, list: null };
+  }
+  if (!Array.isArray(raw)) {
+    return { ok: false, errMsg: 'sessionCardPlans 须为数组' };
+  }
+  const out = [];
+  for (let i = 0; i < raw.length; i += 1) {
+    const row = raw[i];
+    if (!row || typeof row !== 'object') {
+      return { ok: false, errMsg: `次卡档位第 ${i + 1} 项无效` };
+    }
+    const payYuan = Math.round(Number(row.payYuan) * 100) / 100;
+    const grantTimes = Math.floor(Number(row.grantTimes));
+    if (!Number.isFinite(payYuan) || payYuan <= 0) {
+      return { ok: false, errMsg: `次卡档位第 ${i + 1} 项售价无效` };
+    }
+    if (!Number.isFinite(grantTimes) || grantTimes < 1 || grantTimes > 9999) {
+      return { ok: false, errMsg: `次卡档位第 ${i + 1} 项次数无效` };
+    }
+    out.push({
+      payYuan,
+      grantTimes,
+      enabled: row.enabled !== false,
+      sort: i,
+    });
+  }
+  return { ok: true, omit: false, list: out };
 }
 
 /** 场馆储值卡档位：payYuan 实付，creditYuan 入账余额 */
@@ -351,9 +393,9 @@ function normalizeMonthCard(raw) {
   }
   let windowStartHour = Math.floor(Number(raw.windowStartHour));
   let windowEndHour = Math.floor(Number(raw.windowEndHour));
-  if (!Number.isFinite(windowStartHour)) windowStartHour = 9;
+  if (!Number.isFinite(windowStartHour)) windowStartHour = 10;
   if (!Number.isFinite(windowEndHour)) windowEndHour = 12;
-  if (windowStartHour < 8) windowStartHour = 8;
+  if (windowStartHour < 10) windowStartHour = 10;
   if (windowEndHour > 22) windowEndHour = 22;
   if (windowEndHour <= windowStartHour) {
     return { ok: false, errMsg: '月卡生效结束时间须晚于开始时间' };

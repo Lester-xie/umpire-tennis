@@ -44,6 +44,10 @@ function findMonthCardForVenue(monthCards, venueId) {
   return (monthCards || []).find((row) => venueIdLooseEqual(row.venueId, venueId)) || null;
 }
 
+function findSessionCardForVenue(sessionCards, venueId) {
+  return (sessionCards || []).find((row) => venueIdLooseEqual(row.venueId, venueId)) || null;
+}
+
 function formatDateInputFromTs(ts) {
   const n = Number(ts);
   if (!Number.isFinite(n) || n <= 0) return '';
@@ -78,10 +82,12 @@ function buildVenueAssetFields(venueId, assetCache) {
   const balances = (assetCache && assetCache.balances) || [];
   const courseHours = filterManagedCourseHours((assetCache && assetCache.courseHours) || []);
   const monthCards = (assetCache && assetCache.monthCards) || [];
+  const sessionCards = (assetCache && assetCache.sessionCards) || [];
   const bal = findBalanceForVenue(balances, vid);
   const h1 = findHoursForVenueAndKey(courseHours, vid, 'regular:1v1');
   const h2 = findHoursForVenueAndKey(courseHours, vid, 'regular:1v2');
   const mc = findMonthCardForVenue(monthCards, vid);
+  const sc = findSessionCardForVenue(sessionCards, vid);
   const monthCardExpiresInput = formatDateInputFromTs(mc ? mc.expiresAt : 0);
   return {
     venueAssetsReady: !!vid,
@@ -96,6 +102,8 @@ function buildVenueAssetFields(venueId, assetCache) {
     monthCardDocId: mc && mc.docId ? String(mc.docId) : '',
     monthCardExpiresInput,
     monthCardPickerValue: monthCardExpiresInput || todayDateInput(),
+    sessionCardDocId: sc && sc.docId ? String(sc.docId) : '',
+    sessionCardTimesInput: String(Math.max(0, Math.floor(Number(sc ? sc.remainingTimes : 0)))),
   };
 }
 
@@ -130,6 +138,8 @@ Page({
     monthCardDocId: '',
     monthCardExpiresInput: '',
     monthCardPickerValue: todayDateInput(),
+    sessionCardDocId: '',
+    sessionCardTimesInput: '0',
   },
 
   onLoad() {
@@ -202,6 +212,8 @@ Page({
       monthCardDocId: '',
       monthCardExpiresInput: '',
       monthCardPickerValue: todayDateInput(),
+      sessionCardDocId: '',
+      sessionCardTimesInput: '0',
     });
   },
 
@@ -278,7 +290,12 @@ Page({
         avatarDisplayUrl = resolved || DEFAULT_USER_AVATAR;
       }
 
-      this._assetCache = assets.data || { balances: [], courseHours: [], monthCards: [] };
+      this._assetCache = assets.data || {
+        balances: [],
+        courseHours: [],
+        monthCards: [],
+        sessionCards: [],
+      };
       const venueOptions = this.data.venueOptions || [];
       let selectedVenueIndex = this.data.selectedVenueIndex;
       if (selectedVenueIndex < 0 || selectedVenueIndex >= venueOptions.length) {
@@ -342,6 +359,10 @@ Page({
     });
   },
 
+  onSessionCardTimesInput(e) {
+    this.setData({ sessionCardTimesInput: e.detail.value || '' });
+  },
+
   assertQueriedPhone() {
     const targetPhone = String(this.data.targetPhone || '').trim();
     const queriedPhone = String(this.data.queriedPhone || '').trim();
@@ -397,6 +418,12 @@ Page({
       return;
     }
 
+    const sessionCardTimes = Math.floor(Number(this.data.sessionCardTimesInput));
+    if (!Number.isFinite(sessionCardTimes) || sessionCardTimes < 0) {
+      wx.showToast({ title: '次卡次数无效', icon: 'none' });
+      return;
+    }
+
     const userName = String(this.data.userName || '').trim();
     if (!userName) {
       wx.showToast({ title: '请填写用户名', icon: 'none' });
@@ -449,6 +476,13 @@ Page({
               expiresAt: monthCardExpiresAt > 0 ? monthCardExpiresAt : null,
             },
           ],
+          sessionCards: [
+            {
+              docId: this.data.sessionCardDocId || '',
+              venueId,
+              remainingTimes: sessionCardTimes,
+            },
+          ],
         }),
       ]);
       wx.hideLoading();
@@ -469,7 +503,12 @@ Page({
       const refreshRes = await adminGetUserMemberAssets({ phone: queriedPhone });
       const refreshed = (refreshRes && refreshRes.result) || {};
       if (refreshed.ok) {
-        this._assetCache = refreshed.data || { balances: [], courseHours: [], monthCards: [] };
+        this._assetCache = refreshed.data || {
+          balances: [],
+          courseHours: [],
+          monthCards: [],
+          sessionCards: [],
+        };
         this.setData(buildVenueAssetFields(venueId, this._assetCache));
       }
     } catch (e) {

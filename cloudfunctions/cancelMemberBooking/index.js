@@ -278,6 +278,79 @@ async function returnCourseHoursForBooking(booking, now) {
 }
 
 /**
+ * 普通订场取消：退回次卡次数
+ */
+async function returnSessionCardForBooking(booking, now) {
+  const subtype = String(booking.bookingSubtype || '').trim();
+  if (subtype === 'coach_course') return { ok: true };
+
+  const refundTimes = Math.floor(Number(booking.sessionCardDeductTimes) || 0);
+  if (refundTimes <= 0) return { ok: true };
+  if (String(booking.sessionCardRefundStatus || '') === 'success') {
+    return { ok: true, skipped: true };
+  }
+
+  const phone = String(booking.phone || '').trim();
+  const vId = String(booking.venueId != null ? booking.venueId : '').trim();
+  if (!phone || !vId) {
+    console.warn('returnSessionCardForBooking: 缺少字段', booking._id);
+    return { ok: false, errMsg: '订单缺少用户信息，无法退回次卡' };
+  }
+
+  try {
+    const scColl = db.collection('db_member_venue_session_card');
+    const hit = await scColl.where({ phone, venueId: vId }).limit(1).get();
+    if (hit.data && hit.data[0] && hit.data[0]._id) {
+      await scColl.doc(hit.data[0]._id).update({
+        data: {
+          remainingTimes: _.inc(refundTimes),
+          updatedAt: now,
+        },
+      });
+    } else {
+      const n = Number(vId);
+      let updated = false;
+      if (Number.isFinite(n)) {
+        const hitNum = await scColl.where({ phone, venueId: n }).limit(1).get();
+        if (hitNum.data && hitNum.data[0] && hitNum.data[0]._id) {
+          await scColl.doc(hitNum.data[0]._id).update({
+            data: {
+              remainingTimes: _.inc(refundTimes),
+              updatedAt: now,
+            },
+          });
+          updated = true;
+        }
+      }
+      if (!updated) {
+        await scColl.add({
+          data: {
+            phone,
+            venueId: vId,
+            remainingTimes: refundTimes,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+      }
+    }
+
+    await db.collection('db_booking').doc(booking._id).update({
+      data: {
+        sessionCardRefundStatus: 'success',
+        sessionCardRefundedTimes: refundTimes,
+        sessionCardRefundedAt: now,
+        updatedAt: now,
+      },
+    });
+    return { ok: true };
+  } catch (err) {
+    console.error('returnSessionCardForBooking', err);
+    return { ok: false, errMsg: err.message || '次卡退回失败' };
+  }
+}
+
+/**
  * 普通订场取消：退回储值抵扣（储值仅可用于订场，教练课订单不会走到此处）
  */
 async function returnStoredBalanceForBooking(booking, now) {
@@ -538,7 +611,12 @@ exports.main = async (event) => {
     if (!rh.ok) {
       return rh;
     }
-    // 3) 普通订场：退回储值抵扣（教练课不会退储值）
+    // 3) 普通订场：退回次卡次数
+    const rs = await returnSessionCardForBooking({ ...booking, _id: bookingId }, now);
+    if (!rs.ok) {
+      return rs;
+    }
+    // 4) 普通订场：退回储值抵扣（教练课不会退储值）
     const rb = await returnStoredBalanceForBooking({ ...booking, _id: bookingId }, now);
     if (!rb.ok) {
       return rb;

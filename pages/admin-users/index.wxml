@@ -147,6 +147,18 @@
             bindtap="onClearMonthCard"
           >清除月卡</view>
         </view>
+
+        <view class="asset-input-row">
+          <text class="asset-input-label">次卡次数</text>
+          <input
+            class="admin-input admin-input--flex"
+            type="number"
+            placeholder="0"
+            value="{{sessionCardTimesInput}}"
+            bindinput="onSessionCardTimesInput"
+          />
+          <text class="asset-unit">次</text>
+        </view>
       </view>
 
       <button

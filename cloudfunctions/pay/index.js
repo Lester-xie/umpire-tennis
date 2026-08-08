@@ -581,10 +581,41 @@ exports.main = async (event, context) => {
         }
       }
 
+      let sessionCardDeductTimes = 0;
+      let sessionCardSlotKeys = [];
+      let sessionCardDeductYuan = 0;
+      if (bookingSubtype !== 'coach_course' && event.booking.sessionCard) {
+        const { assertAndNormalizeSessionCard } = require('./sessionCardDeduct');
+        const scGate = await assertAndNormalizeSessionCard({
+          db,
+          phone: bookingPhone,
+          venueId: event.booking.venueId,
+          bookedSlots: Array.isArray(event.booking.bookedSlots) ? event.booking.bookedSlots : [],
+          vouchers: Array.isArray(event.booking.bookingVouchers)
+            ? event.booking.bookingVouchers
+            : [],
+          monthCardFreeSlotKey,
+          sessionCard: event.booking.sessionCard,
+        });
+        if (!scGate.ok) {
+          return {
+            returnCode: 'FAIL',
+            returnMsg: scGate.errMsg || '次卡校验失败',
+            payment: undefined,
+          };
+        }
+        if (scGate.sessionCard) {
+          sessionCardDeductTimes = scGate.sessionCard.deductTimes;
+          sessionCardSlotKeys = scGate.sessionCard.slotKeys;
+          sessionCardDeductYuan = scGate.sessionCard.deductYuan;
+        }
+      }
+
       let paymentMethod = 'wechat_pending';
       const hasVouchers =
         Array.isArray(event.booking.bookingVouchers) &&
         event.booking.bookingVouchers.length > 0;
+      const hasSession = sessionCardDeductTimes > 0;
       if (monthCardFree && hasVouchers && storedBalanceDeductYuan > 0) {
         paymentMethod = 'month_card_voucher_balance_mixed';
       } else if (monthCardFree && hasVouchers) {
@@ -593,6 +624,14 @@ exports.main = async (event, context) => {
         paymentMethod = 'month_card_balance_mixed';
       } else if (monthCardFree) {
         paymentMethod = 'month_card_mixed';
+      } else if (hasSession && hasVouchers && storedBalanceDeductYuan > 0) {
+        paymentMethod = 'session_card_voucher_balance_mixed';
+      } else if (hasSession && hasVouchers) {
+        paymentMethod = 'session_card_voucher_mixed';
+      } else if (hasSession && storedBalanceDeductYuan > 0) {
+        paymentMethod = 'session_card_balance_mixed';
+      } else if (hasSession) {
+        paymentMethod = 'session_card_mixed';
       } else if (hasVouchers && storedBalanceDeductYuan > 0) {
         paymentMethod = 'voucher_balance_mixed';
       } else if (hasVouchers) {
@@ -624,6 +663,9 @@ exports.main = async (event, context) => {
           voucherDeductionYuan: Number(event.booking.voucherDeductionYuan) || 0,
           monthCardDeductYuan,
           monthCardFreeSlotKey,
+          sessionCardDeductTimes,
+          sessionCardSlotKeys,
+          sessionCardDeductYuan,
           storedBalanceDeductYuan,
           cashDueYuan:
             event.booking.cashDueYuan != null
@@ -776,6 +818,76 @@ exports.main = async (event, context) => {
       return {
         returnCode: 'FAIL',
         returnMsg: '月卡订单保存失败，请重试',
+        payment: undefined,
+      };
+    }
+  }
+
+  // 场馆次卡：统一下单成功后写 db_session_card_purchase（pending），支付结果由 payCallback 累加 remainingTimes
+  if (res.returnCode === 'SUCCESS' && event.sessionCardPurchase && event.sessionCardPurchase.type === 'venue_session_card') {
+    const sp = event.sessionCardPurchase;
+    const phone = String(sp.phone || '').trim();
+    const venueId = String(sp.venueId || '').trim();
+    const payYuan = Math.round(Number(sp.payYuan) * 100) / 100;
+    const grantTimes = Math.floor(Number(sp.grantTimes) || 0);
+    const expectFee = Math.max(1, Math.round(payYuan * 100));
+    if (!phone || !venueId || payYuan <= 0 || grantTimes < 1) {
+      return {
+        returnCode: 'FAIL',
+        returnMsg: '次卡参数无效',
+        payment: undefined,
+      };
+    }
+    if (Number(totalFee) !== expectFee) {
+      return {
+        returnCode: 'FAIL',
+        returnMsg: '次卡支付金额与档位不符',
+        payment: undefined,
+      };
+    }
+    try {
+      // 必须命中场馆已上架次卡档位，防止客户端篡改 grantTimes
+      let venueDoc = null;
+      try {
+        const byId = await db.collection('db_venue').doc(venueId).get();
+        venueDoc = byId && byId.data ? byId.data : null;
+      } catch (e) {
+        venueDoc = null;
+      }
+      const plans = Array.isArray(venueDoc && venueDoc.sessionCardPlans)
+        ? venueDoc.sessionCardPlans
+        : [];
+      const matched = plans.some((row) => {
+        if (!row || row.enabled === false) return false;
+        const p = Math.round(Number(row.payYuan) * 100) / 100;
+        const t = Math.floor(Number(row.grantTimes) || 0);
+        return p === payYuan && t === grantTimes;
+      });
+      if (!matched) {
+        return {
+          returnCode: 'FAIL',
+          returnMsg: '次卡档位无效或已下架',
+          payment: undefined,
+        };
+      }
+      await db.collection('db_session_card_purchase').add({
+        data: {
+          phone,
+          venueId,
+          venueName: sp.venueName != null ? String(sp.venueName).trim() : '',
+          outTradeNo,
+          totalFee,
+          payYuan,
+          grantTimes,
+          status: 'pending',
+          createdAt: Date.now(),
+        },
+      });
+    } catch (err) {
+      console.error('db_session_card_purchase 写入失败', err);
+      return {
+        returnCode: 'FAIL',
+        returnMsg: '次卡订单保存失败，请重试',
         payment: undefined,
       };
     }

@@ -5,6 +5,7 @@ const {
   planDisplayLabel,
   formatYuanText,
 } = require('../../utils/storedValuePlans');
+const sessionCard = require('../../utils/sessionCardPlans');
 
 Page({
   data: {
@@ -15,6 +16,7 @@ Page({
     venueId: '',
     venueName: '',
     planCards: [],
+    sessionPlanCards: [],
     paying: false,
     lottieLoadingVisible: false,
   },
@@ -84,7 +86,7 @@ Page({
     const venueName = venue && venue.name ? String(venue.name) : '';
     this.setData({ isLoggedIn, venueId, venueName });
     if (!venueId) {
-      this.setData({ planCards: [] });
+      this.setData({ planCards: [], sessionPlanCards: [] });
       return;
     }
     this.beginLoading();
@@ -92,7 +94,11 @@ Page({
       const res = await getVenues();
       const rows = (res && res.data) || [];
       const hit = rows.find((v) => normalizeVenueId(v._id) === venueId);
-      const plans = activeStoredValuePlans(hit || { storedValuePlans: venue.storedValuePlans });
+      const venueDoc = hit || {
+        storedValuePlans: venue.storedValuePlans,
+        sessionCardPlans: venue.sessionCardPlans,
+      };
+      const plans = activeStoredValuePlans(venueDoc);
       const planCards = plans.map((p, idx) => ({
         idx,
         payYuan: p.payYuan,
@@ -101,10 +107,18 @@ Page({
         creditText: formatYuanText(p.creditYuan),
         label: planDisplayLabel(p),
       }));
-      this.setData({ planCards });
+      const sessionPlans = sessionCard.activeSessionCardPlans(venueDoc);
+      const sessionPlanCards = sessionPlans.map((p, idx) => ({
+        idx,
+        payYuan: p.payYuan,
+        grantTimes: p.grantTimes,
+        payText: formatYuanText(p.payYuan),
+        label: sessionCard.planDisplayLabel(p),
+      }));
+      this.setData({ planCards, sessionPlanCards });
     } catch (e) {
       console.error('syncVenueAndPlans', e);
-      this.setData({ planCards: [] });
+      this.setData({ planCards: [], sessionPlanCards: [] });
     } finally {
       this.endLoading();
     }
@@ -168,6 +182,66 @@ Page({
     } catch (err) {
       this.endLoading();
       console.error('stored value pay', err);
+      wx.showToast({ title: '网络异常，请重试', icon: 'none' });
+    } finally {
+      this.setData({ paying: false });
+    }
+  },
+
+  async onSessionCardTap(e) {
+    if (!this.data.isLoggedIn) {
+      wx.showToast({ title: '请先登录', icon: 'none' });
+      wx.switchTab({ url: '/pages/profile/index' });
+      return;
+    }
+    if (this.data.paying) return;
+    const idx = Number(e.currentTarget.dataset.idx);
+    const plan = (this.data.sessionPlanCards || []).find((p) => p.idx === idx);
+    if (!plan || !this.data.venueId) return;
+    const phone = String(wx.getStorageSync('user_phone') || '').trim();
+    if (!phone) {
+      wx.showToast({ title: '请先授权手机号', icon: 'none' });
+      return;
+    }
+    const totalFee = Math.max(1, Math.round(plan.payYuan * 100));
+    this.setData({ paying: true });
+    this.beginLoading();
+    try {
+      const res = await requestWechatPay({
+        totalFee,
+        sessionCardPurchase: {
+          type: 'venue_session_card',
+          phone,
+          venueId: this.data.venueId,
+          venueName: this.data.venueName,
+          payYuan: plan.payYuan,
+          grantTimes: plan.grantTimes,
+        },
+      });
+      this.endLoading();
+      const result = (res && res.result) || {};
+      const payment = result.payment;
+      if (result.returnCode !== 'SUCCESS' || !payment) {
+        wx.showToast({ title: result.returnMsg || '下单失败', icon: 'none' });
+        return;
+      }
+      wx.requestPayment({
+        ...payment,
+        success: () => {
+          markProfileSummaryStale();
+          wx.showToast({ title: '购买成功', icon: 'success' });
+        },
+        fail: (err) => {
+          const msg = (err && err.errMsg) ? String(err.errMsg) : '';
+          wx.showToast({
+            title: msg.indexOf('cancel') >= 0 ? '已取消支付' : '支付未完成',
+            icon: 'none',
+          });
+        },
+      });
+    } catch (err) {
+      this.endLoading();
+      console.error('session card pay', err);
       wx.showToast({ title: '网络异常，请重试', icon: 'none' });
     } finally {
       this.setData({ paying: false });

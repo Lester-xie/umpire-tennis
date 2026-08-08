@@ -137,12 +137,35 @@ async function findMonthCardDoc({ phone, venueId, docId }) {
   return hit.data && hit.data[0] ? hit.data[0] : null;
 }
 
+async function findSessionCardDoc({ phone, venueId, docId }) {
+  if (docId) {
+    try {
+      const doc = await db.collection('db_member_venue_session_card').doc(String(docId).trim()).get();
+      const row = doc.data;
+      if (!row) return null;
+      if (String(row.phone || '').trim() !== phone) return null;
+      return row;
+    } catch (e) {
+      return null;
+    }
+  }
+  const venueIds = venueIdInValues(venueId);
+  if (!venueIds.length) return null;
+  const hit = await db
+    .collection('db_member_venue_session_card')
+    .where({ phone, venueId: _.in(venueIds) })
+    .limit(1)
+    .get();
+  return hit.data && hit.data[0] ? hit.data[0] : null;
+}
+
 /**
  * event: {
  *   targetPhone: string,
  *   balances?: Array<{ docId?: string, venueId: string, balanceYuan: number }>,
  *   courseHours?: Array<{ docId?: string, venueId: string, lessonKey: string, hours: number, unitPriceYuan?: number }>,
  *   monthCards?: Array<{ docId?: string, venueId: string, expiresAt: number|null }>,
+ *   sessionCards?: Array<{ docId?: string, venueId: string, remainingTimes: number }>,
  * }
  * monthCards.expiresAt 为 null/0 时表示清除该场馆月卡
  */
@@ -167,14 +190,21 @@ exports.main = async (event) => {
   const balances = Array.isArray(event && event.balances) ? event.balances : [];
   const courseHours = Array.isArray(event && event.courseHours) ? event.courseHours : [];
   const monthCards = Array.isArray(event && event.monthCards) ? event.monthCards : [];
-  if (balances.length === 0 && courseHours.length === 0 && monthCards.length === 0) {
-    return { ok: false, errMsg: '未指定要保存的储值、课时或月卡' };
+  const sessionCards = Array.isArray(event && event.sessionCards) ? event.sessionCards : [];
+  if (
+    balances.length === 0 &&
+    courseHours.length === 0 &&
+    monthCards.length === 0 &&
+    sessionCards.length === 0
+  ) {
+    return { ok: false, errMsg: '未指定要保存的储值、课时、月卡或次卡' };
   }
 
   const now = Date.now();
   const balanceUpdates = [];
   const courseHourUpdates = [];
   const monthCardUpdates = [];
+  const sessionCardUpdates = [];
 
   try {
     for (let i = 0; i < balances.length; i += 1) {
@@ -320,6 +350,49 @@ exports.main = async (event) => {
       }
     }
 
+    for (let i = 0; i < sessionCards.length; i += 1) {
+      const item = sessionCards[i] || {};
+      const venueId = String(item.venueId || '').trim();
+      const remainingTimes = Math.floor(Number(item.remainingTimes));
+      const docId = item.docId != null ? String(item.docId).trim() : '';
+      if (!venueId) {
+        return { ok: false, errMsg: `次卡第 ${i + 1} 项缺少场馆` };
+      }
+      if (!Number.isFinite(remainingTimes) || remainingTimes < 0) {
+        return { ok: false, errMsg: `次卡第 ${i + 1} 项次数无效` };
+      }
+      const existing = await findSessionCardDoc({ phone: targetPhone, venueId, docId });
+      if (docId && !existing) {
+        return { ok: false, errMsg: `次卡第 ${i + 1} 项记录不存在或无权修改` };
+      }
+      if (existing && existing._id) {
+        await db.collection('db_member_venue_session_card').doc(existing._id).update({
+          data: {
+            venueId: existing.venueId != null ? existing.venueId : venueId,
+            remainingTimes,
+            updatedAt: now,
+          },
+        });
+        sessionCardUpdates.push({ docId: existing._id, venueId, remainingTimes });
+      } else {
+        const addRes = await db.collection('db_member_venue_session_card').add({
+          data: {
+            phone: targetPhone,
+            venueId,
+            remainingTimes,
+            createdAt: now,
+            updatedAt: now,
+          },
+        });
+        sessionCardUpdates.push({
+          docId: addRes._id,
+          venueId,
+          remainingTimes,
+          created: true,
+        });
+      }
+    }
+
     await writeAudit({
       adminOpenid: openid,
       adminPhone: admin.phone,
@@ -329,6 +402,7 @@ exports.main = async (event) => {
         balanceUpdates,
         courseHourUpdates,
         monthCardUpdates,
+        sessionCardUpdates,
       },
     });
 

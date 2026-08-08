@@ -18,7 +18,7 @@ const {
 const { buildSlotPriceMapFromCourtList } = require('../../utils/bookingSlotPrice');
 const coachPurpose = require('../../utils/coachBookingPurpose');
 const { mergeBookedSlotsAndCoachHolds } = require('../../utils/coachBookingBookedMerge');
-const { buildBookingTimeSlots } = require('../../utils/bookingTimeSlots');
+const { buildBookingTimeSlots, findCourtSlot } = require('../../utils/bookingTimeSlots');
 const { preventTouchMove } = require('../../utils/preventTouchMove');
 const { buildCoachCourts } = require('../../utils/bookingCoachSlots');
 const {
@@ -847,7 +847,7 @@ Page({
     if (!Number.isFinite(courtId) || !Number.isFinite(slotIndex)) return;
 
     const court = this.data.courts.find((c) => c.id === courtId);
-    const slot = court && court.slots[slotIndex];
+    const slot = findCourtSlot(court, slotIndex);
     if (!slot || !slot.venueLock || slot.past) return;
 
     if (this.slotRippleTimer) {
@@ -1145,7 +1145,8 @@ Page({
     const slotIndex = parseInt(slotindex, 10);
 
     const court = this.data.courts.find((c) => c.id === courtId);
-    if (!court || !court.slots[slotIndex] || !court.slots[slotIndex].available) {
+    const tapSlot = findCourtSlot(court, slotIndex);
+    if (!court || !tapSlot || !tapSlot.available) {
       return;
     }
 
@@ -1227,8 +1228,9 @@ Page({
     let total = 0;
     selectedSlots.forEach((slot) => {
       const court = this.data.courts.find((c) => c.id === slot.courtId);
-      if (court && court.slots[slot.slotIndex] && court.slots[slot.slotIndex].available) {
-        total += court.slots[slot.slotIndex].price || 0;
+      const cell = findCourtSlot(court, slot.slotIndex);
+      if (cell && cell.available) {
+        total += cell.price || 0;
       }
     });
 

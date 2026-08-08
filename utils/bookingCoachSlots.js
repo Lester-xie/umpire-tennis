@@ -1,15 +1,24 @@
 const { resolveCourtSlotPrice } = require('./bookingSlotPrice');
 const { applyCoachSessionFlatVenuePrice } = require('./coachSessionVenuePrice');
+const { slotIndexToHour } = require('./bookingTimeSlots');
 
 const ROW = 126;
 const CELL = 120;
 const GAP = 8;
 
 function formatCoachSlotRange(startIndex, span) {
-  const startH = 8 + startIndex;
+  const startH = slotIndexToHour(startIndex);
   const endH = startH + span;
   const pad = (x) => (x < 10 ? `0${x}` : `${x}`);
   return `${pad(startH)}:00-${pad(endH)}:00`;
+}
+
+function dataSlotIndexAt(slots, arrayIndex) {
+  const s = slots[arrayIndex];
+  if (s && s.slotIndex != null && Number.isFinite(Number(s.slotIndex))) {
+    return Number(s.slotIndex);
+  }
+  return arrayIndex;
 }
 
 /** 合并连续占用时按「用途 + 占用人」区分，避免不同教练被并成一块 */
@@ -61,20 +70,22 @@ function applyCoachHoldMergeAndLayout(slots, courtId, {
       continue;
     }
     const label = (cur.coachPurpose || '').trim();
-    const occupant = coachOccupantKey(metaMap[`${courtId}-${i}`]);
+    const startDataIdx = dataSlotIndexAt(slots, i);
+    const occupant = coachOccupantKey(metaMap[`${courtId}-${startDataIdx}`]);
     let span = 1;
     let j = i + 1;
     while (j < n) {
       const next = slots[j];
       if (!next.booked || !next.bookedByCoach) break;
       if ((next.coachPurpose || '').trim() !== label) break;
-      if (coachOccupantKey(metaMap[`${courtId}-${j}`]) !== occupant) break;
+      const nextDataIdx = dataSlotIndexAt(slots, j);
+      if (coachOccupantKey(metaMap[`${courtId}-${nextDataIdx}`]) !== occupant) break;
       span += 1;
       j += 1;
     }
     cur.coachSpan = span;
-    cur.coachTimeRange = formatCoachSlotRange(i, span);
-    const m0 = metaMap[`${courtId}-${i}`] || {};
+    cur.coachTimeRange = formatCoachSlotRange(startDataIdx, span);
+    const m0 = metaMap[`${courtId}-${startDataIdx}`] || {};
     const idSet = new Set();
     if (Array.isArray(m0.sessionHoldIds)) {
       m0.sessionHoldIds.forEach((x) => {
@@ -83,7 +94,7 @@ function applyCoachHoldMergeAndLayout(slots, courtId, {
       });
     }
     for (let k = 0; k < span; k += 1) {
-      const m = metaMap[`${courtId}-${i + k}`];
+      const m = metaMap[`${courtId}-${dataSlotIndexAt(slots, i + k)}`];
       if (m && Array.isArray(m.sessionHoldIds)) {
         m.sessionHoldIds.forEach((x) => {
           const h = String(x || '').trim();
@@ -154,6 +165,10 @@ function buildCourtSlotsRow({
 
   for (let i = 0; i < timeSlots.length; i += 1) {
     const slotHour = timeSlots[i].hour;
+    const dataSlotIndex =
+      timeSlots[i].slotIndex != null
+        ? Number(timeSlots[i].slotIndex)
+        : slotHour - 8;
     let isAvailableTime = false;
 
     if (selectedDate > todayStr) {
@@ -166,12 +181,12 @@ function buildCourtSlotsRow({
     const slotPrice = resolveCourtSlotPrice(
       courtList,
       courtId,
-      i,
+      dataSlotIndex,
       selectedDate,
       slotPriceMap,
       { isVipUser: !!isVipUser }
     );
-    const key = `${courtId}-${i}`;
+    const key = `${courtId}-${dataSlotIndex}`;
     const isBookedByOrder = bookedSet.has(key);
     const coachMeta = metaMap[key];
     const isVenueLock = !!(coachMeta && coachMeta.lessonType === 'venue_lock');
@@ -208,6 +223,7 @@ function buildCourtSlotsRow({
     }
 
     slots.push({
+      slotIndex: dataSlotIndex,
       available: isAvailable,
       price: isAvailable ? slotPrice : null,
       venueSlotPrice: venueSlotPriceForOrder,

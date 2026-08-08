@@ -4,7 +4,11 @@ const {
   buildSlotPriceMapFromCourtList,
   resolveCourtSlotPrice,
 } = require('../../utils/bookingSlotPrice');
-const { buildBookingTimeSlots } = require('../../utils/bookingTimeSlots');
+const {
+  buildBookingTimeSlots,
+  findCourtSlot,
+  slotIndexToHour,
+} = require('../../utils/bookingTimeSlots');
 const {
   computeBookingMainContentHeightPx,
   estimateBookingHeaderHeightPx,
@@ -661,7 +665,7 @@ Page({
     const selectedSlotsMap = {};
     selected.forEach((s) => {
       const court = this.data.courts.find((c) => c.id === s.courtId);
-      const slot = court && court.slots ? court.slots[s.slotIndex] : null;
+      const slot = findCourtSlot(court, s.slotIndex);
       if (slot && slot.available) {
         selectedSlots.push({ courtId: s.courtId, slotIndex: s.slotIndex });
         selectedSlotsMap[`${s.courtId}-${s.slotIndex}`] = true;
@@ -801,9 +805,9 @@ Page({
     });
   },
 
-  /** slotIndex 从 0 对应 8:00，span 为连续小时数 */
+  /** slotIndex 与 DB 一致：0=8:00；展示可预约从 10:00 起 */
   formatCoachSlotRange(startIndex, span) {
-    const startH = 8 + startIndex;
+    const startH = slotIndexToHour(startIndex);
     const endH = startH + span;
     const pad = (x) => (x < 10 ? `0${x}` : `${x}`);
     return `${pad(startH)}:00-${pad(endH)}:00`;
@@ -819,6 +823,13 @@ Page({
     const CELL = 120;
     const GAP = 8;
     const metaMap = this.coachHoldMeta || {};
+    const dataIdx = (arrayIndex) => {
+      const s = slots[arrayIndex];
+      if (s && s.slotIndex != null && Number.isFinite(Number(s.slotIndex))) {
+        return Number(s.slotIndex);
+      }
+      return arrayIndex;
+    };
 
     const occupantKey = (meta) => {
       if (!meta || typeof meta !== 'object') return '';
@@ -848,26 +859,27 @@ Page({
         continue;
       }
       const label = (cur.coachPurpose || '').trim();
-      const occupant = occupantKey(metaMap[`${courtId}-${i}`]);
+      const startDataIdx = dataIdx(i);
+      const occupant = occupantKey(metaMap[`${courtId}-${startDataIdx}`]);
       let span = 1;
       let j = i + 1;
       while (j < n) {
         const next = slots[j];
         if (!next.booked || !next.bookedByCoach) break;
         if ((next.coachPurpose || '').trim() !== label) break;
-        if (occupantKey(metaMap[`${courtId}-${j}`]) !== occupant) break;
+        if (occupantKey(metaMap[`${courtId}-${dataIdx(j)}`]) !== occupant) break;
         span += 1;
         j += 1;
       }
       cur.coachSpan = span;
-      cur.coachTimeRange = this.formatCoachSlotRange(i, span);
+      cur.coachTimeRange = this.formatCoachSlotRange(startDataIdx, span);
       const ids = [];
       for (let k = 0; k < span; k += 1) {
-        const m = metaMap[`${courtId}-${i + k}`];
+        const m = metaMap[`${courtId}-${dataIdx(i + k)}`];
         if (m && m.holdId) ids.push(String(m.holdId));
       }
       cur.coachHoldIdsStr = ids.join(',');
-      const m0 = metaMap[`${courtId}-${i}`] || {};
+      const m0 = metaMap[`${courtId}-${startDataIdx}`] || {};
       cur.prefillLessonType = m0.lessonType || 'experience';
       cur.prefillPairMode = m0.pairMode || '1v1';
       cur.prefillGroupMode = m0.groupMode || '';
@@ -912,6 +924,10 @@ Page({
 
     for (let i = 0; i < timeSlots.length; i++) {
       const slotHour = timeSlots[i].hour;
+      const dataSlotIndex =
+        timeSlots[i].slotIndex != null
+          ? Number(timeSlots[i].slotIndex)
+          : slotHour - 8;
       let isAvailableTime = false;
 
       if (selectedDate > todayStr) {
@@ -921,8 +937,8 @@ Page({
         isAvailableTime = slotTime > now;
       }
 
-      const slotPrice = this.resolveSlotPrice(courtId, i, selectedDate);
-      const key = `${courtId}-${i}`;
+      const slotPrice = this.resolveSlotPrice(courtId, dataSlotIndex, selectedDate);
+      const key = `${courtId}-${dataSlotIndex}`;
       const isBookedByOrder = bookedSet.has(key);
       const coachMeta = metaMap[key];
       const isVenueLock = !!(coachMeta && coachMeta.lessonType === 'venue_lock');
@@ -957,6 +973,7 @@ Page({
       }
 
       slots.push({
+        slotIndex: dataSlotIndex,
         available: isAvailable,
         price: isAvailable ? slotPrice : null,
         venueSlotPrice: venueSlotPriceForOrder,
@@ -1073,7 +1090,8 @@ Page({
     
     // 检查该时间段是否可选
     const court = this.data.courts.find(c => c.id === courtId);
-    if (!court || !court.slots[slotIndex] || !court.slots[slotIndex].available) {
+    const tapSlot = findCourtSlot(court, slotIndex);
+    if (!court || !tapSlot || !tapSlot.available) {
       return;
     }
     
@@ -1158,8 +1176,9 @@ Page({
     let total = 0;
     selectedSlots.forEach(slot => {
       const court = this.data.courts.find(c => c.id === slot.courtId);
-      if (court && court.slots[slot.slotIndex] && court.slots[slot.slotIndex].available) {
-        total += court.slots[slot.slotIndex].price || 0;
+      const cell = findCourtSlot(court, slot.slotIndex);
+      if (cell && cell.available) {
+        total += cell.price || 0;
       }
     });
     

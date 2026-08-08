@@ -62,33 +62,33 @@
             <view class="court-content-row">
               <view class="court-column" wx:for="{{courts}}" wx:key="id">
                 <view class="court-slots court-slots--stacked">
-                  <block wx:for="{{item.slots}}" wx:for-item="slot" wx:for-index="slotIndex" wx:key="slotIndex">
+                  <block wx:for="{{item.slots}}" wx:for-item="slot" wx:key="slotIndex">
                     <view 
                       wx:if="{{!slot.coachMergeSkip && slot.available}}"
-                      class="time-slot-cell available {{selectedSlotsMap[item.id + '-' + slotIndex] ? 'active' : ''}} {{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slotIndex ? 'ripple' : ''}}"
+                      class="time-slot-cell available {{selectedSlotsMap[item.id + '-' + slot.slotIndex] ? 'active' : ''}} {{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slot.slotIndex ? 'ripple' : ''}}"
                       style="{{slot.slotStyle}}"
                       data-courtid="{{item.id}}"
-                      data-slotindex="{{slotIndex}}"
+                      data-slotindex="{{slot.slotIndex}}"
                       bindtap="handleSlotClick"
                     >
                       <view class="slot-text">
                         <text class="slot-price">预约</text>
                       </view>
-                      <view class="ripple-effect" wx:if="{{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slotIndex}}"></view>
+                      <view class="ripple-effect" wx:if="{{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slot.slotIndex}}"></view>
                     </view>
                     <view 
                       wx:elif="{{!slot.coachMergeSkip && !slot.available && slot.venueLock && isManagerUser && !slot.past}}"
-                      class="time-slot-cell available slot-venue-lock-selectable {{selectedUnlockSlotsMap[item.id + '-' + slotIndex] ? 'active' : ''}} {{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slotIndex ? 'ripple' : ''}}"
+                      class="time-slot-cell available slot-venue-lock-selectable {{selectedUnlockSlotsMap[item.id + '-' + slot.slotIndex] ? 'active' : ''}} {{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slot.slotIndex ? 'ripple' : ''}}"
                       style="{{slot.slotStyle}}"
                       data-courtid="{{item.id}}"
-                      data-slotindex="{{slotIndex}}"
+                      data-slotindex="{{slot.slotIndex}}"
                       data-holdids="{{slot.coachHoldIdsStr}}"
                       bindtap="handleVenueLockSlotClick"
                     >
                       <view class="slot-text">
                         <text class="slot-price">已锁定</text>
                       </view>
-                      <view class="ripple-effect" wx:if="{{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slotIndex}}"></view>
+                      <view class="ripple-effect" wx:if="{{rippleSlot && rippleSlot.courtId === item.id && rippleSlot.slotIndex === slot.slotIndex}}"></view>
                     </view>
                     <view 
                       wx:elif="{{!slot.coachMergeSkip && !slot.available}}"
@@ -115,7 +115,7 @@
                           data-maxparticipants="{{slot.prefillMaxParticipants}}"
                           data-refundhours="{{slot.prefillRefundHours}}"
                           data-courtid="{{item.id}}"
-                          data-slotindex="{{slotIndex}}"
+                          data-slotindex="{{slot.slotIndex}}"
                         >
                           <text class="slot-coach-purpose">{{slot.coachPurpose}}</text>
                           <text class="slot-coach-name" wx:if="{{slot.prefillCoachName}}">{{str.truncate(slot.prefillCoachName, 4)}}</text>

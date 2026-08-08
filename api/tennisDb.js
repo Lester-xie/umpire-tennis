@@ -305,6 +305,24 @@ function listMemberVenueBalance({ venueId } = {}) {
   });
 }
 
+/** 会员各场馆次卡剩余次数 */
+function listAllMemberVenueSessionCards() {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'listMemberVenueSessionCard',
+    data: { phone, allVenues: true },
+  });
+}
+
+/** 会员单场馆次卡剩余次数 */
+function listMemberVenueSessionCard({ venueId } = {}) {
+  const phone = String(wx.getStorageSync('user_phone') || '').trim();
+  return wx.cloud.callFunction({
+    name: 'listMemberVenueSessionCard',
+    data: { phone, venueId: String(venueId || '').trim() },
+  });
+}
+
 /** 会员单场馆月卡；可传 orderDate 查询当日是否已用免费 1 小时 */
 function listMemberVenueMonthCard({ venueId, orderDate } = {}) {
   const phone = String(wx.getStorageSync('user_phone') || '').trim();
@@ -587,6 +605,8 @@ module.exports = {
   listAllMemberCourseHours,
   listAllMemberVenueBalances,
   listMemberVenueBalance,
+  listAllMemberVenueSessionCards,
+  listMemberVenueSessionCard,
   listMemberVenueMonthCard,
   listAllMemberVenueMonthCards,
   refundExperienceCoursePurchase,

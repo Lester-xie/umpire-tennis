@@ -50,6 +50,7 @@ module.exports = Behavior({
         const wechatDue = roundYuan(this.data.wechatDueYuan);
         const balanceDeduct = roundYuan(this.data.storedBalanceDeductYuan);
         const monthCardDeduct = roundYuan(this.data.monthCardDeductYuan);
+        const sessionTimes = Math.floor(Number(this.data.sessionCardDeductTimes) || 0);
         if (wechatDue <= 0.009) {
           if (balanceDeduct > 0 && (this.data.bookingVouchers || []).length > 0) {
             this.setData({ footerButtonText: '确认支付（券+储值）' });
@@ -57,6 +58,10 @@ module.exports = Behavior({
           }
           if (balanceDeduct > 0 && monthCardDeduct > 0) {
             this.setData({ footerButtonText: '确认支付（月卡+储值）' });
+            return;
+          }
+          if (balanceDeduct > 0 && sessionTimes > 0) {
+            this.setData({ footerButtonText: '确认支付（次卡+储值）' });
             return;
           }
           if (balanceDeduct > 0) {
@@ -69,6 +74,14 @@ module.exports = Behavior({
           }
           if (monthCardDeduct > 0) {
             this.setData({ footerButtonText: '确认使用月卡免费' });
+            return;
+          }
+          if (sessionTimes > 0 && (this.data.bookingVouchers || []).length > 0) {
+            this.setData({ footerButtonText: '确认支付（券+次卡）' });
+            return;
+          }
+          if (sessionTimes > 0) {
+            this.setData({ footerButtonText: `确认使用次卡（${sessionTimes} 次）` });
             return;
           }
           if ((this.data.bookingVouchers || []).length > 0) {
@@ -210,7 +223,8 @@ module.exports = Behavior({
               if (
                 !this.data.isCoachCourseOrder &&
                 (Number(this.data.storedBalanceDeductYuan) > 0 ||
-                  Number(this.data.monthCardDeductYuan) > 0)
+                  Number(this.data.monthCardDeductYuan) > 0 ||
+                  Number(this.data.sessionCardDeductTimes) > 0)
               ) {
                 markProfileSummaryStale();
               }
@@ -287,6 +301,16 @@ module.exports = Behavior({
                   deductYuan: Number(this.data.monthCardDeductYuan) || 0,
                 }
               : null,
+          sessionCard:
+            Number(this.data.sessionCardDeductTimes) > 0 &&
+            Array.isArray(this.data.sessionCardSlotKeys) &&
+            this.data.sessionCardSlotKeys.length > 0
+              ? {
+                  slotKeys: this.data.sessionCardSlotKeys,
+                  deductTimes: Number(this.data.sessionCardDeductTimes) || 0,
+                  deductYuan: Number(this.data.sessionCardDeductYuan) || 0,
+                }
+              : null,
         });
         this.endLoading();
         const r = cloudRes && cloudRes.result ? cloudRes.result : {};
@@ -298,6 +322,9 @@ module.exports = Behavior({
           wx.showToast({ title: r.errMsg || '提交失败', icon: 'none' });
           if (r.errMsg && String(r.errMsg).indexOf('月卡') >= 0) {
             this.loadMonthCardBenefit();
+          }
+          if (r.errMsg && String(r.errMsg).indexOf('次卡') >= 0) {
+            this.loadVenueSessionCard();
           }
           return;
         }
@@ -316,7 +343,8 @@ module.exports = Behavior({
         }
         if (
           Number(this.data.storedBalanceDeductYuan) > 0 ||
-          Number(this.data.monthCardDeductYuan) > 0
+          Number(this.data.monthCardDeductYuan) > 0 ||
+          Number(this.data.sessionCardDeductTimes) > 0
         ) {
           markProfileSummaryStale();
         }

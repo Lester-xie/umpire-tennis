@@ -3,12 +3,12 @@ const { roundYuan, formatYuanText } = require('./storedValuePlans');
 /** 月卡默认有效天数 */
 const MONTH_CARD_DAYS = 30;
 
-/** 生效时段默认：每天 9:00–12:00（含开始、不含结束整点） */
-const DEFAULT_WINDOW_START_HOUR = 9;
+/** 生效时段默认：每天 10:00–12:00（含开始、不含结束整点；与可预约起始一致） */
+const DEFAULT_WINDOW_START_HOUR = 10;
 const DEFAULT_WINDOW_END_HOUR = 12;
 
-/** 订场时段钟点范围（与 booking 一致：8–22） */
-const SLOT_CLOCK_MIN = 8;
+/** 订场时段钟点范围（会员可预约 10–22；DB slotIndex 仍以 8 为基准） */
+const SLOT_CLOCK_MIN = 10;
 const SLOT_CLOCK_MAX = 22;
 
 function extractMonthCard(venue) {

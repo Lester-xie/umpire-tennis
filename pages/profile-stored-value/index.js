@@ -1,4 +1,8 @@
-const { getVenues, listAllMemberVenueBalances } = require('../../api/tennisDb');
+const {
+  getVenues,
+  listAllMemberVenueBalances,
+  listAllMemberVenueSessionCards,
+} = require('../../api/tennisDb');
 const { normalizeVenueId } = require('../../utils/venueId');
 const { formatYuanText, roundYuan } = require('../../utils/storedValuePlans');
 const {
@@ -6,20 +10,42 @@ const {
   detachPageMemberAssetRealtime,
 } = require('../../utils/memberAssetRealtime');
 
-function buildSections(balanceRows, venueNameById) {
+function buildSections(balanceRows, sessionRows, venueNameById) {
   const byVenue = {};
   (balanceRows || []).forEach((row) => {
     const vid = normalizeVenueId(row.venueId);
     const balanceYuan = roundYuan(row.balanceYuan);
-    if (balanceYuan <= 0 || !vid) return;
-    byVenue[vid] = (byVenue[vid] || 0) + balanceYuan;
+    if (!vid) return;
+    if (!byVenue[vid]) {
+      byVenue[vid] = { balanceYuan: 0, remainingTimes: 0 };
+    }
+    byVenue[vid].balanceYuan += balanceYuan;
   });
-  const sections = Object.keys(byVenue).map((vid) => ({
-    venueId: vid,
-    venueName: venueNameById[vid] || `场馆 ${vid}`,
-    balanceYuan: byVenue[vid],
-    balanceText: formatYuanText(byVenue[vid]),
-  }));
+  (sessionRows || []).forEach((row) => {
+    const vid = normalizeVenueId(row.venueId);
+    const times = Math.max(0, Math.floor(Number(row.remainingTimes) || 0));
+    if (!vid || times <= 0) return;
+    if (!byVenue[vid]) {
+      byVenue[vid] = { balanceYuan: 0, remainingTimes: 0 };
+    }
+    byVenue[vid].remainingTimes += times;
+  });
+  const sections = Object.keys(byVenue)
+    .map((vid) => {
+      const bal = roundYuan(byVenue[vid].balanceYuan);
+      const times = Math.max(0, Math.floor(byVenue[vid].remainingTimes || 0));
+      if (bal <= 0 && times <= 0) return null;
+      return {
+        venueId: vid,
+        venueName: venueNameById[vid] || `场馆 ${vid}`,
+        balanceYuan: bal,
+        balanceText: formatYuanText(bal),
+        remainingTimes: times,
+        showBalance: bal > 0,
+        showTimes: times > 0,
+      };
+    })
+    .filter(Boolean);
   sections.sort((a, b) => a.venueName.localeCompare(b.venueName, 'zh-CN'));
   return sections;
 }
@@ -112,14 +138,19 @@ Page({
     this.beginLoading();
     const task = (async () => {
       try {
-        const [venueRes, balRes] = await Promise.all([getVenues(), listAllMemberVenueBalances()]);
-      const venueNameById = {};
-      ((venueRes && venueRes.data) || []).forEach((v) => {
-        const id = normalizeVenueId(v._id);
-        if (id) venueNameById[id] = String(v.name || '').trim() || id;
-      });
-      const rows = (balRes && balRes.result && balRes.result.data) || [];
-      this.setData({ sections: buildSections(rows, venueNameById) });
+        const [venueRes, balRes, scRes] = await Promise.all([
+          getVenues(),
+          listAllMemberVenueBalances(),
+          listAllMemberVenueSessionCards(),
+        ]);
+        const venueNameById = {};
+        ((venueRes && venueRes.data) || []).forEach((v) => {
+          const id = normalizeVenueId(v._id);
+          if (id) venueNameById[id] = String(v.name || '').trim() || id;
+        });
+        const balRows = (balRes && balRes.result && balRes.result.data) || [];
+        const scRows = (scRes && scRes.result && scRes.result.data) || [];
+        this.setData({ sections: buildSections(balRows, scRows, venueNameById) });
       } catch (e) {
         console.error('profile-stored-value refresh', e);
         this.setData({ sections: [] });

@@ -1,10 +1,12 @@
 const { adminVenue, refreshSelectedVenueFromCloud } = require('../../api/tennisDb');
+const { extractCategoryList } = require('../../utils/venueCategoryList');
 const {
   extractStoredValuePlans,
   rowsFromPlans,
   plansFromRows,
   planDisplayLabel,
 } = require('../../utils/storedValuePlans');
+const sessionCard = require('../../utils/sessionCardPlans');
 
 function rowsWithPreview(rows) {
   return (rows || []).map((r) => {
@@ -18,6 +20,18 @@ function rowsWithPreview(rows) {
   });
 }
 
+function sessionRowsWithPreview(rows) {
+  return (rows || []).map((r) => {
+    const payYuan = Number(r.payYuan);
+    const grantTimes = Math.floor(Number(r.grantTimes));
+    let previewLabel = '';
+    if (Number.isFinite(payYuan) && payYuan > 0 && Number.isFinite(grantTimes) && grantTimes >= 1) {
+      previewLabel = sessionCard.planDisplayLabel({ payYuan, grantTimes });
+    }
+    return { ...r, previewLabel };
+  });
+}
+
 Page({
   data: {
     scrollHeight: 400,
@@ -25,6 +39,7 @@ Page({
     loading: true,
     name: '',
     planRows: [],
+    sessionPlanRows: [],
   },
 
   onLoad(options) {
@@ -70,11 +85,13 @@ Page({
         return;
       }
       const d = r.data;
-      const planRows = rowsWithPreview(rowsFromPlans(extractStoredValuePlans(d)));
       this.setData({
         loading: false,
         name: d.name != null ? String(d.name) : '',
-        planRows,
+        planRows: rowsWithPreview(rowsFromPlans(extractStoredValuePlans(d))),
+        sessionPlanRows: sessionRowsWithPreview(
+          sessionCard.rowsFromPlans(sessionCard.extractSessionCardPlans(d)),
+        ),
       });
     } catch (e) {
       console.error(e);
@@ -85,6 +102,10 @@ Page({
 
   refreshPreviewRows(planRows) {
     this.setData({ planRows: rowsWithPreview(planRows) });
+  },
+
+  refreshSessionPreviewRows(sessionPlanRows) {
+    this.setData({ sessionPlanRows: sessionRowsWithPreview(sessionPlanRows) });
   },
 
   onPayYuan(e) {
@@ -122,10 +143,52 @@ Page({
     this.refreshPreviewRows(planRows.length ? planRows : [{ payYuan: '', creditYuan: '', enabled: true }]);
   },
 
+  onSessionPayYuan(e) {
+    const idx = Number(e.currentTarget.dataset.idx);
+    const sessionPlanRows = [...(this.data.sessionPlanRows || [])];
+    sessionPlanRows[idx] = { ...sessionPlanRows[idx], payYuan: e.detail.value };
+    this.refreshSessionPreviewRows(sessionPlanRows);
+  },
+
+  onSessionGrantTimes(e) {
+    const idx = Number(e.currentTarget.dataset.idx);
+    const sessionPlanRows = [...(this.data.sessionPlanRows || [])];
+    sessionPlanRows[idx] = { ...sessionPlanRows[idx], grantTimes: e.detail.value };
+    this.refreshSessionPreviewRows(sessionPlanRows);
+  },
+
+  onSessionEnabledChange(e) {
+    const idx = Number(e.currentTarget.dataset.idx);
+    const sessionPlanRows = [...(this.data.sessionPlanRows || [])];
+    sessionPlanRows[idx] = { ...sessionPlanRows[idx], enabled: !!e.detail.value };
+    this.setData({ sessionPlanRows });
+  },
+
+  onAddSessionRow() {
+    const sessionPlanRows = [
+      ...(this.data.sessionPlanRows || []),
+      { payYuan: '', grantTimes: '', enabled: true, previewLabel: '' },
+    ];
+    this.setData({ sessionPlanRows });
+  },
+
+  onRemoveSessionRow(e) {
+    const idx = Number(e.currentTarget.dataset.idx);
+    const sessionPlanRows = (this.data.sessionPlanRows || []).filter((_, i) => i !== idx);
+    this.refreshSessionPreviewRows(
+      sessionPlanRows.length ? sessionPlanRows : [{ payYuan: '', grantTimes: '', enabled: true }],
+    );
+  },
+
   async onSave() {
     const parsed = plansFromRows(this.data.planRows || []);
     if (!parsed.ok) {
-      wx.showToast({ title: parsed.errMsg || '请检查档位', icon: 'none' });
+      wx.showToast({ title: parsed.errMsg || '请检查储值档位', icon: 'none' });
+      return;
+    }
+    const sessionParsed = sessionCard.plansFromRows(this.data.sessionPlanRows || []);
+    if (!sessionParsed.ok) {
+      wx.showToast({ title: sessionParsed.errMsg || '请检查次卡档位', icon: 'none' });
       return;
     }
     wx.showLoading({ title: '保存中', mask: true });
@@ -147,8 +210,12 @@ Page({
         longitude: lon,
         image: d.image != null ? String(d.image) : '',
         courtList: d.courtList,
-        categoryList: d.categoryList != null ? d.categoryList : d.category_list,
+        categoryList: extractCategoryList(d),
         storedValuePlans: parsed.plans,
+        sessionCardPlans: sessionParsed.plans,
+        monthCard: d.monthCard,
+        announcement: d.announcement,
+        announcementTitle: d.announcementTitle,
       };
       const res = await adminVenue({ action: 'update', venueId: this.data.venueId, payload });
       wx.hideLoading();

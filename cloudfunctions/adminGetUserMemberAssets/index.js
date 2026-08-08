@@ -43,10 +43,11 @@ exports.main = async (event) => {
       return { ok: false, errMsg: '该手机号尚未注册小程序' };
     }
 
-    const [balRes, hoursRes, monthCardRes] = await Promise.all([
+    const [balRes, hoursRes, monthCardRes, sessionCardRes] = await Promise.all([
       db.collection('db_member_venue_balance').where({ phone }).get(),
       db.collection('db_member_course_hours').where({ phone }).get(),
       db.collection('db_member_venue_month_card').where({ phone }).get(),
+      db.collection('db_member_venue_session_card').where({ phone }).get(),
     ]);
 
     const balances = (balRes.data || []).map((row) => ({
@@ -70,7 +71,13 @@ exports.main = async (event) => {
       expiresAt: Number(row.expiresAt) || 0,
     }));
 
-    return { ok: true, data: { balances, courseHours, monthCards } };
+    const sessionCards = (sessionCardRes.data || []).map((row) => ({
+      docId: row._id || '',
+      venueId: row.venueId != null ? String(row.venueId).trim() : '',
+      remainingTimes: Math.max(0, Math.floor(Number(row.remainingTimes) || 0)),
+    }));
+
+    return { ok: true, data: { balances, courseHours, monthCards, sessionCards } };
   } catch (e) {
     console.error('adminGetUserMemberAssets', e);
     return { ok: false, errMsg: e.message || '查询失败' };

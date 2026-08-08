@@ -5,6 +5,10 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 const { assertAndNormalizeMonthCardFree } = require('./monthCardFreeHour');
+const {
+  assertAndNormalizeSessionCard,
+  tryDeductSessionCardTimes,
+} = require('./sessionCardDeduct');
 
 function normalizeOrderDate(raw) {
   const s = String(raw || '').trim();
@@ -179,9 +183,31 @@ exports.main = async (event, context) => {
   if (!mcGate.ok) return mcGate;
   const monthCardFree = mcGate.monthCardFree;
   const monthCardDeductYuan = monthCardFree ? roundYuan(monthCardFree.deductYuan) : 0;
+  const monthCardFreeSlotKey = monthCardFree ? monthCardFree.slotKey : '';
 
-  if (!vouchers.length && storedBalanceDeductYuan <= 0 && !monthCardFree) {
-    return { ok: false, errMsg: '请使用团购券、月卡或储值余额完成支付' };
+  const scGate = await assertAndNormalizeSessionCard({
+    db,
+    phone,
+    venueId: snapshot.venueId,
+    bookedSlots,
+    vouchers,
+    monthCardFreeSlotKey,
+    sessionCard: event && event.sessionCard,
+    slotPrices,
+  });
+  if (!scGate.ok) return scGate;
+  const sessionCard = scGate.sessionCard;
+  const sessionCardDeductTimes = sessionCard ? sessionCard.deductTimes : 0;
+  const sessionCardSlotKeys = sessionCard ? sessionCard.slotKeys : [];
+  const sessionCardDeductYuan = sessionCard ? roundYuan(sessionCard.deductYuan) : 0;
+
+  if (
+    !vouchers.length &&
+    storedBalanceDeductYuan <= 0 &&
+    !monthCardFree &&
+    sessionCardDeductTimes <= 0
+  ) {
+    return { ok: false, errMsg: '请使用团购券、月卡、次卡或储值余额完成支付' };
   }
 
   const totalPrice = roundYuan(snapshot.totalPrice);
@@ -223,14 +249,20 @@ exports.main = async (event, context) => {
   if (monthCardDeductYuan > cashAfterVoucher + 0.011) {
     return { ok: false, errMsg: '月卡抵扣金额超出应付' };
   }
-  if (storedBalanceDeductYuan > cashAfterMonthCard + 0.011) {
+  const cashAfterSession = roundYuan(Math.max(0, cashAfterMonthCard - sessionCardDeductYuan));
+  if (sessionCardDeductYuan > cashAfterMonthCard + 0.011) {
+    return { ok: false, errMsg: '次卡抵扣金额超出应付' };
+  }
+  if (storedBalanceDeductYuan > cashAfterSession + 0.011) {
     return { ok: false, errMsg: '储值抵扣金额超出应付' };
   }
-  const remain = roundYuan(totalPrice - voucherSum - monthCardDeductYuan - storedBalanceDeductYuan);
+  const remain = roundYuan(
+    totalPrice - voucherSum - monthCardDeductYuan - sessionCardDeductYuan - storedBalanceDeductYuan,
+  );
   if (remain > 0.009) {
     return { ok: false, errMsg: '尚有未支付金额，请使用微信支付' };
   }
-  if (storedBalanceDeductYuan <= 0 && cashAfterMonthCard > 0.009) {
+  if (storedBalanceDeductYuan <= 0 && cashAfterSession > 0.009) {
     return { ok: false, errMsg: '尚有未抵扣金额，请使用混合支付' };
   }
 
@@ -245,6 +277,20 @@ exports.main = async (event, context) => {
 
   const venueId = String(snapshot.venueId || '').trim();
   const now = Date.now();
+
+  if (sessionCardDeductTimes > 0) {
+    const scDeduct = await tryDeductSessionCardTimes({
+      db,
+      _,
+      phone,
+      venueId,
+      deductTimes: sessionCardDeductTimes,
+      now,
+    });
+    if (!scDeduct.ok) {
+      return { ok: false, errMsg: scDeduct.errMsg || '次卡剩余次数不足' };
+    }
+  }
 
   if (storedBalanceDeductYuan > 0) {
     const deductRes = await db
@@ -261,6 +307,21 @@ exports.main = async (event, context) => {
         },
       });
     if (!deductRes.stats || deductRes.stats.updated < 1) {
+      if (sessionCardDeductTimes > 0) {
+        try {
+          await db
+            .collection('db_member_venue_session_card')
+            .where({ phone, venueId })
+            .update({
+              data: {
+                remainingTimes: _.inc(sessionCardDeductTimes),
+                updatedAt: now,
+              },
+            });
+        } catch (rollbackErr) {
+          console.error('session card rollback failed', rollbackErr);
+        }
+      }
       return { ok: false, errMsg: '储值余额不足' };
     }
   }
@@ -276,6 +337,14 @@ exports.main = async (event, context) => {
     paymentMethod = 'month_card_balance';
   } else if (monthCardFree) {
     paymentMethod = 'month_card';
+  } else if (sessionCardDeductTimes > 0 && vouchers.length && storedBalanceDeductYuan > 0) {
+    paymentMethod = 'session_card_voucher_balance';
+  } else if (sessionCardDeductTimes > 0 && vouchers.length) {
+    paymentMethod = 'session_card_voucher';
+  } else if (sessionCardDeductTimes > 0 && storedBalanceDeductYuan > 0) {
+    paymentMethod = 'session_card_balance';
+  } else if (sessionCardDeductTimes > 0) {
+    paymentMethod = 'session_card';
   } else if (vouchers.length && storedBalanceDeductYuan > 0) {
     paymentMethod = 'voucher_balance';
   } else if (vouchers.length) {
@@ -301,6 +370,9 @@ exports.main = async (event, context) => {
         voucherDeductionYuan: voucherSum,
         monthCardDeductYuan,
         monthCardFreeSlotKey: monthCardFree ? monthCardFree.slotKey : '',
+        sessionCardDeductTimes,
+        sessionCardSlotKeys,
+        sessionCardDeductYuan,
         storedBalanceDeductYuan,
         cashDueYuan: 0,
         bookingVouchers: vouchers,

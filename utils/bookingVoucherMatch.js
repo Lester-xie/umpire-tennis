@@ -83,20 +83,23 @@ function recalcVoucherPayment(totalPriceYuan, vouchers) {
   return { voucherDeductionYuan, cashDueYuan };
 }
 
-/** 普通订场：券后 → 月卡免费 → 储值 → 微信 */
+/** 普通订场：券后 → 月卡免费 → 次卡 → 储值 → 微信 */
 function recalcCourtPlainPayment({
   totalPriceYuan,
   vouchers,
   courtPayMethod,
   storedBalanceYuan,
   monthCardDeductYuan,
+  sessionCardDeductYuan,
 }) {
   const { voucherDeductionYuan, cashDueYuan: afterVoucher } = recalcVoucherPayment(
     totalPriceYuan,
     vouchers,
   );
   const monthCardDeduct = roundYuan(Math.min(roundYuan(monthCardDeductYuan), afterVoucher));
-  const cashDueYuan = roundYuan(Math.max(0, afterVoucher - monthCardDeduct));
+  const afterMonthCard = roundYuan(Math.max(0, afterVoucher - monthCardDeduct));
+  const sessionDeduct = roundYuan(Math.min(roundYuan(sessionCardDeductYuan), afterMonthCard));
+  const cashDueYuan = roundYuan(Math.max(0, afterMonthCard - sessionDeduct));
   const bal = roundYuan(storedBalanceYuan);
   const method = String(courtPayMethod || 'wechat');
   let storedBalanceDeductYuan = 0;
@@ -107,6 +110,7 @@ function recalcCourtPlainPayment({
   return {
     voucherDeductionYuan,
     monthCardDeductYuan: monthCardDeduct,
+    sessionCardDeductYuan: sessionDeduct,
     cashDueYuan,
     storedBalanceDeductYuan,
     wechatDueYuan,

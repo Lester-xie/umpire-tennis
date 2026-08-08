@@ -1,9 +1,10 @@
 /**
- * 普通订场支付：团购券 / 月卡免费 / 储值余额
+ * 普通订场支付：团购券 / 月卡免费 / 次卡 / 储值余额
  */
 const {
   listMemberVenueBalance,
   listMemberVenueMonthCard,
+  listMemberVenueSessionCard,
   getVenues,
 } = require('../../../api/tennisDb');
 const {
@@ -42,6 +43,8 @@ module.exports = Behavior({
         monthCardUseFree: this.data.monthCardUseFree,
         monthCardConfig: this._monthCardConfig,
         courtOrderSlotPrices: this.data.courtOrderSlotPrices,
+        sessionCardRemainingTimes: this.data.sessionCardRemainingTimes,
+        sessionCardUse: this.data.sessionCardUse,
       });
       this.setData(patch, () => this.updateFooterButtonText());
     },
@@ -52,6 +55,17 @@ module.exports = Behavior({
       this.setData({ monthCardUseFree: next }, () => this.recomputeCourtPayAmounts());
     },
 
+    toggleSessionCardUse() {
+      if (Math.floor(Number(this.data.sessionCardRemainingTimes) || 0) <= 0) return;
+      const next = !this.data.sessionCardUse;
+      // 开启次卡时与「仅微信支付」互斥：取消微信选中态（余款仍可走微信，但不与次卡同时高亮）
+      const patch = { sessionCardUse: next };
+      if (next && this.data.courtPayMethod === 'wechat') {
+        patch.courtPayUserChose = false;
+      }
+      this.setData(patch, () => this.recomputeCourtPayAmounts());
+    },
+
     selectCourtPayMethod(e) {
       const method = e.currentTarget.dataset.method;
       if (method !== 'wechat' && method !== 'stored_balance' && method !== 'mixed_balance') return;
@@ -59,7 +73,12 @@ module.exports = Behavior({
       const due = roundYuan(this.data.cashDueYuan);
       if (method === 'stored_balance' && bal < due) return;
       if (method === 'mixed_balance' && !(bal > 0 && bal < due)) return;
-      this.setData({ courtPayMethod: method, courtPayUserChose: true }, () => {
+      const patch = { courtPayMethod: method, courtPayUserChose: true };
+      // 选「仅微信支付」时关闭次卡，二者互斥
+      if (method === 'wechat') {
+        patch.sessionCardUse = false;
+      }
+      this.setData(patch, () => {
         this.recomputeCourtPayAmounts();
       });
     },
@@ -261,6 +280,39 @@ module.exports = Behavior({
           venueStoredBalanceReady: false,
           venueStoredBalanceHint: '储值余额加载失败',
         });
+      }
+    },
+
+    async loadVenueSessionCard() {
+      if (this.data.orderType !== 'court' || this.data.isCoachCourseOrder || !this.data.venueId) {
+        return;
+      }
+      const app = getApp();
+      if (!app || !app.checkLogin()) {
+        this.setData({
+          sessionCardRemainingTimes: 0,
+          sessionCardUse: false,
+          sessionCardHint: '请登录后查看本场馆次卡',
+        }, () => this.recomputeCourtPayAmounts());
+        return;
+      }
+      try {
+        const res = await listMemberVenueSessionCard({ venueId: this.data.venueId });
+        const rows = (res && res.result && res.result.data) || [];
+        const row = rows[0];
+        const remaining = Math.max(0, Math.floor(Number(row && row.remainingTimes) || 0));
+        const use = remaining > 0 ? this.data.sessionCardUse !== false : false;
+        this.setData({
+          sessionCardRemainingTimes: remaining,
+          sessionCardUse: use,
+          sessionCardHint: remaining > 0 ? '订场时每次抵扣 1 小时，教练课不可用' : '',
+        }, () => this.recomputeCourtPayAmounts());
+      } catch (e) {
+        console.error('loadVenueSessionCard', e);
+        this.setData({
+          sessionCardRemainingTimes: 0,
+          sessionCardHint: '次卡加载失败',
+        }, () => this.recomputeCourtPayAmounts());
       }
     },
   },

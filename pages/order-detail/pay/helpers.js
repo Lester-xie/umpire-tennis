@@ -3,6 +3,7 @@ const {
   recalcCourtPlainPayment,
 } = require('../../../utils/bookingVoucherMatch');
 const { pickMonthCardFreeSlot } = require('../../../utils/monthCard');
+const { pickSessionCardSlots } = require('../../../utils/sessionCardPlans');
 
 /** 团课 / 畅打：仅允许微信支付，不可用课时或组合支付 */
 function isCoachWechatOnlyLessonKey(lk) {
@@ -117,7 +118,7 @@ function calcCoachPayAmounts({
   };
 }
 
-/** 普通订场：券 + 月卡 + 储值 → 各抵扣字段 */
+/** 普通订场：券 + 月卡 + 次卡 + 储值 → 各抵扣字段 */
 function calcCourtPayAmounts({
   totalPriceYuan,
   bookingVouchers,
@@ -126,6 +127,8 @@ function calcCourtPayAmounts({
   monthCardUseFree,
   monthCardConfig,
   courtOrderSlotPrices,
+  sessionCardRemainingTimes,
+  sessionCardUse,
 }) {
   let monthCardDeductYuan = 0;
   let monthCardFreeSlotKey = '';
@@ -143,18 +146,38 @@ function calcCourtPayAmounts({
       useFree = false;
     }
   }
+  let sessionCardDeductTimes = 0;
+  let sessionCardSlotKeys = [];
+  let sessionCardDeductYuan = 0;
+  const useSession = sessionCardUse !== false;
+  const remainTimes = Math.max(0, Math.floor(Number(sessionCardRemainingTimes) || 0));
+  if (useSession && remainTimes > 0) {
+    const picked = pickSessionCardSlots(
+      courtOrderSlotPrices,
+      bookingVouchers,
+      monthCardFreeSlotKey,
+      remainTimes,
+    );
+    sessionCardDeductTimes = picked.sessionCardDeductTimes;
+    sessionCardSlotKeys = picked.sessionCardSlotKeys;
+    sessionCardDeductYuan = picked.sessionCardDeductYuan;
+  }
   const pay = recalcCourtPlainPayment({
     totalPriceYuan,
     vouchers: bookingVouchers,
     courtPayMethod,
     storedBalanceYuan: venueStoredBalanceYuan,
     monthCardDeductYuan,
+    sessionCardDeductYuan,
   });
   return {
     voucherDeductionYuan: pay.voucherDeductionYuan,
     monthCardUseFree: useFree,
     monthCardDeductYuan: pay.monthCardDeductYuan,
     monthCardFreeSlotKey,
+    sessionCardDeductTimes,
+    sessionCardSlotKeys,
+    sessionCardDeductYuan: pay.sessionCardDeductYuan,
     cashDueYuan: pay.cashDueYuan,
     storedBalanceDeductYuan: pay.storedBalanceDeductYuan,
     wechatDueYuan: pay.wechatDueYuan,
@@ -239,6 +262,17 @@ function buildCourtBookingPayload(data, { isCourtPlain, phone, userNickname }) {
         ? {
             slotKey: data.monthCardFreeSlotKey,
             deductYuan: Number(data.monthCardDeductYuan) || 0,
+          }
+        : null,
+    sessionCard:
+      isCourtPlain &&
+      Number(data.sessionCardDeductTimes) > 0 &&
+      Array.isArray(data.sessionCardSlotKeys) &&
+      data.sessionCardSlotKeys.length > 0
+        ? {
+            slotKeys: data.sessionCardSlotKeys,
+            deductTimes: Number(data.sessionCardDeductTimes) || 0,
+            deductYuan: Number(data.sessionCardDeductYuan) || 0,
           }
         : null,
   };

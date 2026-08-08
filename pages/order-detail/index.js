@@ -153,6 +153,13 @@ Page({
     monthCardFreeSlotKey: '',
     monthCardDeductYuan: 0,
     monthCardHint: '',
+    /** 普通订场：次卡（1 次 = 1 小时） */
+    sessionCardRemainingTimes: 0,
+    sessionCardUse: true,
+    sessionCardDeductTimes: 0,
+    sessionCardSlotKeys: [],
+    sessionCardDeductYuan: 0,
+    sessionCardHint: '',
   },
   _loadingTaskCount: 0,
   _monthCardConfig: null,
@@ -663,6 +670,7 @@ Page({
     this.loadCoachCourseHoursBalance();
     this.loadVenueStoredBalance();
     this.loadMonthCardBenefit();
+    this.loadVenueSessionCard();
     this.loadCoachSessionRoster();
     this.updateFooterButtonText();
     this._memberAssetWatchSessionGen = this._memberAssetWatchSessionGen || 0;
@@ -677,6 +685,7 @@ Page({
     this.loadCoachCourseHoursBalance();
     this.loadVenueStoredBalance();
     this.loadMonthCardBenefit();
+    this.loadVenueSessionCard();
     this.updateFooterButtonText();
   },
 

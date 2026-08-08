@@ -9,7 +9,7 @@
 
       <view class="field">
         <text class="field-label">场地列表 *</text>
-        <text class="field-hint">每片场地：名称、常规/VIP 各 14 个时段单价（8:00–21:00）、可选周末一口价（仅非 VIP 订场）。</text>
+        <text class="field-hint">每片场地：名称、常规/VIP 各 12 个时段单价（10:00–21:00，至 22:00 结束）、可选周末一口价（仅非 VIP 订场）。</text>
 
         <block wx:for="{{courts}}" wx:for-item="court" wx:for-index="cIdx" wx:key="cIdx">
           <view class="court-card">

@@ -25,7 +25,11 @@ function applyCoachSessionFlatVenuePrice(slots, courtId, coachHoldMeta) {
   for (let i = 0; i < n; i += 1) {
     if (slots[i].coachMergeSkip) continue;
     if (!slots[i].bookedByCoach) continue;
-    const sessionYuan = sessionMemberPriceFromMeta(m[`${courtId}-${i}`]);
+    const dataIdx =
+      slots[i].slotIndex != null && Number.isFinite(Number(slots[i].slotIndex))
+        ? Number(slots[i].slotIndex)
+        : i;
+    const sessionYuan = sessionMemberPriceFromMeta(m[`${courtId}-${dataIdx}`]);
     if (sessionYuan == null) continue;
     const span = slots[i].coachSpan || 1;
     slots[i].venueSlotPrice = sessionYuan;

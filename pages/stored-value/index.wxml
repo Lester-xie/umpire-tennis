@@ -1,7 +1,7 @@
 <view class="stored-page">
   <lottie-loading visible="{{lottieLoadingVisible}}" />
   <view class="header-wrapper">
-    <header showBackButton="{{true}}" title="场馆储值" />
+    <header showBackButton="{{true}}" title="储值与次卡" />
   </view>
   <scroll-view
     class="content-scroll"
@@ -20,11 +20,11 @@
           <view class="venue-switch" bindtap="onSwitchVenue">切换场馆</view>
         </view>
         <view class="hint-banner" wx:if="{{isLoggedIn}}">
-          储值余额仅在本场馆使用，不同场馆余额不可通用。
+          储值与次卡仅在本场馆使用；次卡每次抵扣订场 1 小时，教练课不可用。
         </view>
       </view>
 
-
+      <view class="section-title" wx:if="{{planCards.length > 0}}">储值充值</view>
       <block wx:if="{{planCards.length > 0}}">
         <view class="plan-card" wx:for="{{planCards}}" wx:key="idx">
           <text class="plan-title">{{item.label}}</text>
@@ -40,9 +40,25 @@
         </view>
       </block>
 
-      <view class="empty-card" wx:else>
+      <view class="section-title" wx:if="{{sessionPlanCards.length > 0}}">次卡（1 次 = 1 小时）</view>
+      <block wx:if="{{sessionPlanCards.length > 0}}">
+        <view class="plan-card" wx:for="{{sessionPlanCards}}" wx:key="idx">
+          <text class="plan-title">{{item.label}}</text>
+          <view class="plan-price-row">
+            <text class="plan-pay">¥{{item.payText}}</text>
+            <text class="plan-credit">{{item.grantTimes}} 次 · 仅订场可用</text>
+          </view>
+          <view
+            class="plan-btn {{isLoggedIn && !paying ? '' : 'plan-btn--disabled'}}"
+            data-idx="{{item.idx}}"
+            bindtap="onSessionCardTap"
+          >立即购买</view>
+        </view>
+      </block>
+
+      <view class="empty-card" wx:if="{{planCards.length === 0 && sessionPlanCards.length === 0}}">
         <text wx:if="{{!venueId}}">请先在首页选择场馆</text>
-        <text wx:else>该场馆暂未配置储值卡，请联系场馆工作人员</text>
+        <text wx:else>该场馆暂未配置储值或次卡，请联系场馆工作人员</text>
         <view wx:if="{{!venueId}}" class="empty-link" bindtap="onSwitchVenue">去选择场馆</view>
       </view>
 

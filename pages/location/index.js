@@ -235,7 +235,7 @@ Page({
         latitude: v.latitude,
         longitude: v.longitude,
         image,
-        // 场地列表：name + priceList（14 个时段，对应 8:00–21:00 每小时单价，至 22:00 结束）
+        // 场地列表：name + priceList（14 格存储，0=8:00；管理端/会员可预约均为 10:00–22:00）
         courtList: Array.isArray(v.courtList) ? v.courtList : [],
       };
     });
