@@ -166,24 +166,30 @@
   <view class="purpose-sheet" wx:if="{{showPurposeSheet}}">
     <view class="purpose-sheet-title">{{ purposeSheetMode === 'edit' ? '更改场地类型' : '填写场地用途' }}</view>
     <scroll-view scroll-y class="purpose-sheet-scroll" enhanced="{{true}}" show-scrollbar="{{false}}">
-    <block wx:if="{{purposeShowStandardTypes || showOpenPlayChip}}">
+    <block wx:if="{{purposeShowStandardTypes || showOpenPlayChip || purposeShowExperience || lessonType === 'experience'}}">
       <view class="purpose-section-label">课程类型</view>
       <view class="purpose-chip-row">
-        <view class="purpose-chip {{lessonType === 'experience' ? 'purpose-chip--on' : ''}}" data-v="experience" bindtap="selectLessonType">体验课</view>
+        <view
+          wx:if="{{purposeShowExperience || lessonType === 'experience'}}"
+          class="purpose-chip {{lessonType === 'experience' ? 'purpose-chip--on' : ''}}"
+          data-v="experience"
+          bindtap="selectLessonType"
+        >体验课</view>
         <view class="purpose-chip {{lessonType === 'regular' ? 'purpose-chip--on' : ''}}" data-v="regular" bindtap="selectLessonType">正课</view>
         <view class="purpose-chip {{lessonType === 'group' ? 'purpose-chip--on' : ''}}" data-v="group" bindtap="selectLessonType">团课</view>
         <view wx:if="{{showOpenPlayChip}}" class="purpose-chip {{lessonType === 'open_play' ? 'purpose-chip--on' : ''}}" data-v="open_play" bindtap="selectLessonType">畅打</view>
       </view>
     </block>
-    <block wx:if="{{isManagerUser && (lessonType === 'experience' || lessonType === 'regular' || lessonType === 'group')}}">
-      <view class="purpose-section-label">指定教练（可选）</view>
+    <block wx:if="{{isManagerUser && purposeSheetMode === 'create' && (lessonType === 'experience' || lessonType === 'regular' || lessonType === 'group')}}">
+      <view class="purpose-section-label">{{lessonType === 'experience' ? '指定教练（必选）' : '指定教练（可选）'}}</view>
       <block wx:if="{{coachPickerLabels.length}}">
         <picker mode="selector" range="{{coachPickerLabels}}" value="{{coachPickerIndex}}" bindchange="onCoachPickerChange">
           <view class="purpose-coach-pick">{{coachPickerLabels[coachPickerIndex]}}</view>
         </picker>
       </block>
       <view wx:else class="purpose-coach-pick purpose-coach-pick--empty" bindtap="onCoachPickEmptyTap">暂无可选教练 · 点击重试</view>
-      <view class="purpose-open-hint">默认当前账号，也可改为指定其他教练</view>
+      <view class="purpose-open-hint" wx:if="{{lessonType === 'experience'}}">体验课必须指定教练，占用与统计均记在该教练名下</view>
+      <view class="purpose-open-hint" wx:else>默认当前账号，也可改为指定其他教练</view>
     </block>
     <view wx:if="{{isManagerUser && lessonType === 'open_play'}}" class="purpose-open-hint">畅打可不指定教练，占用记在本人管理员账号下</view>
     <block wx:if="{{lessonType === 'experience' || lessonType === 'regular'}}">

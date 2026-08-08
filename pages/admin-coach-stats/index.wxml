@@ -1,0 +1,88 @@
+<view class="admin-sub-page">
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="教练统计" />
+  </view>
+  <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
+    <view class="coach-head">
+      <text class="coach-head-name">{{displayName}}</text>
+      <text class="coach-head-phone">{{coachPhone}}</text>
+    </view>
+
+    <view class="picker-row">
+      <text class="picker-label">上课月份</text>
+      <picker mode="date" fields="month" value="{{monthValue}}" bindchange="onMonthChange">
+        <view class="picker-value">{{monthValue}}</view>
+      </picker>
+    </view>
+    <button class="submit-btn" bindtap="onQuery">查询</button>
+
+    <view wx:if="{{loaded}}" class="detail-card">
+      <text class="detail-title">{{monthValue}} · 课量明细</text>
+      <text class="section-sub">按 orderDate 实际上课日期统计；正课金额为课包单价合计；体验课仅统计节数。</text>
+
+      <view class="detail-block">
+        <view class="detail-line detail-line--head">
+          <text>体验课</text>
+          <text class="detail-sum">{{stats.experienceCount}} 节</text>
+        </view>
+      </view>
+
+      <view class="detail-block detail-block--total">
+        <view class="detail-line detail-line--head">
+          <text>正课合计</text>
+          <text class="detail-sum">{{stats.regularTotal.valueYuan}} 元</text>
+        </view>
+        <view class="detail-line">
+          <text class="detail-muted">课时节数</text>
+          <text>{{stats.regularTotal.count}}</text>
+        </view>
+      </view>
+
+      <view class="detail-block" wx:if="{{stats.regular1v1.count > 0}}">
+        <view class="detail-line detail-line--head">
+          <text>正课 · 1V1</text>
+          <text class="detail-sum">{{stats.regular1v1.valueYuan}} 元</text>
+        </view>
+        <view class="detail-line">
+          <text class="detail-muted">节数</text>
+          <text>{{stats.regular1v1.count}}</text>
+        </view>
+      </view>
+
+      <view class="detail-block" wx:if="{{stats.regular1v2.count > 0}}">
+        <view class="detail-line detail-line--head">
+          <text>正课 · 1V2</text>
+          <text class="detail-sum">{{stats.regular1v2.valueYuan}} 元</text>
+        </view>
+        <view class="detail-line">
+          <text class="detail-muted">节数</text>
+          <text>{{stats.regular1v2.count}}</text>
+        </view>
+      </view>
+
+      <view class="detail-block" wx:if="{{stats.regularOther.count > 0}}">
+        <view class="detail-line detail-line--head">
+          <text>正课 · 其他规格</text>
+          <text class="detail-sum">{{stats.regularOther.valueYuan}} 元</text>
+        </view>
+        <view class="detail-line">
+          <text class="detail-muted">节数</text>
+          <text>{{stats.regularOther.count}}</text>
+        </view>
+      </view>
+
+      <view class="detail-block" wx:if="{{stats.other.count > 0}}">
+        <view class="detail-line detail-line--head">
+          <text>团课 / 畅打等</text>
+          <text class="detail-sum">{{stats.other.valueYuan}} 元</text>
+        </view>
+        <view class="detail-line">
+          <text class="detail-muted">节数</text>
+          <text>{{stats.other.count}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{truncated}}" class="warn">本月教练课订单超过 1000 条，统计可能不全。</view>
+  </scroll-view>
+</view>

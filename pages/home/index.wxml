@@ -29,6 +29,16 @@
         </card>
       </view>
       <goods bind:courseloading="onCourseLoading" />
+      <view class="home-announcement" wx:if="{{announcement}}">
+        <card>
+          <view class="home-announcement-inner">
+            <view class="home-announcement-head">
+              <view class="home-announcement-badge">{{announcementTitle}}</view>
+            </view>
+            <text class="home-announcement-text">{{announcement}}</text>
+          </view>
+        </card>
+      </view>
       <view style="height: {{placeholderHeight}}px;"></view>
     </view>
   </scroll-view>

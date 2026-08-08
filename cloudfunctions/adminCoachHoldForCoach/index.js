@@ -235,13 +235,22 @@ exports.main = async (event) => {
   }
 
   const coachPhoneRaw = (event && event.coachPhone) != null ? String(event.coachPhone).trim() : '';
+  const lessonTypeEarly =
+    event && event.lessonType != null ? String(event.lessonType).trim() : '';
+
+  /** 体验课：必须显式指定 isCoach 教练，不可默认挂管理员本人 */
+  if (lessonTypeEarly === 'experience') {
+    if (!coachPhoneRaw || !/^1\d{10}$/.test(coachPhoneRaw)) {
+      return { ok: false, errMsg: '开设体验课须指定教练' };
+    }
+  }
 
   let coachUser = null;
   let targetOpenid = '';
   let coachPhone = coachPhoneRaw;
 
   if (!coachPhoneRaw) {
-    /** 未指定教练：体验课 / 正课 / 团课 / 畅打 一律记在管理员本人名下 */
+    /** 未指定教练：正课 / 团课 / 畅打 记在管理员本人名下 */
     coachUser = admin;
     targetOpenid = adminOpenid;
     coachPhone = admin.phone != null ? String(admin.phone).trim() : '';
@@ -265,7 +274,7 @@ exports.main = async (event) => {
   const orderDateRaw = event.orderDate != null ? String(event.orderDate).trim() : '';
   const orderDate = normalizeOrderDate(orderDateRaw) || orderDateRaw;
   const slots = Array.isArray(event.slots) ? event.slots : [];
-  const lessonType = event.lessonType != null ? String(event.lessonType).trim() : '';
+  const lessonType = lessonTypeEarly;
   let pairMode = event.pairMode != null ? String(event.pairMode).trim() : '';
   let groupMode = event.groupMode != null ? String(event.groupMode).trim() : '';
   const scaleDisplayName = sanitizeScaleDisplayName(event.scaleDisplayName);
@@ -281,7 +290,11 @@ exports.main = async (event) => {
   if (!['experience', 'regular', 'group', 'open_play'].includes(lessonType)) {
     return { ok: false, errMsg: '请选择场地用途' };
   }
-  if (lessonType === 'open_play') {
+  if (lessonType === 'experience') {
+    if (!coachUser || !coachUser.isCoach) {
+      return { ok: false, errMsg: '体验课须指定教练账号' };
+    }
+  } else if (lessonType === 'open_play') {
     if (!coachUser.isManager) {
       return { ok: false, errMsg: '畅打占用须使用管理员账号发起' };
     }
@@ -291,7 +304,7 @@ exports.main = async (event) => {
       coachUser._openid != null &&
       String(coachUser._openid).trim() === adminOpenid;
     if (!isAdminSelf && !coachUser.isCoach) {
-      return { ok: false, errMsg: '体验课/团课/正课须指定 isCoach 教练账号' };
+      return { ok: false, errMsg: '团课/正课须指定 isCoach 教练账号' };
     }
   }
 

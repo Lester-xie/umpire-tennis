@@ -3,6 +3,7 @@ const {
   getUserByPhone,
   coachHoldSlots,
   adminCoachHoldForCoach,
+  adminListCoaches,
   adminVenueSlotLock,
   listCoachHolds,
   cancelCoachHold,
@@ -50,14 +51,16 @@ Page({
     selectedVenueId: '', // 当前选定的球场 id
     priceLoading: false, // 加载价格规则状态
     showPurposeSheet: false,
-    /** experience | regular | group | open_play（畅打仅管理员可选） */
-    lessonType: 'experience',
+    /** experience | regular | group | open_play（畅打仅管理员可选；体验课仅管理员） */
+    lessonType: 'regular',
     /** 管理员：与 bookingCoachSlots 中「可管理全部占用」一致 */
     purposeOnlyOpenPlay: false,
     isManagerUser: false,
     /** 管理员可见「畅打」类型 */
     showOpenPlayChip: false,
-    /** 教练或管理员：展示体验/正课/团课 */
+    /** 仅管理员：展示并开设体验课 */
+    purposeShowExperience: false,
+    /** 教练或管理员：展示正课/团课（体验课见 purposeShowExperience） */
     purposeShowStandardTypes: false,
     /** 管理员指定教练：db_user.isCoach */
     coachPickerList: [],
@@ -110,6 +113,7 @@ Page({
       }
     }
     const isManagerUser = !!isManager;
+    const purposeShowExperience = isManagerUser;
     const purposeShowStandardTypes = !!(isCoach || isManager);
     const showOpenPlayChip = isManagerUser;
 
@@ -117,6 +121,7 @@ Page({
       isManagerUser,
       purposeOnlyOpenPlay: isManagerUser,
       showOpenPlayChip,
+      purposeShowExperience,
       purposeShowStandardTypes,
     });
 
@@ -125,9 +130,9 @@ Page({
       return;
     }
 
-    let lt = this.data.lessonType || 'experience';
-    if (!isManagerUser && lt === 'open_play') {
-      lt = 'experience';
+    let lt = this.data.lessonType || 'regular';
+    if (!isManagerUser && (lt === 'open_play' || lt === 'experience')) {
+      lt = 'regular';
     }
     let patch;
     if (lt === 'open_play') {
@@ -145,12 +150,21 @@ Page({
     this.endLoading();
   },
 
-  async ensureCoachPickerLoaded() {
+  /**
+   * @param {{ forExperience?: boolean, force?: boolean }} [opts]
+   * forExperience：仅 isCoach 列表（体验课必选教练，含管理员兼教练）；否则可附加管理员本人（正课/团课可选）
+   */
+  async ensureCoachPickerLoaded(opts = {}) {
     if (!this.data.isManagerUser) return;
-    if (this.data.coachPickerList.length > 0) return;
+    const forExperience = !!opts.forExperience;
+    const force = !!opts.force;
+    if (!force && this.data.coachPickerList.length > 0 && this._coachPickerForExperience === forExperience) {
+      return;
+    }
     try {
       const myPhone = String(wx.getStorageSync('user_phone') || '').trim();
       let myName = '我';
+      let amCoach = false;
       if (myPhone) {
         try {
           const ur = await getUserByPhone(myPhone);
@@ -158,51 +172,87 @@ Page({
           if (u && u.name != null && String(u.name).trim() !== '') {
             myName = String(u.name).trim();
           }
+          amCoach = !!(u && u.isCoach);
         } catch (e) {
           /* ignore */
         }
       }
-      const db = wx.cloud.database();
-      const res = await db.collection('db_user').where({ isCoach: true }).get();
-      const rows = (res && res.data) || [];
-      const coaches = rows
-        .filter((u) => u && u.phone && /^1\d{10}$/.test(String(u.phone).trim()))
-        .map((u) => ({
-          phone: String(u.phone).trim(),
-          name: u.name != null && String(u.name).trim() !== '' ? String(u.name).trim() : '教练',
-        }));
-      const others = coaches.filter((c) => c.phone !== myPhone);
-      const coachPickerList = myPhone
-        ? [{ phone: myPhone, name: myName }, ...others]
-        : others;
-      const coachPickerLabels = coachPickerList.map((c) => `${c.name} · ${c.phone}`);
+
+      /** 走云函数拉全量教练，避免客户端直查 db_user 受权限限制读不全（管理员兼教练也会漏） */
+      let coaches = [];
+      try {
+        const cloudRes = await adminListCoaches();
+        const r = (cloudRes && cloudRes.result) || {};
+        if (r.ok && r.data && Array.isArray(r.data.coaches)) {
+          coaches = r.data.coaches.map((c) => ({
+            phone: String(c.phone || '').trim(),
+            name: c.name != null && String(c.name).trim() !== '' ? String(c.name).trim() : '教练',
+            isCoach: true,
+            isManager: !!c.isManager,
+          })).filter((c) => /^1\d{10}$/.test(c.phone));
+        }
+      } catch (e) {
+        console.warn('adminListCoaches', e);
+      }
+
+      /** 兜底：云函数失败时仍保证「本人且是教练」可选 */
+      if (myPhone && amCoach && !coaches.some((c) => c.phone === myPhone)) {
+        coaches = [{ phone: myPhone, name: myName, isCoach: true }, ...coaches];
+      }
+
+      let coachPickerList;
+      if (forExperience) {
+        coachPickerList = coaches;
+      } else if (myPhone && !amCoach) {
+        coachPickerList = [
+          { phone: myPhone, name: myName, isCoach: false },
+          ...coaches.filter((c) => c.phone !== myPhone),
+        ];
+      } else if (myPhone) {
+        const self = coaches.find((c) => c.phone === myPhone);
+        const others = coaches.filter((c) => c.phone !== myPhone);
+        coachPickerList = self ? [self, ...others] : coaches;
+      } else {
+        coachPickerList = coaches;
+      }
+
+      const coachPickerLabels = coachPickerList.map((c) => {
+        const tag = c.isManager && c.isCoach ? '（管理员·教练）' : '';
+        return `${c.name}${tag} · ${c.phone}`;
+      });
+      const firstPhone =
+        coachPickerList[0] && coachPickerList[0].phone
+          ? String(coachPickerList[0].phone).trim()
+          : '';
+      this._coachPickerForExperience = forExperience;
       this.setData({
         coachPickerList,
         coachPickerLabels,
         coachPickerIndex: 0,
-        selectedCoachPhone: myPhone,
+        selectedCoachPhone: firstPhone,
       });
     } catch (e) {
       console.warn('ensureCoachPickerLoaded', e);
-      wx.showToast({ title: '教练列表加载失败，请检查数据库权限', icon: 'none' });
+      wx.showToast({ title: '教练列表加载失败，请部署云函数 adminGetUserByPhone', icon: 'none' });
     }
   },
 
-  /** 新建占用时重置为列表第一项（当前账号），避免沿用上次选中的其他教练 */
+  /** 新建占用时重置教练选择：优先当前账号（若在列表中），否则第一项 */
   resetCoachPickerToSelf() {
     if (!this.data.isManagerUser) return {};
-    const myPhone = String(wx.getStorageSync('user_phone') || '').trim();
-    if (!this.data.coachPickerList.length) {
-      return { coachPickerIndex: 0, selectedCoachPhone: myPhone };
+    const list = this.data.coachPickerList || [];
+    if (!list.length) {
+      return { coachPickerIndex: 0, selectedCoachPhone: '' };
     }
+    const myPhone = String(wx.getStorageSync('user_phone') || '').trim();
     const selfIdx = myPhone
-      ? this.data.coachPickerList.findIndex((c) => String(c.phone || '').trim() === myPhone)
-      : 0;
+      ? list.findIndex((c) => String(c.phone || '').trim() === myPhone)
+      : -1;
     const idx = selfIdx >= 0 ? selfIdx : 0;
-    const item = this.data.coachPickerList[idx];
+    const item = list[idx];
     return {
       coachPickerIndex: idx,
-      selectedCoachPhone: item && item.phone ? String(item.phone).trim() : myPhone,
+      selectedCoachPhone: item && item.phone ? String(item.phone).trim() : '',
     };
   },
 
@@ -217,7 +267,7 @@ Page({
 
   /**
    * 管理员提交占用时的目标教练手机号：
-   * 体验课 / 正课 / 团课：传选中教练手机号（默认当前账号）
+   * 体验课：必须选中教练；正课 / 团课：可选（默认当前账号）
    * 畅打：始终本人（不指定教练）
    */
   resolveManagerCoachPhoneArg(lessonType) {
@@ -230,7 +280,10 @@ Page({
   },
 
   async onCoachPickEmptyTap() {
-    await this.ensureCoachPickerLoaded();
+    await this.ensureCoachPickerLoaded({
+      forExperience: this.data.lessonType === 'experience',
+      force: true,
+    });
     if (this.data.coachPickerLabels.length === 0) {
       wx.showToast({
         title: '仍无教练，请在管理后台先添加教练',
@@ -628,9 +681,10 @@ Page({
         if (res.tapIndex === 0) {
           const pm = ds.pairmode || '1v1';
           const gm = ds.groupmode || 'group35';
-          let lt = ds.lessontype || 'experience';
+          let lt = ds.lessontype || 'regular';
+          // 教练不可开设畅打；已是体验课的占用仍可进入编辑改规模/价格
           if (!this.data.isManagerUser && lt === 'open_play') {
-            lt = 'experience';
+            lt = 'regular';
           }
           const scalePatch = this.applyPurposeScalesForLessonType(lt, pm, gm);
           const courtId = parseInt(ds.courtid, 10);
@@ -673,7 +727,10 @@ Page({
             enrollPatch = { refundHoursBeforeStart: rhEff };
           }
           if (this.data.isManagerUser) {
-            await this.ensureCoachPickerLoaded();
+            await this.ensureCoachPickerLoaded({
+              forExperience: lt === 'experience',
+              force: true,
+            });
           }
           let existingPrice = '';
           const mpEx =
@@ -937,6 +994,19 @@ Page({
 
   confirmPurposeSheet() {
     const { lessonType, purposeSheetMode } = this.data;
+    if (lessonType === 'experience') {
+      if (purposeSheetMode !== 'edit') {
+        if (!this.data.isManagerUser || !this.data.purposeShowExperience) {
+          wx.showToast({ title: '体验课仅管理员可开设', icon: 'none' });
+          return;
+        }
+        const coachPhone = String(this.data.selectedCoachPhone || '').trim();
+        if (!/^1\d{10}$/.test(coachPhone)) {
+          wx.showToast({ title: '开设体验课须指定教练', icon: 'none' });
+          return;
+        }
+      }
+    }
     if (lessonType === 'group' || lessonType === 'open_play') {
       const mn = Math.floor(Number(this.data.minParticipants));
       const mx = Math.floor(Number(this.data.maxParticipants));
@@ -1191,10 +1261,16 @@ Page({
       wx.showToast({ title: '无权限占用场地', icon: 'none' });
       return;
     }
-    if (this.data.isManagerUser) {
-      await this.ensureCoachPickerLoaded();
+    let lt = this.data.lessonType || 'regular';
+    if (!this.data.isManagerUser && (lt === 'experience' || lt === 'open_play')) {
+      lt = 'regular';
     }
-    const lt = this.data.lessonType || 'experience';
+    if (this.data.isManagerUser) {
+      await this.ensureCoachPickerLoaded({
+        forExperience: lt === 'experience',
+        force: true,
+      });
+    }
     let scalePatch;
     if (lt === 'open_play') {
       scalePatch = this.applyPurposeScalesForLessonType(
@@ -1221,8 +1297,9 @@ Page({
       editingHoldIds: [],
       lessonType: lt,
       ...scalePatch,
-      ...this.resetCoachPickerToSelf(),
     };
+    this.setData({ lessonType: lt });
+    Object.assign(patch, this.resetCoachPickerToSelf());
     if (lt === 'group' || lt === 'open_play') {
       patch.minParticipants = 3;
       patch.maxParticipants = 6;
@@ -1243,11 +1320,15 @@ Page({
     });
   },
 
-  selectLessonType(e) {
+  async selectLessonType(e) {
     const { v } = e.currentTarget.dataset;
     if (!v) return;
+    if (v === 'experience' && !this.data.purposeShowExperience) return;
     if (v === 'open_play') {
       if (!this.data.showOpenPlayChip) return;
+      if (this.data.isManagerUser) {
+        await this.ensureCoachPickerLoaded({ forExperience: false, force: true });
+      }
       const scalePatch = this.applyPurposeScalesForLessonType(
         'open_play',
         '',
@@ -1266,7 +1347,13 @@ Page({
       );
       return;
     }
-    if (!this.data.purposeShowStandardTypes) return;
+    if (v !== 'experience' && !this.data.purposeShowStandardTypes) return;
+    if (this.data.isManagerUser) {
+      await this.ensureCoachPickerLoaded({
+        forExperience: v === 'experience',
+        force: true,
+      });
+    }
     const prev = String(this.data.lessonType || '').trim();
     const scalePatch = this.applyPurposeScalesForLessonType(v, '', '');
     const patch = {
@@ -1280,8 +1367,9 @@ Page({
     } else if (v === 'experience' || v === 'regular') {
       patch.refundHoursBeforeStart = 3;
     }
-    /** 体验课 / 正课 / 团课切换时统一默认本人，避免沿用其他课型选中的教练 */
+    /** 体验课 / 正课 / 团课切换时重置教练选择，避免沿用其他课型选中的人 */
     if (prev !== v) {
+      this.setData({ lessonType: v });
       Object.assign(patch, this.resetCoachPickerToSelf());
     }
     this.setData(patch, () => this.applyPurposeMemberPriceDefault());

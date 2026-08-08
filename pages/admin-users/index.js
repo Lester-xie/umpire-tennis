@@ -211,6 +211,10 @@ Page({
     this.resetUserCard();
   },
 
+  onUserNameInput(e) {
+    this.setData({ userName: e.detail.value != null ? String(e.detail.value) : '' });
+  },
+
   onToggleCoach(e) {
     this.setData({ isCoach: !!e.detail.value });
   },
@@ -393,12 +397,23 @@ Page({
       return;
     }
 
+    const userName = String(this.data.userName || '').trim();
+    if (!userName) {
+      wx.showToast({ title: '请填写用户名', icon: 'none' });
+      return;
+    }
+    if (userName.length > 32) {
+      wx.showToast({ title: '用户名最多 32 个字', icon: 'none' });
+      return;
+    }
+
     this.setData({ saving: true });
     wx.showLoading({ title: '保存中', mask: true });
     try {
       const [rolesRes, assetsRes] = await Promise.all([
         adminSetUserRoles({
           targetPhone: queriedPhone,
+          name: userName,
           isCoach: this.data.isCoach,
           isVip: this.data.isVip,
         }),

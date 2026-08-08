@@ -55,6 +55,30 @@
   margin-bottom: 20rpx;
 }
 
+.field-sub-label {
+  display: block;
+  font-size: 24rpx;
+  color: #888;
+  margin-bottom: 10rpx;
+}
+
+.field-sub-label--spaced {
+  margin-top: 20rpx;
+}
+
+.field-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 200rpx;
+  padding: 22rpx 24rpx;
+  font-size: 28rpx;
+  line-height: 1.55;
+  color: #1a1a1a;
+  background: #eef6f1;
+  border-radius: 12rpx;
+  border: 2rpx solid rgba(19, 78, 53, 0.35);
+}
+
 .court-card {
   margin-top: 20rpx;
   padding: 20rpx;

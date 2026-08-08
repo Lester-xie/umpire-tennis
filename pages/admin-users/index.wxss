@@ -31,26 +31,52 @@
   margin-bottom: 12rpx;
 }
 
-.field-input {
+/** 可编辑输入：浅绿底 + 品牌描边，区别于选择器/开关 */
+.admin-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 88rpx;
+  padding: 22rpx 24rpx;
   font-size: 30rpx;
+  line-height: 44rpx;
   color: #1a1a1a;
+  background: #eef6f1;
+  border-radius: 12rpx;
+  border: 2rpx solid rgba(19, 78, 53, 0.35);
 }
 
-.venue-pick {
+.admin-input--flex {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
+.admin-input--name {
+  font-weight: 600;
+  font-size: 32rpx;
+}
+
+/** 选择器触发区：中性底、细边框，与输入框区分 */
+.admin-pick {
   box-sizing: border-box;
   min-height: 88rpx;
   padding: 22rpx 24rpx;
   font-size: 28rpx;
   line-height: 44rpx;
   color: #333;
-  background: #f7f9ff;
+  background: #f3f5f9;
   border-radius: 12rpx;
-  border: 1rpx solid #e8ecf4;
+  border: 1rpx solid #d5dbe6;
 }
 
-.venue-pick--disabled {
+.admin-pick--flex {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-pick--empty {
   color: #999;
-  background: #f5f5f5;
 }
 
 .admin-btn {
@@ -117,16 +143,11 @@
 .user-meta {
   flex: 1;
   min-width: 0;
+  width: 0;
   display: flex;
   flex-direction: column;
   gap: 12rpx;
-}
-
-.user-name {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #1a1a1a;
-  word-break: break-all;
+  align-self: stretch;
 }
 
 .user-phone {
@@ -238,47 +259,6 @@
   font-size: 26rpx;
   color: #888;
   min-width: 72rpx;
-}
-
-.asset-input {
-  box-sizing: border-box;
-  min-height: 88rpx;
-  padding: 22rpx 24rpx;
-  font-size: 28rpx;
-  line-height: 44rpx;
-  color: #1a1a1a;
-  background: #fff;
-  border-radius: 12rpx;
-  border: 1rpx solid #e8ecf4;
-}
-
-.asset-input--balance {
-  flex: 1;
-  min-width: 0;
-}
-
-.asset-input--hours {
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-}
-
-.asset-date-pick {
-  flex: 1;
-  min-width: 0;
-  min-height: 88rpx;
-  padding: 22rpx 24rpx;
-  box-sizing: border-box;
-  font-size: 28rpx;
-  line-height: 44rpx;
-  color: #1a1a1a;
-  background: #fff;
-  border-radius: 12rpx;
-  border: 1rpx solid #e8ecf4;
-}
-
-.asset-date-pick--empty {
-  color: #999;
 }
 
 .asset-input-row picker {

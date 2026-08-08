@@ -16,7 +16,9 @@ async function assertStaffCaller(openid) {
 }
 
 /**
- * event: { phone: string }
+ * event:
+ * - { action: 'listCoaches' } 列出全部 isCoach 用户（含管理员兼教练）
+ * - { phone: string } 按手机号查单用户
  */
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext();
@@ -25,6 +27,27 @@ exports.main = async (event) => {
 
   const admin = await assertStaffCaller(openid);
   if (!admin) return { ok: false, errMsg: '无权限' };
+
+  const action = event && event.action != null ? String(event.action).trim() : '';
+
+  if (action === 'listCoaches') {
+    try {
+      const hit = await db.collection('db_user').where({ isCoach: true }).limit(500).get();
+      const rows = (hit && hit.data) || [];
+      const coaches = rows
+        .filter((u) => u && u.phone && /^1\d{10}$/.test(String(u.phone).trim()))
+        .map((u) => ({
+          phone: String(u.phone).trim(),
+          name: u.name != null && String(u.name).trim() !== '' ? String(u.name).trim() : '教练',
+          isCoach: true,
+          isManager: !!u.isManager,
+        }));
+      return { ok: true, data: { coaches } };
+    } catch (e) {
+      console.error('adminGetUserByPhone listCoaches', e);
+      return { ok: false, errMsg: e.message || '查询失败' };
+    }
+  }
 
   const phone = String((event && event.phone) || '').trim();
   if (!/^1\d{10}$/.test(phone)) {
@@ -45,6 +68,7 @@ exports.main = async (event) => {
         avatar: row.avatar != null ? String(row.avatar) : '',
         isVip: !!row.isVip,
         isCoach: !!row.isCoach,
+        isManager: !!row.isManager,
       },
     };
   } catch (e) {

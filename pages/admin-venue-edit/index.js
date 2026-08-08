@@ -21,6 +21,8 @@ Page({
     image: '',
     imageDisplayUrl: '',
     uploadingImage: false,
+    announcementTitle: '',
+    announcement: '',
     courts: [],
     slotLabels: buildSlotLabels(),
   },
@@ -75,6 +77,8 @@ Page({
         latitude: d.latitude != null ? String(d.latitude) : '',
         longitude: d.longitude != null ? String(d.longitude) : '',
         image: d.image != null ? String(d.image) : '',
+        announcementTitle: d.announcementTitle != null ? String(d.announcementTitle) : '',
+        announcement: d.announcement != null ? String(d.announcement) : '',
         courts: [],
       });
       this.refreshVenueCoverDisplay();
@@ -91,6 +95,14 @@ Page({
 
   onAddress(e) {
     this.setData({ address: e.detail.value });
+  },
+
+  onAnnouncementTitle(e) {
+    this.setData({ announcementTitle: e.detail.value != null ? String(e.detail.value) : '' });
+  },
+
+  onAnnouncement(e) {
+    this.setData({ announcement: e.detail.value != null ? String(e.detail.value) : '' });
   },
 
   onLat(e) {
@@ -201,6 +213,9 @@ Page({
           latitude: lat,
           longitude: lon,
           image: this.data.image,
+          announcementTitle:
+            this.data.announcementTitle != null ? String(this.data.announcementTitle) : '',
+          announcement: this.data.announcement != null ? String(this.data.announcement) : '',
           courtList,
           categoryList: [],
         };
@@ -231,6 +246,9 @@ Page({
         latitude: lat,
         longitude: lon,
         image: this.data.image != null ? String(this.data.image) : '',
+        announcementTitle:
+          this.data.announcementTitle != null ? String(this.data.announcementTitle) : '',
+        announcement: this.data.announcement != null ? String(this.data.announcement) : '',
         courtList: d.courtList,
         categoryList: extractCategoryList(d),
       };

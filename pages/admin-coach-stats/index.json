@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "教练统计",
+  "usingComponents": {
+    "header": "/components/header/header"
+  }
+}

@@ -8,6 +8,8 @@ Page({
     contentHeight: 400,
     placeholderHeight: 0,
     courseLoadingVisible: false,
+    announcement: '',
+    announcementTitle: '公告',
   },
   onLoad() {
     // 小程序码等可直达首页；首次用户仍先进入欢迎页
@@ -15,7 +17,25 @@ Page({
     const seen = wx.getStorageSync(STORAGE_WELCOME_SEEN);
     if (!phone && !seen) {
       wx.reLaunch({ url: '/pages/welcome/index' });
+      return;
     }
+    this.syncVenueAnnouncement();
+  },
+
+  onShow() {
+    this.syncVenueAnnouncement();
+  },
+
+  /** 展示当前已选场馆的首页公告（支持换行） */
+  syncVenueAnnouncement() {
+    const app = getApp();
+    const venue = app && app.globalData && app.globalData.selectedVenue;
+    const raw = venue && venue.announcement != null ? String(venue.announcement) : '';
+    const announcement = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/^\s+|\s+$/g, '');
+    const titleRaw =
+      venue && venue.announcementTitle != null ? String(venue.announcementTitle).trim() : '';
+    const announcementTitle = titleRaw || '公告';
+    this.setData({ announcement, announcementTitle });
   },
 
   onCourseLoading(e) {

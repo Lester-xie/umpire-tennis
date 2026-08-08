@@ -1,5 +1,5 @@
 {
-  "navigationBarTitleText": "交易统计",
+  "navigationBarTitleText": "教练管理",
   "usingComponents": {
     "header": "/components/header/header"
   }

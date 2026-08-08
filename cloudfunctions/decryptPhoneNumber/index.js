@@ -86,6 +86,27 @@ exports.main = async (event, context) => {
     appid: APPID,
   });
 
+  /** 管理员预建教练等无 _openid 的账号：首次授权手机号时绑定当前微信 */
+  try {
+    const { OPENID } = cloud.getWXContext();
+    const phone = phoneNumber != null ? String(phoneNumber).trim() : '';
+    if (OPENID && phone) {
+      const db = cloud.database();
+      const hit = await db.collection('db_user').where({ phone }).limit(1).get();
+      const row = hit.data && hit.data[0];
+      if (row && row._id) {
+        const existingOid = row._openid != null ? String(row._openid).trim() : '';
+        if (!existingOid) {
+          await db.collection('db_user').doc(row._id).update({
+            data: { _openid: OPENID, updatedAt: Date.now() },
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('bind openid on decryptPhoneNumber failed', e);
+  }
+
   return { phoneNumber };
 };
 

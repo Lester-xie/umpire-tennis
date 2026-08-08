@@ -260,6 +260,23 @@ function normalizeVenuePayload(body) {
   if (!catNorm.omit && catNorm.list != null) {
     data.categoryList = catNorm.list;
   }
+  /** 首页公告标题 / 正文：显式传入（含空串）时写入，未传则不改动已有字段 */
+  if (Object.prototype.hasOwnProperty.call(body, 'announcementTitle')) {
+    let announcementTitle = String(body.announcementTitle != null ? body.announcementTitle : '').trim();
+    if (announcementTitle.length > 20) {
+      return { ok: false, errMsg: '公告标题最多 20 字' };
+    }
+    data.announcementTitle = announcementTitle;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'announcement')) {
+    let announcement = String(body.announcement != null ? body.announcement : '');
+    announcement = announcement.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    announcement = announcement.replace(/^\s+|\s+$/g, '');
+    if (announcement.length > 800) {
+      return { ok: false, errMsg: '公告最多 800 字' };
+    }
+    data.announcement = announcement;
+  }
   const svNorm = normalizeStoredValuePlans(body.storedValuePlans);
   if (!svNorm.ok) {
     return svNorm;

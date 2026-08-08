@@ -1,0 +1,237 @@
+.admin-sub-page {
+  min-height: 100vh;
+  background: #f7f9ff;
+}
+
+.header-wrapper {
+  position: relative;
+  z-index: 2;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+  box-sizing: border-box;
+}
+
+.admin-scroll {
+  box-sizing: border-box;
+  padding: 24rpx 32rpx 48rpx;
+}
+
+.admin-btn {
+  width: 100%;
+  margin-bottom: 24rpx;
+  padding: 22rpx 24rpx;
+  box-sizing: border-box;
+  background: #134e35;
+  color: #fff;
+  border: none;
+  border-radius: 16rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.admin-btn::after {
+  border: none;
+}
+
+.section-sub {
+  display: block;
+  font-size: 24rpx;
+  color: #888;
+  line-height: 1.45;
+  margin-bottom: 20rpx;
+}
+
+.coach-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 28rpx 24rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  border: 1rpx solid #e8ecf4;
+  margin-bottom: 16rpx;
+}
+
+.coach-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.coach-name {
+  font-size: 32rpx;
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+.coach-phone {
+  font-size: 26rpx;
+  color: #666;
+  font-family: ui-monospace, monospace;
+}
+
+.coach-tag {
+  align-self: flex-start;
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #134e35;
+  background: #eef6f1;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.coach-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  flex-shrink: 0;
+  width: 200rpx;
+}
+
+.coach-actions-row {
+  display: flex;
+  gap: 10rpx;
+}
+
+.coach-action {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  padding: 10rpx 8rpx;
+  font-size: 24rpx;
+  color: #333;
+  background: #f3f5f9;
+  border-radius: 10rpx;
+  border: 1rpx solid #d5dbe6;
+  box-sizing: border-box;
+}
+
+.coach-action--block {
+  width: 100%;
+  flex: none;
+}
+
+.coach-action--primary {
+  color: #134e35;
+  background: #eef6f1;
+  border-color: rgba(19, 78, 53, 0.28);
+  font-weight: 600;
+}
+
+.coach-action--danger {
+  color: #c62828;
+  background: #fff5f5;
+  border-color: rgba(198, 40, 40, 0.28);
+}
+
+.empty-hint {
+  font-size: 28rpx;
+  color: #888;
+  padding: 48rpx 16rpx;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.admin-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 88rpx;
+  padding: 22rpx 24rpx;
+  font-size: 30rpx;
+  line-height: 44rpx;
+  color: #1a1a1a;
+  background: #eef6f1;
+  border-radius: 12rpx;
+  border: 2rpx solid rgba(19, 78, 53, 0.35);
+}
+
+.admin-input--disabled {
+  color: #888;
+  background: #f3f5f9;
+  border-color: #d5dbe6;
+}
+
+.form-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.form-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1001;
+  background: #fff;
+  border-radius: 24rpx 24rpx 0 0;
+  padding: 32rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+.form-title {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 28rpx;
+}
+
+.form-field {
+  margin-bottom: 24rpx;
+}
+
+.form-label {
+  display: block;
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 12rpx;
+}
+
+.form-hint {
+  display: block;
+  font-size: 22rpx;
+  color: #888;
+  line-height: 1.5;
+  margin-bottom: 28rpx;
+}
+
+.form-btns {
+  display: flex;
+  gap: 16rpx;
+}
+
+.form-btn {
+  flex: 1;
+  margin: 0;
+  padding: 20rpx 16rpx;
+  background: #134e35;
+  color: #fff;
+  border: none;
+  border-radius: 14rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.form-btn::after {
+  border: none;
+}
+
+.form-btn--ghost {
+  background: #f3f5f9;
+  color: #333;
+  font-weight: 500;
+}
+
+.form-btn[disabled] {
+  opacity: 0.65;
+}

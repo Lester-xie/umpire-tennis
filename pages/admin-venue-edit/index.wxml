@@ -24,6 +24,29 @@
         </view>
       </view>
       <view class="field">
+        <text class="field-label">首页公告</text>
+        <text class="field-hint">展示在小程序首页底部；正文支持换行。清空正文后保存即不显示。</text>
+        <text class="field-sub-label">公告标题</text>
+        <input
+          class="field-input"
+          maxlength="20"
+          placeholder="默认「公告」"
+          value="{{announcementTitle}}"
+          bindinput="onAnnouncementTitle"
+        />
+        <text class="field-sub-label field-sub-label--spaced">公告内容</text>
+        <textarea
+          class="field-textarea"
+          maxlength="800"
+          auto-height
+          show-confirm-bar="{{false}}"
+          placeholder="输入场馆公告，回车换行"
+          value="{{announcement}}"
+          bindinput="onAnnouncement"
+        />
+      </view>
+
+      <view class="field">
         <text class="field-label">封面图（可选）</text>
         <text class="field-hint">上传后保存为云文件 ID，前台与订场列表使用「场馆 image」字段。</text>
         <view class="admin-image-block">

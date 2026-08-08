@@ -69,6 +69,8 @@ function normalizeVenueDoc(v, idx) {
     latitude: v.latitude,
     longitude: v.longitude,
     image,
+    announcementTitle: v.announcementTitle != null ? String(v.announcementTitle) : '',
+    announcement: v.announcement != null ? String(v.announcement) : '',
     courtList: Array.isArray(v.courtList) ? v.courtList : [],
     categoryList: Array.isArray(mergedCategoryList) ? mergedCategoryList : [],
   };
@@ -414,11 +416,27 @@ function adminSetUserRoles(payload) {
   });
 }
 
+/** 管理员：新增教练或将已有用户设为教练（name + phone） */
+function adminUpsertCoach(payload) {
+  return wx.cloud.callFunction({
+    name: 'adminSetUserRoles',
+    data: { action: 'upsertCoach', ...(payload || {}) },
+  });
+}
+
 /** 管理员：按手机号查询用户昵称、头像、VIP/教练（需 isManager） */
 function adminGetUserByPhone(payload) {
   return wx.cloud.callFunction({
     name: 'adminGetUserByPhone',
     data: payload || {},
+  });
+}
+
+/** 管理员：列出全部教练（含管理员兼教练；走云函数避免客户端库权限读不全） */
+function adminListCoaches() {
+  return wx.cloud.callFunction({
+    name: 'adminGetUserByPhone',
+    data: { action: 'listCoaches' },
   });
 }
 
@@ -466,14 +484,6 @@ function adminVenueSlotLock(payload) {
       venueName: p.venueName,
       slots: p.slots,
     },
-  });
-}
-
-/** 管理员：按月交易汇总 */
-function adminOrderStatsByMonth(payload) {
-  return wx.cloud.callFunction({
-    name: 'adminOrderStatsByMonth',
-    data: payload || {},
   });
 }
 
@@ -587,13 +597,14 @@ module.exports = {
   cancelCoachHold,
   updateCoachHolds,
   adminSetUserRoles,
+  adminUpsertCoach,
   adminGetUserByPhone,
+  adminListCoaches,
   adminGetUserMemberAssets,
   adminSetUserMemberAssets,
   adminUpdateCourse,
   adminCoachHoldForCoach,
   adminVenueSlotLock,
-  adminOrderStatsByMonth,
   adminCoachMonthStats,
   verifyMeituanReceiptPrepare,
   verifyMeituanReceiptPrepareForBooking,

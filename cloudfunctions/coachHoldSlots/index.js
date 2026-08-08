@@ -194,7 +194,7 @@ function sanitizeMemberPricePerSlotYuan(raw) {
 /**
  * 教练占用场地（写入 db_coach_slot_hold，与已支付订单一并参与 getBookedSlots 占用计算）
  * event: { venueId, orderDate, slots: [{courtId, slotIndex}], lessonType, pairMode?, groupMode? }
- * lessonType: experience | regular | group | open_play（畅打，需 isManager）
+ * lessonType: regular | group | open_play（畅打需 isManager；experience 仅管理员经 adminCoachHoldForCoach 开设）
  * pairMode（体验课/正课）: 1v1 | 1v2
  * groupMode（团课）: 如 group35、group36 等
  * scaleDisplayName（可选）: 规模展示名，写入 capacityLabel（与 scaleList.name 一致时推荐传入）
@@ -233,6 +233,9 @@ exports.main = async (event, context) => {
 
   if (!['experience', 'regular', 'group', 'open_play'].includes(lessonType)) {
     return { ok: false, errMsg: '请选择场地用途' };
+  }
+  if (lessonType === 'experience') {
+    return { ok: false, errMsg: '体验课仅可由管理员开设并指定教练' };
   }
   if (lessonType === 'open_play') {
     if (!user.isManager) {

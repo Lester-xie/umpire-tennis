@@ -16,9 +16,9 @@
         <text class="admin-card-title">课程信息</text>
         <text class="admin-card-desc">编辑 db_course 价格与说明</text>
       </navigator>
-      <navigator url="/pages/admin-stats/index" class="admin-card" hover-class="admin-card--hover">
-        <text class="admin-card-title">交易统计</text>
-        <text class="admin-card-desc">按月汇总订场与课时包实付</text>
+      <navigator url="/pages/admin-coaches/index" class="admin-card" hover-class="admin-card--hover">
+        <text class="admin-card-title">教练管理</text>
+        <text class="admin-card-desc">查看教练列表及各教练按月课量统计</text>
       </navigator>
     </view>
     <view class="admin-footer-space"></view>

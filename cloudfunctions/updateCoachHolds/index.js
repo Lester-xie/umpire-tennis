@@ -218,6 +218,13 @@ exports.main = async (event) => {
       if (doc.status !== 'active') {
         return { ok: false, errMsg: '部分占用已失效，请刷新' };
       }
+      /** 不允许把其他类型改为体验课；已是体验课的可由教练改规模/价格 */
+      if (
+        lessonType === 'experience' &&
+        String(doc.lessonType || '').trim() !== 'experience'
+      ) {
+        return { ok: false, errMsg: '体验课仅可由管理员开设，无法改为体验课' };
+      }
       if (!signalVenueId && doc.venueId != null) signalVenueId = String(doc.venueId).trim();
       if (!signalOrderDate && doc.orderDate != null) signalOrderDate = String(doc.orderDate).trim();
 

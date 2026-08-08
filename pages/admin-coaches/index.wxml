@@ -1,0 +1,80 @@
+<view class="admin-sub-page">
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="教练管理" />
+  </view>
+  <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
+    <button class="admin-btn" bindtap="openAddForm">新增教练</button>
+
+    <view wx:if="{{loading}}" class="empty-hint">加载中…</view>
+    <block wx:elif="{{coachList.length > 0}}">
+      <text class="section-sub">共 {{coachList.length}} 位教练</text>
+      <view
+        wx:for="{{coachList}}"
+        wx:key="phone"
+        class="coach-row"
+      >
+        <view class="coach-row-main">
+          <text class="coach-name">{{item.displayName}}</text>
+          <text class="coach-phone">{{item.phone}}</text>
+          <text wx:if="{{item.isManager}}" class="coach-tag">管理员·教练</text>
+        </view>
+        <view class="coach-actions">
+          <view class="coach-actions-row">
+            <view
+              class="coach-action"
+              data-phone="{{item.phone}}"
+              data-name="{{item.name}}"
+              catchtap="openEditForm"
+            >改名</view>
+            <view
+              class="coach-action coach-action--danger"
+              data-phone="{{item.phone}}"
+              data-name="{{item.displayName}}"
+              catchtap="onRemoveCoach"
+            >删除</view>
+          </view>
+          <view
+            class="coach-action coach-action--primary coach-action--block"
+            data-phone="{{item.phone}}"
+            data-name="{{item.name}}"
+            catchtap="onTapStats"
+          >统计</view>
+        </view>
+      </view>
+    </block>
+    <view wx:else class="empty-hint">暂无教练，点击上方「新增教练」添加</view>
+  </scroll-view>
+
+  <view class="form-mask" wx:if="{{showForm}}" catchtouchmove="preventMove" catchtap="closeForm"></view>
+  <view class="form-sheet" wx:if="{{showForm}}" catchtouchmove="preventMove">
+    <text class="form-title">{{formMode === 'add' ? '新增教练' : '修改教练姓名'}}</text>
+    <view class="form-field">
+      <text class="form-label">姓名</text>
+      <input
+        class="admin-input"
+        type="text"
+        maxlength="32"
+        placeholder="请输入教练姓名"
+        value="{{formName}}"
+        bindinput="onFormNameInput"
+      />
+    </view>
+    <view class="form-field">
+      <text class="form-label">手机号</text>
+      <input
+        class="admin-input {{formPhoneDisabled ? 'admin-input--disabled' : ''}}"
+        type="number"
+        maxlength="11"
+        placeholder="11 位手机号"
+        value="{{formPhone}}"
+        disabled="{{formPhoneDisabled}}"
+        bindinput="onFormPhoneInput"
+      />
+    </view>
+    <text wx:if="{{formMode === 'add'}}" class="form-hint">未注册用户将创建为教练账号；已注册用户将开启教练身份。对方需用该手机号登录一次后，方可代约开课。</text>
+    <view class="form-btns">
+      <button class="form-btn form-btn--ghost" disabled="{{saving}}" bindtap="closeForm">取消</button>
+      <button class="form-btn" loading="{{saving}}" disabled="{{saving}}" bindtap="onSubmitForm">保存</button>
+    </view>
+  </view>
+</view>
