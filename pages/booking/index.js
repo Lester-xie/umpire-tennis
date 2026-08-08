@@ -1,4 +1,5 @@
 const { getBookedSlots, refreshSelectedVenueFromCloud, getUserByPhone } = require('../../api/tennisDb');
+const { venueIdLooseEqual } = require('../../utils/venueId');
 const { getTodayDateStr, buildBookingDateList } = require('../../utils/bookingDate');
 const {
   buildSlotPriceMapFromCourtList,
@@ -106,15 +107,74 @@ Page({
     });
   },
 
-  onLoad() {
+  async onLoad(options) {
+    try {
+      wx.showShareMenu({
+        withShareTicket: true,
+        menus: ['shareAppMessage', 'shareTimeline'],
+      });
+    } catch (e) {
+      /* ignore */
+    }
+
     this._bookingIsVipUser = false;
     this.coachHoldMeta = {};
+
+    const shareVenueId =
+      options && options.v != null ? decodeURIComponent(String(options.v)).trim() : '';
+    if (shareVenueId) {
+      await this.applyShareVenueId(shareVenueId);
+    }
+
     this.syncSelectedVenueName();
     this.ensureVenueSelected();
     // 生成最近两个月的日期列表
     this.generateDateList();
     // 先渲染页面骨架，避免首次进入时白屏等待
     this.generateTimeSchedule();
+  },
+
+  /** 分享落地：切换到分享链接中的场馆，避免未选场被踢去选场页 */
+  async applyShareVenueId(venueId) {
+    const wantId = String(venueId || '').trim();
+    if (!wantId) return;
+    const app = getApp();
+    if (!app || !app.globalData) return;
+    const cur = app.globalData.selectedVenue;
+    const same = cur && cur.id != null && venueIdLooseEqual(cur.id, wantId);
+    if (!same) {
+      app.globalData.selectedVenue = { id: wantId };
+    }
+    await refreshSelectedVenueFromCloud(app).catch(() => null);
+  },
+
+  onShareAppMessage() {
+    const venueId = this.data.selectedVenueId
+      ? String(this.data.selectedVenueId).trim()
+      : '';
+    const venueName = this.data.selectedVenueName
+      ? String(this.data.selectedVenueName).trim()
+      : '';
+    const path = venueId
+      ? `/pages/booking/index?v=${encodeURIComponent(venueId)}`
+      : '/pages/booking/index';
+    return {
+      title: venueName ? `${venueName} · 订场` : '昂湃网球 · 订场',
+      path,
+    };
+  },
+
+  onShareTimeline() {
+    const venueId = this.data.selectedVenueId
+      ? String(this.data.selectedVenueId).trim()
+      : '';
+    const venueName = this.data.selectedVenueName
+      ? String(this.data.selectedVenueName).trim()
+      : '';
+    return {
+      title: venueName ? `${venueName} · 订场` : '昂湃网球 · 订场',
+      query: venueId ? `v=${encodeURIComponent(venueId)}` : '',
+    };
   },
 
   onShow() {

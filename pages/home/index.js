@@ -1,6 +1,8 @@
 /** 与 welcome 页一致：未授权手机号且未看过欢迎页时需先走欢迎流程 */
 const STORAGE_USER_PHONE = 'user_phone';
 const STORAGE_WELCOME_SEEN = 'welcome_seen';
+const { refreshSelectedVenueFromCloud } = require('../../api/tennisDb');
+const { venueIdLooseEqual } = require('../../utils/venueId');
 
 Page({
   data: {
@@ -11,7 +13,22 @@ Page({
     announcement: '',
     announcementTitle: '公告',
   },
-  onLoad() {
+  async onLoad(options) {
+    try {
+      wx.showShareMenu({
+        withShareTicket: true,
+        menus: ['shareAppMessage', 'shareTimeline'],
+      });
+    } catch (e) {
+      /* ignore */
+    }
+
+    const shareVenueId =
+      options && options.v != null ? decodeURIComponent(String(options.v)).trim() : '';
+    if (shareVenueId) {
+      await this.applyShareVenueId(shareVenueId);
+    }
+
     // 小程序码等可直达首页；首次用户仍先进入欢迎页
     const phone = wx.getStorageSync(STORAGE_USER_PHONE);
     const seen = wx.getStorageSync(STORAGE_WELCOME_SEEN);
@@ -24,6 +41,45 @@ Page({
 
   onShow() {
     this.syncVenueAnnouncement();
+  },
+
+  /** 分享落地：切换到分享链接中的场馆 */
+  async applyShareVenueId(venueId) {
+    const wantId = String(venueId || '').trim();
+    if (!wantId) return;
+    const app = getApp();
+    if (!app || !app.globalData) return;
+    const cur = app.globalData.selectedVenue;
+    const same = cur && cur.id != null && venueIdLooseEqual(cur.id, wantId);
+    if (!same) {
+      app.globalData.selectedVenue = { id: wantId };
+    }
+    await refreshSelectedVenueFromCloud(app).catch(() => null);
+  },
+
+  onShareAppMessage() {
+    const app = getApp();
+    const venue = app && app.globalData && app.globalData.selectedVenue;
+    const venueId = venue && venue.id != null ? String(venue.id).trim() : '';
+    const venueName = venue && venue.name ? String(venue.name).trim() : '';
+    const path = venueId
+      ? `/pages/home/index?v=${encodeURIComponent(venueId)}`
+      : '/pages/home/index';
+    return {
+      title: venueName ? `${venueName} · 昂湃网球` : '昂湃网球',
+      path,
+    };
+  },
+
+  onShareTimeline() {
+    const app = getApp();
+    const venue = app && app.globalData && app.globalData.selectedVenue;
+    const venueId = venue && venue.id != null ? String(venue.id).trim() : '';
+    const venueName = venue && venue.name ? String(venue.name).trim() : '';
+    return {
+      title: venueName ? `${venueName} · 昂湃网球` : '昂湃网球',
+      query: venueId ? `v=${encodeURIComponent(venueId)}` : '',
+    };
   },
 
   /** 展示当前已选场馆的首页公告（支持换行） */
