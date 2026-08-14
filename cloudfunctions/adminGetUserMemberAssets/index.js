@@ -38,11 +38,7 @@ exports.main = async (event) => {
   }
 
   try {
-    const userHit = await db.collection('db_user').where({ phone }).limit(1).get();
-    if (!userHit.data || !userHit.data[0]) {
-      return { ok: false, errMsg: '该手机号尚未注册小程序' };
-    }
-
+    // 未注册也可查空资产，便于预导入；真正写库时在 set 接口预建 db_user
     const [balRes, hoursRes, monthCardRes, sessionCardRes] = await Promise.all([
       db.collection('db_member_venue_balance').where({ phone }).get(),
       db.collection('db_member_course_hours').where({ phone }).get(),

@@ -4,6 +4,8 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
 
+const DEFAULT_AVATAR = '/assets/images/default-avatar.jpg';
+
 function isStaffUser(u) {
   return !!(u && u.isManager);
 }
@@ -15,10 +17,27 @@ async function assertStaffCaller(openid) {
   return u;
 }
 
+function mapUserRow(row, phoneFallback) {
+  const phone =
+    row && row.phone != null && String(row.phone).trim()
+      ? String(row.phone).trim()
+      : String(phoneFallback || '').trim();
+  return {
+    phone,
+    name: row && row.name != null ? String(row.name) : '',
+    avatar: row && row.avatar != null ? String(row.avatar) : DEFAULT_AVATAR,
+    isVip: !!(row && row.isVip),
+    isCoach: !!(row && row.isCoach),
+    isManager: !!(row && row.isManager),
+    /** 库中尚无记录：管理端可预建并导入资产，用户授权后绑 openid */
+    pendingCreate: !row || !row._id,
+  };
+}
+
 /**
  * event:
  * - { action: 'listCoaches' } 列出全部 isCoach 用户（含管理员兼教练）
- * - { phone: string } 按手机号查单用户
+ * - { phone: string } 按手机号查单用户；未注册也返回空壳，便于预导入资产
  */
 exports.main = async (event) => {
   const wxContext = cloud.getWXContext();
@@ -58,18 +77,14 @@ exports.main = async (event) => {
     const hit = await db.collection('db_user').where({ phone }).limit(1).get();
     const row = hit.data && hit.data[0];
     if (!row || !row._id) {
-      return { ok: false, errMsg: '该手机号尚未注册小程序' };
+      return {
+        ok: true,
+        data: mapUserRow(null, phone),
+      };
     }
     return {
       ok: true,
-      data: {
-        phone: row.phone != null ? String(row.phone) : phone,
-        name: row.name != null ? String(row.name) : '',
-        avatar: row.avatar != null ? String(row.avatar) : '',
-        isVip: !!row.isVip,
-        isCoach: !!row.isCoach,
-        isManager: !!row.isManager,
-      },
+      data: mapUserRow(row, phone),
     };
   } catch (e) {
     console.error('adminGetUserByPhone', e);

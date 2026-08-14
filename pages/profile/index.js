@@ -13,7 +13,6 @@ const PROFILE_REFRESH_MS = 45 * 1000;
 
 const {
   getUserByPhone,
-  createUser,
   decryptPhoneNumber,
   listAllMemberCourseHours,
   listAllMemberVenueBalances,
@@ -568,95 +567,64 @@ Page({
         iv,
         appid,
       });
-      const phoneNumber =
-        decryptRes && decryptRes.result ? decryptRes.result.phoneNumber : decryptRes.phoneNumber;
+      // 云函数解密手机号并按 phone upsert db_user（避免客户端直插重复建档）
+      const payload =
+        decryptRes && decryptRes.result != null ? decryptRes.result : decryptRes;
+      const phoneNumber = payload && payload.phoneNumber;
+      const user = payload && payload.user ? payload.user : null;
+      const created = !!(payload && payload.created);
 
-      if (!phoneNumber) {
+      if (!phoneNumber || !user) {
         this.endLoading();
         wx.setStorageSync(STORAGE_KEYS.userPhoneCode, '');
         wx.setStorageSync(STORAGE_KEYS.userPhone, '');
-        wx.showToast({ title: '手机号解密失败，请重试', icon: 'none' });
-        // wx.navigateTo({ url: '/pages/complete-profile/index' });
+        wx.showToast({
+          title: payload && payload.error ? '登录失败，请重试' : '手机号解密失败，请重试',
+          icon: 'none',
+        });
         return;
       }
 
       const phone = String(phoneNumber);
-      const last4 = phone.slice(-4);
-      const defaultNickname = `昂湃用户_${last4}`;
+      const avatar = user.avatar || DEFAULT_USER_AVATAR;
+      const nickname = user.name || `昂湃用户_${phone.slice(-4)}`;
+      const resolvedAvatar = await resolveAvatarForUI(avatar);
 
-      const res = await getUserByPhone(phone);
-      const user = (res && res.data && res.data.length > 0) ? res.data[0] : null;
-
-      if (user) {
-        // 已注册：直接读用户信息，不跳转 complete-profile
-        const avatar = user.avatar || '';
-        const nickname = user.name || '';
-        const resolvedAvatar = await resolveAvatarForUI(avatar);
-
-        wx.setStorageSync(STORAGE_KEYS.userPhone, phone);
-        wx.setStorageSync(STORAGE_KEYS.userAvatar, avatar);
-        wx.setStorageSync(STORAGE_KEYS.userNickname, nickname);
-        restartMemberAssetRealtimeWatch(this, () => this.handleMemberAssetRealtimeChange());
-
-        const isVip = !!user.isVip;
-        const isCoach = !!user.isCoach;
-        const isManager = !!user.isManager;
-        const [totalCourseHours, totalStoredBalanceYuan, monthCardInfo] = await Promise.all([
-          this.fetchTotalCourseHoursSum(),
-          this.fetchTotalStoredBalanceSum(),
-          this.fetchActiveMonthCardInfo(),
-        ]);
-        const summary = buildSummaryFromFlags(
-          { isVip, isCoach, isManager },
-          totalCourseHours,
-          totalStoredBalanceYuan,
-          monthCardInfo,
-        );
-        writeProfileSummaryCache(phone, { userAvatar: resolvedAvatar, ...summary });
-        this._profileSummary = { phone, ts: Date.now(), userAvatar: resolvedAvatar, ...summary };
-        this.setData({
-          isLoggedIn: true,
-          userAvatar: resolvedAvatar,
-          userAvatarFileID: avatar,
-          userNickname: nickname,
-          userPhone: phone,
-          userDisplayName: nickname || '昂湃用户',
-          ...summary,
-        });
-
-        this.endLoading();
-        // 保持在当前 profile 页
-        return;
-      }
-
-      // 未注册：写入 user 集合并继续走完善资料流程（默认头像：包内 default-avatar.jpg）
-      await createUser({
-        phone,
-        name: defaultNickname,
-      });
-
-      // 必须先写 storage，再 setData，否则 onShow 可能先读到空 user_avatar 并覆盖头像
       wx.setStorageSync(STORAGE_KEYS.userPhone, phone);
+      wx.setStorageSync(STORAGE_KEYS.userAvatar, avatar);
+      wx.setStorageSync(STORAGE_KEYS.userNickname, nickname);
       restartMemberAssetRealtimeWatch(this, () => this.handleMemberAssetRealtimeChange());
-      wx.setStorageSync(STORAGE_KEYS.userNickname, defaultNickname);
-      wx.setStorageSync(STORAGE_KEYS.userAvatar, DEFAULT_USER_AVATAR);
 
-      this.endLoading();
+      const isVip = !!user.isVip;
+      const isCoach = !!user.isCoach;
+      const isManager = !!user.isManager;
+      const [totalCourseHours, totalStoredBalanceYuan, monthCardInfo] = await Promise.all([
+        this.fetchTotalCourseHoursSum(),
+        this.fetchTotalStoredBalanceSum(),
+        this.fetchActiveMonthCardInfo(),
+      ]);
+      const summary = buildSummaryFromFlags(
+        { isVip, isCoach, isManager },
+        totalCourseHours,
+        totalStoredBalanceYuan,
+        monthCardInfo,
+      );
+      writeProfileSummaryCache(phone, { userAvatar: resolvedAvatar, ...summary });
+      this._profileSummary = { phone, ts: Date.now(), userAvatar: resolvedAvatar, ...summary };
       this.setData({
         isLoggedIn: true,
-        userAvatar: DEFAULT_USER_AVATAR,
-        userAvatarFileID: DEFAULT_USER_AVATAR,
-        userDisplayName: defaultNickname,
-        isVip: false,
-        isCoach: false,
-        isManager: false,
-        userIdentity: '',
-        identityBadgeKind: '',
-        totalCourseHours: 0,
-        totalCourseHoursText: '0',
+        userAvatar: resolvedAvatar,
+        userAvatarFileID: avatar,
+        userNickname: nickname,
+        userPhone: phone,
+        userDisplayName: nickname || '昂湃用户',
+        ...summary,
       });
 
-      // wx.navigateTo({ url: '/pages/complete-profile/index' });
+      this.endLoading();
+      if (created) {
+        wx.showToast({ title: '注册成功', icon: 'success' });
+      }
     } catch (err2) {
       this.endLoading();
       wx.showToast({ title: '注册失败，请重试', icon: 'none' });

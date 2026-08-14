@@ -110,10 +110,42 @@ exports.main = async (event) => {
     }
   }
 
-  const hit = await db.collection('db_user').where({ phone: targetPhone }).limit(1).get();
-  const row = hit.data && hit.data[0];
+  let hit = await db.collection('db_user').where({ phone: targetPhone }).limit(1).get();
+  let row = hit.data && hit.data[0];
+  let stubCreated = false;
   if (!row || !row._id) {
-    return { ok: false, errMsg: '该手机号尚未注册小程序' };
+    // 未注册：预建账号后再写角色（与导入课时一致，用户授权后绑 openid）
+    const now = Date.now();
+    const last4 = targetPhone.slice(-4);
+    const nameFromEvent =
+      event && Object.prototype.hasOwnProperty.call(event, 'name')
+        ? sanitizeName(event.name)
+        : null;
+    if (nameFromEvent && !nameFromEvent.ok) return nameFromEvent;
+    const createData = {
+      phone: targetPhone,
+      name: (nameFromEvent && nameFromEvent.name) || `昂湃用户_${last4}`,
+      avatar: DEFAULT_AVATAR,
+      isVip: typeof (event && event.isVip) === 'boolean' ? event.isVip : false,
+      isCoach: typeof (event && event.isCoach) === 'boolean' ? event.isCoach : false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    try {
+      const addRes = await db.collection('db_user').add({ data: createData });
+      row = { _id: addRes._id, ...createData };
+      stubCreated = true;
+      await writeAudit({
+        adminOpenid: openid,
+        adminPhone: admin.phone,
+        action: 'setUserRoles',
+        detail: { targetPhone, stubCreated: true, created: createData },
+      });
+      return { ok: true, stubCreated: true };
+    } catch (e) {
+      console.error('adminSetUserRoles create stub', e);
+      return { ok: false, errMsg: e.message || '预建用户失败' };
+    }
   }
 
   const data = { updatedAt: Date.now() };
@@ -140,7 +172,7 @@ exports.main = async (event) => {
       adminOpenid: openid,
       adminPhone: admin.phone,
       action: 'setUserRoles',
-      detail: { targetPhone, patch: data },
+      detail: { targetPhone, stubCreated, patch: data },
     });
     return { ok: true };
   } catch (e) {

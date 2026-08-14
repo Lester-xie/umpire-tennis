@@ -184,21 +184,17 @@ function getUserByPhone(phone) {
 }
 
 /**
- * 新增用户（未传 avatar 或为空时使用包内默认图）
+ * 新增用户（已废弃：客户端直插会因安全规则读不到旧号而重复建档）。
+ * 注册/登录请走 decryptPhoneNumber，由云函数按 phone upsert。
  */
-function createUser({ phone, name, avatar } = {}) {
-  const db = getDb();
-  const avatarTrim = avatar != null ? String(avatar).trim() : '';
-  const data = {
-    phone: phone || '',
-    name: name || '',
-    avatar: avatarTrim || DEFAULT_USER_AVATAR,
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  };
-  return db.collection('db_user').add({ data });
+function createUser() {
+  return Promise.reject(new Error('createUser_deprecated_use_decryptPhoneNumber'));
 }
 
+/**
+ * 解密手机号并在服务端按 phone 确保唯一 db_user（存在则登录/绑 openid，不存在则创建）。
+ * 返回 result: { phoneNumber, user, created, error? }
+ */
 function decryptPhoneNumber({ code, encryptedData, iv, appid } = {}) {
   return wx.cloud.callFunction({
     name: 'decryptPhoneNumber',

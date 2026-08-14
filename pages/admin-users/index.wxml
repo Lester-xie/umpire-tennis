@@ -52,6 +52,7 @@
               bindinput="onUserNameInput"
             />
             <text class="user-phone">{{queriedPhone}}</text>
+            <text class="user-pending" wx:if="{{pendingCreate}}">未注册 · 保存后预建账号，用户授权即可使用课时</text>
           </view>
         </view>
 

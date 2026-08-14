@@ -8,8 +8,6 @@ const coachPayBehavior = require('./pay/coachPay');
 const submitPayBehavior = require('./pay/submitPay');
 
 const {
-  getUserByPhone,
-  createUser,
   decryptPhoneNumber,
   DEFAULT_USER_AVATAR,
   getBookedSlots,
@@ -1018,49 +1016,34 @@ Page({
         iv,
         appid,
       });
-      const phoneNumber =
-        decryptRes && decryptRes.result ? decryptRes.result.phoneNumber : decryptRes.phoneNumber;
+      const payload =
+        decryptRes && decryptRes.result != null ? decryptRes.result : decryptRes;
+      const phoneNumber = payload && payload.phoneNumber;
+      const user = payload && payload.user ? payload.user : null;
+      const created = !!(payload && payload.created);
 
-      if (!phoneNumber) {
+      if (!phoneNumber || !user) {
         this.endLoading();
         wx.setStorageSync(STORAGE_KEYS.userPhoneCode, '');
         wx.setStorageSync(STORAGE_KEYS.userPhone, '');
-        wx.showToast({ title: '手机号解密失败，请重试', icon: 'none' });
+        wx.showToast({
+          title: payload && payload.error ? '登录失败，请重试' : '手机号解密失败，请重试',
+          icon: 'none',
+        });
         return;
       }
 
       const phone = String(phoneNumber);
-      const last4 = phone.slice(-4);
-      const defaultNickname = `昂湃用户_${last4}`;
-
-      const res = await getUserByPhone(phone);
-      const user = res && res.data && res.data.length > 0 ? res.data[0] : null;
-
-      if (user) {
-        wx.setStorageSync(STORAGE_KEYS.userPhone, phone);
-        wx.setStorageSync(STORAGE_KEYS.userAvatar, user.avatar || '');
-        wx.setStorageSync(STORAGE_KEYS.userNickname, user.name || '');
-        this.endLoading();
-        this.setData({ showPhoneAuthModal: false });
-        wx.showToast({ title: '登录成功', icon: 'success' });
-        this.updateFooterButtonText();
-        this.loadCoachCourseHoursBalance();
-        this.loadCoachSessionRoster();
-        return;
-      }
-
-      await createUser({
-        phone,
-        name: defaultNickname,
-      });
-
       wx.setStorageSync(STORAGE_KEYS.userPhone, phone);
-      wx.setStorageSync(STORAGE_KEYS.userNickname, defaultNickname);
-      wx.setStorageSync(STORAGE_KEYS.userAvatar, DEFAULT_USER_AVATAR);
+      wx.setStorageSync(STORAGE_KEYS.userAvatar, user.avatar || DEFAULT_USER_AVATAR);
+      wx.setStorageSync(
+        STORAGE_KEYS.userNickname,
+        user.name || `昂湃用户_${phone.slice(-4)}`,
+      );
 
       this.endLoading();
       this.setData({ showPhoneAuthModal: false });
-      wx.showToast({ title: '注册成功', icon: 'success' });
+      wx.showToast({ title: created ? '注册成功' : '登录成功', icon: 'success' });
       this.updateFooterButtonText();
       this.loadCoachCourseHoursBalance();
       this.loadCoachSessionRoster();

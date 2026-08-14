@@ -116,6 +116,7 @@ Page({
     userCardVisible: false,
     queriedPhone: '',
     userName: '',
+    pendingCreate: false,
     avatarDisplayUrl: DEFAULT_USER_AVATAR,
     isCoach: false,
     isVip: false,
@@ -194,6 +195,7 @@ Page({
       userCardVisible: false,
       queriedPhone: '',
       userName: '',
+      pendingCreate: false,
       avatarDisplayUrl: DEFAULT_USER_AVATAR,
       isCoach: false,
       isVip: false,
@@ -303,12 +305,22 @@ Page({
       }
       const selectedVenue = venueOptions[selectedVenueIndex] || venueOptions[0];
       const assetFields = buildVenueAssetFields(selectedVenue.id, this._assetCache);
+      const pendingCreate = !!d.pendingCreate;
+      const phoneForName = d.phone != null ? String(d.phone) : targetPhone;
+      const defaultName = `昂湃用户_${String(phoneForName).slice(-4)}`;
+      const userName =
+        d.name != null && String(d.name).trim()
+          ? String(d.name).trim()
+          : pendingCreate
+            ? defaultName
+            : '';
 
       this.setData({
         querying: false,
         userCardVisible: true,
-        queriedPhone: d.phone != null ? String(d.phone) : targetPhone,
-        userName: d.name != null ? String(d.name) : '',
+        queriedPhone: phoneForName,
+        userName,
+        pendingCreate,
         avatarDisplayUrl,
         isCoach: !!d.isCoach,
         isVip: !!d.isVip,
@@ -317,6 +329,9 @@ Page({
         selectedVenueName: selectedVenue.name || selectedVenue.id,
         ...assetFields,
       });
+      if (pendingCreate) {
+        wx.showToast({ title: '未注册，保存将预建账号', icon: 'none' });
+      }
     } catch (e) {
       console.error(e);
       this.setData({ querying: false });
@@ -499,7 +514,13 @@ Page({
         return;
       }
 
-      wx.showToast({ title: '已保存', icon: 'success' });
+      wx.showToast({
+        title: this.data.pendingCreate || assets.stubUserCreated || roles.stubCreated
+          ? '已预建并保存'
+          : '已保存',
+        icon: 'success',
+      });
+      this.setData({ pendingCreate: false });
       const refreshRes = await adminGetUserMemberAssets({ phone: queriedPhone });
       const refreshed = (refreshRes && refreshRes.result) || {};
       if (refreshed.ok) {

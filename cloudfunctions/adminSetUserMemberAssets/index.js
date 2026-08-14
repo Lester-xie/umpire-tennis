@@ -5,6 +5,8 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 
+const DEFAULT_AVATAR = '/assets/images/default-avatar.jpg';
+
 function isStaffUser(u) {
   return !!(u && u.isManager);
 }
@@ -14,6 +16,28 @@ async function assertStaffCaller(openid) {
   const u = res.data && res.data[0];
   if (!isStaffUser(u)) return null;
   return u;
+}
+
+/** 未注册会员：预建仅含手机号的账号，授权登录后由 decryptPhoneNumber 绑定 openid */
+async function ensureStubUserByPhone(phone) {
+  const phoneNorm = String(phone || '').trim();
+  const hit = await db.collection('db_user').where({ phone: phoneNorm }).limit(1).get();
+  if (hit.data && hit.data[0] && hit.data[0]._id) {
+    return { user: hit.data[0], created: false };
+  }
+  const now = Date.now();
+  const last4 = phoneNorm.length >= 4 ? phoneNorm.slice(-4) : phoneNorm;
+  const data = {
+    phone: phoneNorm,
+    name: `昂湃用户_${last4}`,
+    avatar: DEFAULT_AVATAR,
+    isVip: false,
+    isCoach: false,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const addRes = await db.collection('db_user').add({ data });
+  return { user: { _id: addRes._id, ...data }, created: true };
 }
 
 async function emitMemberAssetRealtimeSignal(phone) {
@@ -182,9 +206,13 @@ exports.main = async (event) => {
     return { ok: false, errMsg: '请输入有效手机号' };
   }
 
-  const userHit = await db.collection('db_user').where({ phone: targetPhone }).limit(1).get();
-  if (!userHit.data || !userHit.data[0]) {
-    return { ok: false, errMsg: '该手机号尚未注册小程序' };
+  let stubUserCreated = false;
+  try {
+    const ensured = await ensureStubUserByPhone(targetPhone);
+    stubUserCreated = !!ensured.created;
+  } catch (e) {
+    console.error('ensureStubUserByPhone', e);
+    return { ok: false, errMsg: e.message || '预建用户失败' };
   }
 
   const balances = Array.isArray(event && event.balances) ? event.balances : [];
@@ -399,6 +427,7 @@ exports.main = async (event) => {
       action: 'setUserMemberAssets',
       detail: {
         targetPhone,
+        stubUserCreated,
         balanceUpdates,
         courseHourUpdates,
         monthCardUpdates,
@@ -412,7 +441,7 @@ exports.main = async (event) => {
       console.warn('emitMemberAssetRealtimeSignal failed', e);
     }
 
-    return { ok: true };
+    return { ok: true, stubUserCreated };
   } catch (e) {
     console.error('adminSetUserMemberAssets', e);
     return { ok: false, errMsg: e.message || '保存失败' };

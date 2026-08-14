@@ -156,6 +156,13 @@
   font-family: ui-monospace, monospace;
 }
 
+.user-pending {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #b45309;
+  line-height: 1.4;
+}
+
 .switch-row {
   display: flex;
   align-items: center;
