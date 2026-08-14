@@ -84,7 +84,7 @@ function pickSessionCardSlots(flatSlots, vouchers, monthCardFreeSlotKey, remaini
     const key = String(s.slotKey || '');
     if (!key || used.has(key)) continue;
     sessionCardSlotKeys.push(key);
-    sessionCardDeductYuan += roundYuan(s.priceYuan);
+    sessionCardDeductYuan = roundYuan(sessionCardDeductYuan + roundYuan(s.priceYuan));
   }
   return {
     sessionCardDeductTimes: sessionCardSlotKeys.length,

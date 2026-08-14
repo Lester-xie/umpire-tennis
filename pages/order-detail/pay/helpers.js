@@ -2,6 +2,7 @@ const { roundYuan } = require('../../../utils/storedValuePlans');
 const {
   recalcCourtPlainPayment,
 } = require('../../../utils/bookingVoucherMatch');
+const { findCourtSlot } = require('../../../utils/bookingTimeSlots');
 const { pickMonthCardFreeSlot } = require('../../../utils/monthCard');
 const { pickSessionCardSlots } = require('../../../utils/sessionCardPlans');
 
@@ -20,7 +21,8 @@ function buildCourtOrderSlotPrices(bookedSlots, courts) {
     const slotIndex = Number(s.slotIndex);
     if (!Number.isFinite(courtId) || !Number.isFinite(slotIndex)) return;
     const court = (courts || []).find((c) => Number(c.id) === courtId);
-    const slotData = court && court.slots && court.slots[slotIndex];
+    // slots 按展示序从 10:00 起，须按 slotIndex 字段查找，不能当数组下标
+    const slotData = findCourtSlot(court, slotIndex);
     list.push({
       courtId,
       slotIndex,
@@ -45,15 +47,15 @@ function computeCoachSlotPrices(selectedSlots, courts) {
     (a.courtId !== b.courtId ? a.courtId - b.courtId : a.slotIndex - b.slotIndex));
   const prices = [];
   slots.forEach((s) => {
-    const court = (courts || []).find((c) => c.id === s.courtId);
+    const court = (courts || []).find((c) => Number(c.id) === s.courtId);
     if (!court || !court.slots) return;
-    const slotData = court.slots[s.slotIndex];
+    const slotData = findCourtSlot(court, s.slotIndex);
     if (!slotData) return;
     const raw =
       slotData.venueSlotPrice != null ? slotData.venueSlotPrice : slotData.price;
-    const price = Number(raw);
-    if (!Number.isFinite(price)) return;
-    prices.push(price);
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return;
+    prices.push(roundYuan(n));
   });
   return prices;
 }
@@ -88,12 +90,12 @@ function calcCoachPayAmounts({
   } else if (pm === 'mixed') {
     deduct = Math.min(balance, need);
     if (prices.length === need && need > 0) {
-      cash = prices.slice(deduct).reduce((a, b) => a + b, 0);
+      cash = roundYuan(prices.slice(deduct).reduce((a, b) => a + roundYuan(b), 0));
     } else if (need > 0) {
       const per = total / need;
       cash = per * Math.max(0, need - deduct);
     }
-    cash = Math.round(cash * 100) / 100;
+    cash = roundYuan(cash);
   } else {
     deduct = 0;
     cash = 0;
@@ -103,12 +105,14 @@ function calcCoachPayAmounts({
   if (balance > 0 && balance < need && need > 0) {
     mixedPreviewDeduct = Math.min(balance, need);
     if (prices.length === need) {
-      mixedPreviewCash = prices.slice(mixedPreviewDeduct).reduce((a, b) => a + b, 0);
+      mixedPreviewCash = roundYuan(
+        prices.slice(mixedPreviewDeduct).reduce((a, b) => a + roundYuan(b), 0),
+      );
     } else {
       const per = total / need;
       mixedPreviewCash = per * Math.max(0, need - mixedPreviewDeduct);
     }
-    mixedPreviewCash = Math.round(mixedPreviewCash * 100) / 100;
+    mixedPreviewCash = roundYuan(mixedPreviewCash);
   }
   return {
     coachHoursDeductForPay: deduct,

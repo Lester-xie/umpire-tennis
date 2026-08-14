@@ -63,7 +63,7 @@ async function assertAndNormalizeSessionCard({
       if (!slot) {
         return { ok: false, errMsg: '次卡时段价格不匹配' };
       }
-      deductYuan += roundYuan(slot.priceYuan);
+      deductYuan = roundYuan(deductYuan + roundYuan(slot.priceYuan));
     }
     deductYuan = roundYuan(deductYuan);
   } else {

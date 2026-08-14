@@ -19,6 +19,7 @@ const { buildSlotPriceMapFromCourtList } = require('../../utils/bookingSlotPrice
 const coachPurpose = require('../../utils/coachBookingPurpose');
 const { mergeBookedSlotsAndCoachHolds } = require('../../utils/coachBookingBookedMerge');
 const { buildBookingTimeSlots, findCourtSlot } = require('../../utils/bookingTimeSlots');
+const { roundYuan } = require('../../utils/storedValuePlans');
 const { preventTouchMove } = require('../../utils/preventTouchMove');
 const { buildCoachCourts } = require('../../utils/bookingCoachSlots');
 const {
@@ -1230,7 +1231,7 @@ Page({
       const court = this.data.courts.find((c) => c.id === slot.courtId);
       const cell = findCourtSlot(court, slot.slotIndex);
       if (cell && cell.available) {
-        total += cell.price || 0;
+        total = roundYuan(total + roundYuan(cell.price));
       }
     });
 

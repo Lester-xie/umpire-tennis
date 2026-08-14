@@ -10,6 +10,7 @@ const {
   findCourtSlot,
   slotIndexToHour,
 } = require('../../utils/bookingTimeSlots');
+const { roundYuan } = require('../../utils/storedValuePlans');
 const {
   computeBookingMainContentHeightPx,
   estimateBookingHeaderHeightPx,
@@ -1238,7 +1239,7 @@ Page({
       const court = this.data.courts.find(c => c.id === slot.courtId);
       const cell = findCourtSlot(court, slot.slotIndex);
       if (cell && cell.available) {
-        total += cell.price || 0;
+        total = roundYuan(total + roundYuan(cell.price));
       }
     });
     

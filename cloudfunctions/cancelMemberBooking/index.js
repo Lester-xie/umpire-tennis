@@ -512,7 +512,9 @@ async function emitBookingRealtimeSignal({ venueId, orderDate }) {
 
 /**
  * 会员取消订场/教练课订单
- * event: { phone, bookingId }
+ * event:
+ * - { phone, bookingId } 常规取消（含退款规则）
+ * - { phone, action: 'abandonCheckout', outTradeNo } 取消微信支付后关闭待支付单
  *
  * 取消退款规则（paid）：
  * - 微信实付（totalFee>0）→ 原路微信退款
@@ -524,15 +526,61 @@ exports.main = async (event) => {
   const wxContext = cloud.getWXContext();
   const openid = wxContext.OPENID;
   const phone = String((event && event.phone) || '').trim();
-  const bookingId = String((event && event.bookingId) || '').trim();
+  const action = event && event.action != null ? String(event.action).trim() : '';
 
-  if (!openid || !phone || !bookingId) {
+  if (!openid || !phone) {
     return { ok: false, errMsg: '参数不完整' };
   }
 
   const userRes = await db.collection('db_user').where({ _openid: openid, phone }).limit(1).get();
   if (!userRes.data || userRes.data.length === 0) {
     return { ok: false, errMsg: '用户校验失败' };
+  }
+
+  // 取消微信支付：关闭仍为 pending 的订场单，不再出现在订场历史
+  if (action === 'abandonCheckout') {
+    const outTradeNo = String((event && event.outTradeNo) || '').trim();
+    if (!outTradeNo) {
+      return { ok: false, errMsg: '缺少商户订单号' };
+    }
+    const hit = await db
+      .collection('db_booking')
+      .where({ outTradeNo, phone })
+      .limit(1)
+      .get();
+    const booking = hit.data && hit.data[0];
+    if (!booking || !booking._id) {
+      return { ok: true, skipped: true };
+    }
+    const stAbandon = String(booking.status || '');
+    if (stAbandon === 'closed_unpaid' || stAbandon === 'cancelled') {
+      return { ok: true, skipped: true };
+    }
+    if (stAbandon !== 'pending' && stAbandon !== 'payment_confirming') {
+      return { ok: false, errMsg: '订单已支付或不可关闭' };
+    }
+    const nowAbandon = Date.now();
+    await db.collection('db_booking').doc(booking._id).update({
+      data: {
+        status: 'closed_unpaid',
+        closedReason: 'abandoned_checkout',
+        updatedAt: nowAbandon,
+      },
+    });
+    try {
+      await emitBookingRealtimeSignal({
+        venueId: booking.venueId,
+        orderDate: booking.orderDate,
+      });
+    } catch (e) {
+      console.error('emitBookingRealtimeSignal', e);
+    }
+    return { ok: true, closed: true };
+  }
+
+  const bookingId = String((event && event.bookingId) || '').trim();
+  if (!bookingId) {
+    return { ok: false, errMsg: '参数不完整' };
   }
 
   let booking;

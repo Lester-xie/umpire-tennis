@@ -19,7 +19,7 @@ function buildSections(balanceRows, sessionRows, venueNameById) {
     if (!byVenue[vid]) {
       byVenue[vid] = { balanceYuan: 0, remainingTimes: 0 };
     }
-    byVenue[vid].balanceYuan += balanceYuan;
+    byVenue[vid].balanceYuan = roundYuan(byVenue[vid].balanceYuan + balanceYuan);
   });
   (sessionRows || []).forEach((row) => {
     const vid = normalizeVenueId(row.venueId);

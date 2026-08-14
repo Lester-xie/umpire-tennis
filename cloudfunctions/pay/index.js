@@ -893,5 +893,5 @@ exports.main = async (event, context) => {
     }
   }
 
-  return res;
+  return Object.assign({}, res, { outTradeNo });
 };

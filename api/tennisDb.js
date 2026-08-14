@@ -242,7 +242,8 @@ function getMyBookings(options) {
 
 /**
  * 会员取消订场/教练课：首场开始前满 3 小时可取消；已付原路退微信、退课时（云函数内校验）
- * @param {{ bookingId: string }} payload
+ * event.action === 'abandonCheckout' + outTradeNo：取消微信支付后关闭待支付单（不校验开场时间）
+ * @param {{ bookingId: string } | { action: 'abandonCheckout', outTradeNo: string }} payload
  */
 function cancelMemberBooking(payload) {
   const phone = String(wx.getStorageSync('user_phone') || '').trim();
@@ -252,6 +253,14 @@ function cancelMemberBooking(payload) {
       ...(payload || {}),
       phone,
     },
+  });
+}
+
+/** 取消微信支付后关闭对应待支付订场单 */
+function abandonCheckoutPayment(payload) {
+  return cancelMemberBooking({
+    action: 'abandonCheckout',
+    outTradeNo: payload && payload.outTradeNo,
   });
 }
 
@@ -596,6 +605,7 @@ module.exports = {
   updateUserByPhone,
   getMyBookings,
   cancelMemberBooking,
+  abandonCheckoutPayment,
   listCoursePurchases,
   listMemberCourseHours,
   listAllMemberCourseHours,

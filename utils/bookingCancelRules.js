@@ -44,6 +44,7 @@ function bookingStatusLabel(status) {
   if (s === 'pending') return '待支付';
   if (s === 'payment_confirming') return '支付确认中';
   if (s === 'cancelled') return '已取消';
+  if (s === 'closed_unpaid') return '已关闭';
   if (s === 'conflict') return '异常';
   return s || '';
 }

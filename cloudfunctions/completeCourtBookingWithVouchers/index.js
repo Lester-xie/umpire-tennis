@@ -228,7 +228,7 @@ exports.main = async (event, context) => {
       return { ok: false, errMsg: '团购券与订场时段不匹配' };
     }
     usedSlotKeys.add(slotKey);
-    voucherSum += priceYuan;
+    voucherSum = roundYuan(voucherSum + priceYuan);
   }
   voucherSum = roundYuan(voucherSum);
 

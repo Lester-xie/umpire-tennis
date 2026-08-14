@@ -16,6 +16,8 @@ const {
 const { buildLessonKey, formatLessonKeyDisplay } = require('../../utils/lessonKey');
 const { lessonKeyFromTypeMapFormat, splitCourseDescriptionLines } = require('../../utils/courseCatalog');
 const { buildFlatCourtSlots } = require('../../utils/bookingVoucherMatch');
+const { findCourtSlot } = require('../../utils/bookingTimeSlots');
+const { roundYuan } = require('../../utils/storedValuePlans');
 const { preventTouchMove } = require('../../utils/preventTouchMove');
 const {
   attachPageMemberAssetRealtime,
@@ -292,7 +294,9 @@ Page({
     const requiredCourseHours = bookedSlots.length;
     const coachSlotPrices = this.computeCoachSlotPrices(bookedSlots, courts);
     if (!(totalPrice > 0) && coachSlotPrices.length > 0) {
-      totalPrice = coachSlotPrices.reduce((a, b) => a + (Number(b) || 0), 0);
+      totalPrice = roundYuan(
+        coachSlotPrices.reduce((a, b) => a + roundYuan(b), 0),
+      );
     }
     this.setData(
       {
@@ -794,14 +798,16 @@ Page({
   processCoachCourseOrderItems(selectedSlots, courts) {
     const orderMap = {};
     (selectedSlots || []).forEach((slot) => {
-      const court = courts.find((c) => c.id === slot.courtId);
+      const court = (courts || []).find((c) => Number(c.id) === Number(slot.courtId));
       if (!court) return;
-      const slotData = court.slots[slot.slotIndex];
+      // slots 按展示序从 10:00 起，须按 slotIndex 字段查找，不能当数组下标
+      const slotData = findCourtSlot(court, slot.slotIndex);
       if (!slotData) return;
       const raw =
         slotData.venueSlotPrice != null ? slotData.venueSlotPrice : slotData.price;
-      const price = Number(raw);
-      if (!Number.isFinite(price)) return;
+      const n = Number(raw);
+      if (!Number.isFinite(n)) return;
+      const price = roundYuan(n);
       const key = slot.courtId;
       if (!orderMap[key]) {
         orderMap[key] = {
@@ -817,7 +823,7 @@ Page({
         price,
       };
       orderMap[key].timeSlots.push(timeSlot);
-      orderMap[key].totalPrice += price;
+      orderMap[key].totalPrice = roundYuan(orderMap[key].totalPrice + price);
     });
     Object.keys(orderMap).forEach((key) => {
       orderMap[key].timeSlots = this.mergeTimeSlots(orderMap[key].timeSlots);
@@ -830,12 +836,14 @@ Page({
     const orderMap = {};
     
     selectedSlots.forEach(slot => {
-      const court = courts.find(c => c.id === slot.courtId);
+      const court = (courts || []).find((c) => Number(c.id) === Number(slot.courtId));
       if (!court) return;
       
-      const slotData = court.slots[slot.slotIndex];
+      // slots 按展示序从 10:00 起，须按 slotIndex 字段查找，不能当数组下标
+      const slotData = findCourtSlot(court, slot.slotIndex);
       if (!slotData || !slotData.available) return;
       
+      const price = roundYuan(slotData.price);
       const key = slot.courtId;
       if (!orderMap[key]) {
         orderMap[key] = {
@@ -850,11 +858,11 @@ Page({
       const timeSlot = {
         slotIndex: slot.slotIndex,
         time: this.getTimeSlotTime(slot.slotIndex),
-        price: slotData.price,
+        price,
       };
       
       orderMap[key].timeSlots.push(timeSlot);
-      orderMap[key].totalPrice += slotData.price;
+      orderMap[key].totalPrice = roundYuan(orderMap[key].totalPrice + price);
     });
     
     // 对每个场地的时间段进行合并处理
@@ -878,7 +886,7 @@ Page({
       endIndex: sorted[0].slotIndex,
       startTime: sorted[0].time,
       endTime: this.getTimeSlotEndTime(sorted[0].slotIndex),
-      price: sorted[0].price,
+      price: roundYuan(sorted[0].price),
       hours: 1,
     };
     
@@ -889,14 +897,14 @@ Page({
       if (current.slotIndex === currentRange.endIndex + 1) {
         currentRange.endIndex = current.slotIndex;
         currentRange.endTime = this.getTimeSlotEndTime(current.slotIndex);
-        currentRange.price += current.price;
+        currentRange.price = roundYuan(currentRange.price + roundYuan(current.price));
         currentRange.hours += 1;
       } else {
         // 不连续，保存当前范围，开始新范围
         merged.push({
           timeRange: `${currentRange.startTime}-${currentRange.endTime}`,
           hours: currentRange.hours,
-          price: currentRange.price,
+          price: roundYuan(currentRange.price),
         });
         
         currentRange = {
@@ -904,7 +912,7 @@ Page({
           endIndex: current.slotIndex,
           startTime: current.time,
           endTime: this.getTimeSlotEndTime(current.slotIndex),
-          price: current.price,
+          price: roundYuan(current.price),
           hours: 1,
         };
       }
@@ -914,7 +922,7 @@ Page({
     merged.push({
       timeRange: `${currentRange.startTime}-${currentRange.endTime}`,
       hours: currentRange.hours,
-      price: currentRange.price,
+      price: roundYuan(currentRange.price),
     });
     
     return merged;
@@ -949,7 +957,9 @@ Page({
 
   // 计算总价
   calculateTotalPrice(orderItems) {
-    return orderItems.reduce((total, item) => total + item.totalPrice, 0);
+    return roundYuan(
+      (orderItems || []).reduce((total, item) => total + roundYuan(item.totalPrice), 0),
+    );
   },
 
   onUnload() {

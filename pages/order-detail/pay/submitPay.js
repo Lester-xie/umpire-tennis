@@ -5,6 +5,7 @@ const {
   completeCoachBookingWithHours,
   completeCourtBookingWithVouchers,
   requestWechatPay,
+  abandonCheckoutPayment,
   markProfileSummaryStale,
 } = require('../../../api/tennisDb');
 const { formatLessonKeyDisplay } = require('../../../utils/lessonKey');
@@ -188,6 +189,7 @@ module.exports = Behavior({
         this.endLoading();
         const result = (res && res.result) || {};
         const payment = result.payment;
+        const outTradeNo = String(result.outTradeNo || '').trim();
         if (result.returnCode !== 'SUCCESS' || !payment) {
           console.error('unifiedOrder 失败', result);
           wx.showToast({
@@ -252,8 +254,15 @@ module.exports = Behavior({
           },
           fail: (err) => {
             console.error('pay fail', err);
+            const isCancel = !!(err && err.errMsg && String(err.errMsg).indexOf('cancel') >= 0);
+            // 用户取消支付：关闭已写入的 pending 订场单，避免残留在订场历史
+            if (isCancel && orderType === 'court' && outTradeNo) {
+              abandonCheckoutPayment({ outTradeNo }).catch((e) => {
+                console.error('abandonCheckoutPayment', e);
+              });
+            }
             wx.showToast({
-              title: err.errMsg && err.errMsg.indexOf('cancel') >= 0 ? '已取消支付' : '支付未完成',
+              title: isCancel ? '已取消支付' : '支付未完成',
               icon: 'none',
             });
           },

@@ -421,7 +421,7 @@ Page({
       const rows = (res && res.result && Array.isArray(res.result.data)) ? res.result.data : [];
       let sum = 0;
       rows.forEach((r) => {
-        sum += roundYuan(r.balanceYuan);
+        sum = roundYuan(sum + roundYuan(r.balanceYuan));
       });
       return sum;
     } catch (e) {
