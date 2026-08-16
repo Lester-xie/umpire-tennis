@@ -40,17 +40,11 @@
 
       <view class="field">
         <text class="field-label">所属场馆</text>
-        <text class="field-hint">在「场馆与场地」中维护场馆列表。</text>
-        <picker
-          wx:if="{{venueNames.length > 0}}"
-          mode="selector"
-          range="{{venueNames}}"
-          value="{{venueIndex}}"
-          bindchange="onVenuePick"
-        >
-          <view class="picker-display">{{venueNames[venueIndex]}}</view>
-        </picker>
-        <view wx:else class="muted-inline">暂无场馆数据，请先新建场馆</view>
+        <text class="field-hint">每馆一份独立课程数据；改价只影响本馆。其他馆请用「复制到本馆」。</text>
+        <view wx:if="{{venueNames.length > 0}}" class="picker-display picker-display--locked">
+          {{venueNames[venueIndex] || venueId || '未绑定'}}
+        </view>
+        <view wx:else class="muted-inline">{{venueId || '暂无场馆数据'}}</view>
       </view>
 
       <view class="field">

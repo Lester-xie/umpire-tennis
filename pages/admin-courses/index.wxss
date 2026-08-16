@@ -16,11 +16,76 @@
   padding: 24rpx 32rpx 48rpx;
 }
 
+.field {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+  border: 1rpx solid #e8ecf4;
+}
+
+.field-label {
+  display: block;
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 8rpx;
+}
+
+.field-hint {
+  display: block;
+  font-size: 22rpx;
+  color: #999;
+  line-height: 1.4;
+  margin-bottom: 16rpx;
+}
+
+.admin-pick {
+  min-height: 88rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+  background: #f4f7fb;
+  border-radius: 12rpx;
+  border: 1rpx solid #c5d0e0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-pick-text {
+  font-size: 30rpx;
+  color: #1a1a1a;
+  flex: 1;
+}
+
+.admin-pick-arrow {
+  font-size: 40rpx;
+  color: #6b778c;
+  line-height: 1;
+  margin-left: 16rpx;
+}
+
+.muted-inline {
+  font-size: 26rpx;
+  color: #999;
+}
+
+.section-title {
+  font-size: 26rpx;
+  color: #666;
+  margin: 8rpx 0 16rpx;
+}
+
+.section-title--other {
+  margin-top: 32rpx;
+  color: #999;
+}
+
 .loading-text,
 .empty {
   font-size: 28rpx;
   color: #888;
-  padding: 24rpx;
+  padding: 24rpx 8rpx;
+  line-height: 1.5;
 }
 
 .course-row {
@@ -33,8 +98,36 @@
   border: 1rpx solid #e8ecf4;
 }
 
+.course-row--other {
+  flex-direction: row;
+  align-items: center;
+  opacity: 0.92;
+  background: #fafbfd;
+}
+
+.course-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .course-row--hover {
   opacity: 0.9;
+}
+
+.copy-btn {
+  flex-shrink: 0;
+  margin-left: 16rpx;
+  padding: 12rpx 20rpx;
+  font-size: 24rpx;
+  color: #2f5bff;
+  background: #eef2ff;
+  border-radius: 10rpx;
+}
+
+.copy-btn--hover {
+  opacity: 0.85;
 }
 
 .course-name {

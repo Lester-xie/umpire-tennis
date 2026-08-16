@@ -7,7 +7,7 @@ const MAP_CENTER_LAT = 26.5889;
 const MAP_CENTER_LON = 106.7153;
 const MAP_SCALE = 16;
 
-const { getVenues } = require('../../api/tennisDb');
+const { getVenues, normalizeVenueDoc } = require('../../api/tennisDb');
 const { venueIdLooseEqual } = require('../../utils/venueId');
 
 Page({
@@ -221,24 +221,8 @@ Page({
   async loadVenues() {
     const res = await getVenues();
     const docs = res && res.data ? res.data : [];
-
-    return docs.map((v, idx) => {
-      const id = v.id || v.venueId || v._id || String(v._id || idx);
-      const image =
-        v.image ||
-        (idx % 2 === 0 ? '/assets/images/court1.jpg' : '/assets/images/court2.jpg');
-
-      return {
-        id,
-        name: v.name || '',
-        address: v.address || '',
-        latitude: v.latitude,
-        longitude: v.longitude,
-        image,
-        // 场地列表：name + priceList（14 格存储，0=8:00；管理端/会员可预约均为 10:00–22:00）
-        courtList: Array.isArray(v.courtList) ? v.courtList : [],
-      };
-    });
+    // 与 normalizeVenueDoc 对齐，保留公告/分类等字段，避免切馆后首页丢公告
+    return docs.map((v, idx) => normalizeVenueDoc(v, idx)).filter(Boolean);
   },
 
   beginLoading(title) {

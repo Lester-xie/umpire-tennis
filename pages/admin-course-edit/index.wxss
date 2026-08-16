@@ -78,6 +78,12 @@
   border: 1rpx solid #dce8e0;
 }
 
+.picker-display--locked {
+  color: #333;
+  background: #f0f2f5;
+  border-color: #e0e4ea;
+}
+
 .muted-inline {
   font-size: 26rpx;
   color: #999;

@@ -38,12 +38,12 @@ function isMultiHourBallMachineTitle(title) {
   return /(?:1[02]|十二|十)\s*小时|十小时发球机|12\s*小时|10\s*小时/i.test(t);
 }
 
-/** 1 小时发球机券：需管理员协助验券 */
+/** 1 小时发球机券（含「60分钟」等价表述） */
 function isBallMachine1HourVoucher(title) {
   const t = String(title || '').trim();
   if (!isBallMachineTitle(t)) return false;
   if (isMultiHourBallMachineTitle(t)) return false;
-  if (/(?:^|[^0-9])1\s*小时|1\s*h\b|1H|一小时/i.test(t)) return true;
+  if (/(?:^|[^0-9])1\s*小时|1\s*h\b|1H|一小时|60\s*分钟|六十分钟/i.test(t)) return true;
   return parseHoursFromTitle(t) === 1;
 }
 
@@ -65,6 +65,8 @@ function parseHoursFromTitle(title) {
   if (/十小时.*(?:赠|送).*(?:两|2)\s*小时|10\s*小时.*(?:赠|送)/i.test(t)) return 12;
   if (/十二\s*小时|12\s*小时/i.test(t)) return 12;
   if (/十\s*小时|10\s*小时/i.test(t)) return 10;
+  // 60 分钟 = 1 小时（团购标题常见写法）
+  if (/60\s*分钟|六十分钟/i.test(t)) return 1;
   const zhMatch = t.match(/([一二三四五六七八九十两]+)\s*小时/);
   if (zhMatch) {
     const n = parseChineseNumber(zhMatch[1]);

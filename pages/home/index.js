@@ -41,6 +41,10 @@ Page({
 
   onShow() {
     this.syncVenueAnnouncement();
+    // 切馆后本地缓存可能缺公告字段：补拉一次云端场馆
+    refreshSelectedVenueFromCloud()
+      .then(() => this.syncVenueAnnouncement())
+      .catch(() => {});
   },
 
   /** 分享落地：切换到分享链接中的场馆 */

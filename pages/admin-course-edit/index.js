@@ -1,4 +1,4 @@
-const { adminUpdateCourse, invalidateCourseCache, getVenues } = require('../../api/tennisDb');
+const { adminUpdateCourse, invalidateCourseCache, adminVenue } = require('../../api/tennisDb');
 const { venueIdLooseEqual, normalizeVenueId } = require('../../utils/venueId');
 const { typeMapToRows, rowsToTypeMap, defaultTypeMapRows } = require('../../utils/adminTypeMap');
 const { courseImageSource } = require('../../utils/courseCatalog');
@@ -18,13 +18,23 @@ Page({
     venueOptions: [],
     venueNames: [],
     venueIndex: 0,
+    venueLocked: false,
+    lockVenueId: '',
     typeMapRows: defaultTypeMapRows(),
   },
 
   onLoad(options) {
     const id = options && options.id != null ? String(options.id).trim() : '';
+    const lockVenueId =
+      options && options.venueId != null ? normalizeVenueId(decodeURIComponent(String(options.venueId))) : '';
     this._courseId = id;
-    this.setData({ courseId: id });
+    this._lockVenueId = lockVenueId;
+    // 每馆独立课程：编辑页固定所属场馆，禁止改绑
+    this.setData({
+      courseId: id,
+      venueLocked: true,
+      lockVenueId,
+    });
     if (!id) {
       this.setData({ loading: false });
       wx.showToast({ title: '缺少课程 ID', icon: 'none' });
@@ -56,8 +66,9 @@ Page({
 
   async refreshVenuePicker(selectedVenueId) {
     try {
-      const res = await getVenues();
-      const docs = (res && res.data) || [];
+      const cloudRes = await adminVenue({ action: 'list' });
+      const r = (cloudRes && cloudRes.result) || {};
+      const docs = r.ok ? r.data || [] : [];
       let venueOptions = docs
         .map((d) => ({
           id: d._id != null ? String(d._id) : '',
@@ -112,7 +123,16 @@ Page({
         typeMapRows,
       });
       await this.refreshCourseCoverDisplay();
-      await this.refreshVenuePicker(d.venueId);
+      // 始终展示并锁定课程自身 venueId（不改绑）
+      const preferredVenue = d.venueId != null ? String(d.venueId) : d.venue != null ? String(d.venue) : '';
+      await this.refreshVenuePicker(preferredVenue);
+      this.setData({
+        venueId: preferredVenue,
+        venueLocked: true,
+      });
+      if (this._lockVenueId && preferredVenue && !venueIdLooseEqual(this._lockVenueId, preferredVenue)) {
+        wx.showToast({ title: '该课属其他场馆，请回列表「复制到本馆」', icon: 'none', duration: 2800 });
+      }
     } catch (e) {
       console.error(e);
       this.setData({ loading: false });
@@ -237,6 +257,11 @@ Page({
     }
 
     const imgStr = String(this.data.image || '').trim();
+    const venueId = normalizeVenueId(this.data.venueId);
+    if (!venueId) {
+      wx.showToast({ title: '课程未绑定场馆', icon: 'none' });
+      return;
+    }
 
     wx.showLoading({ title: '保存中', mask: true });
     try {
@@ -245,7 +270,7 @@ Page({
         patch: {
           name: this.data.name,
           description: this.data.description,
-          venueId: normalizeVenueId(this.data.venueId),
+          venueId,
           typeMap,
           image: imgStr,
           picture: imgStr,

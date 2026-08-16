@@ -3,17 +3,59 @@
     <header showBackButton="{{true}}" title="课程列表" />
   </view>
   <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
-    <view wx:if="{{loading}}" class="loading-text">加载中…</view>
-    <block wx:for="{{courses}}" wx:key="_id">
-      <navigator
-        url="/pages/admin-course-edit/index?id={{item._id}}"
-        class="course-row"
-        hover-class="course-row--hover"
+    <view class="field">
+      <text class="field-label">场馆</text>
+      <text class="field-hint">每个场馆课程与价格独立。先选场馆，再编辑本馆课程；其他馆课程可「复制到本馆」。</text>
+      <picker
+        wx:if="{{venueNames.length > 0}}"
+        mode="selector"
+        range="{{venueNames}}"
+        value="{{venueIndex}}"
+        bindchange="onVenuePick"
       >
-        <text class="course-name">{{item.name || '未命名'}}</text>
-        <text class="course-id mono">{{item._id}}</text>
-      </navigator>
+        <view class="admin-pick">
+          <text class="admin-pick-text">{{selectedVenueName || '请选择场馆'}}</text>
+          <text class="admin-pick-arrow">›</text>
+        </view>
+      </picker>
+      <view wx:elif="{{!venueLoading}}" class="muted-inline">暂无场馆，请先在「场馆与场地」中新建</view>
+      <view wx:else class="muted-inline">场馆加载中…</view>
+    </view>
+
+    <view wx:if="{{loading}}" class="loading-text">加载中…</view>
+    <block wx:elif="{{selectedVenueId}}">
+      <view class="section-title">{{selectedVenueName}} · 本馆课程</view>
+      <block wx:for="{{courses}}" wx:key="_id">
+        <view
+          class="course-row"
+          hover-class="course-row--hover"
+          data-id="{{item._id}}"
+          bindtap="onOpenCourse"
+        >
+          <text class="course-name">{{item.name || '未命名'}}</text>
+          <text class="course-id mono">{{item._id}}</text>
+        </view>
+      </block>
+      <view wx:if="{{courses.length === 0}}" class="empty">本馆暂无课程。可在下方将其他馆课程「复制到本馆」后单独改价。</view>
+
+      <block wx:if="{{otherCourses.length > 0}}">
+        <view class="section-title section-title--other">其他场馆课程（模板）</view>
+        <block wx:for="{{otherCourses}}" wx:key="_id">
+          <view class="course-row course-row--other">
+            <view class="course-row-main">
+              <text class="course-name">{{item.name || '未命名'}}</text>
+              <text class="course-id mono">{{item._id}}</text>
+            </view>
+            <view
+              class="copy-btn"
+              hover-class="copy-btn--hover"
+              data-id="{{item._id}}"
+              catchtap="onCopyToVenue"
+            >复制到本馆</view>
+          </view>
+        </block>
+      </block>
     </block>
-    <view wx:if="{{!loading && courses.length === 0}}" class="empty">暂无课程数据</view>
+    <view wx:elif="{{!loading && !venueLoading}}" class="empty">请先选择场馆</view>
   </scroll-view>
 </view>

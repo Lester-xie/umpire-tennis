@@ -596,6 +596,7 @@ function adminVenue(payload) {
 module.exports = {
   DEFAULT_USER_AVATAR,
   getVenues,
+  normalizeVenueDoc,
   refreshSelectedVenueFromCloud,
   getCourses,
   invalidateCourseCache,
