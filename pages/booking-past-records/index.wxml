@@ -1,0 +1,29 @@
+<view class="page">
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="订场记录" />
+  </view>
+  <view class="body" style="padding-top: {{headerHeight}}px;">
+    <view class="meta">
+      <text class="meta-date">{{titleDate}}</text>
+      <text class="meta-filter" wx:if="{{filterLabel}}">{{filterLabel}}</text>
+    </view>
+
+    <view wx:if="{{loading}}" class="empty">加载中…</view>
+    <block wx:elif="{{records.length > 0}}">
+      <view class="card" wx:for="{{records}}" wx:key="_id">
+        <view class="card-top">
+          <text class="card-name">{{item.memberLabel}}</text>
+          <text class="card-price">¥ {{item.totalPrice}}</text>
+        </view>
+        <text class="card-phone" wx:if="{{item.phoneLabel}}">{{item.phoneLabel}}</text>
+        <text class="card-summary">{{item.displaySummary}}</text>
+        <view class="card-tags">
+          <text class="tag" wx:if="{{item.statusLabel}}">{{item.statusLabel}}</text>
+          <text class="tag" wx:if="{{item.subtypeLabel}}">{{item.subtypeLabel}}</text>
+          <text class="tag" wx:if="{{item.coachCapacityLabel}}">{{item.coachCapacityLabel}}</text>
+        </view>
+      </view>
+    </block>
+    <view wx:else class="empty">该时段暂无订场记录</view>
+  </view>
+</view>

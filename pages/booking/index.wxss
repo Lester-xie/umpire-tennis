@@ -240,7 +240,7 @@
 .court-slots--stacked {
   position: relative;
   width: 180rpx;
-  min-height: 1792rpx;
+  min-height: 1600rpx;
 }
 
 .court-slots--stacked .time-slot-cell {
@@ -318,6 +318,12 @@
 }
 .time-slot-cell.slot-past .slot-booked {
   color: #BDBDBD;
+}
+.time-slot-cell.slot-staff-inspect {
+  border: 2rpx dashed #90a4ae;
+}
+.time-slot-cell.slot-staff-inspect .slot-booked {
+  color: #546e7a;
 }
 
 .time-slot-cell.slot-coach-hold {

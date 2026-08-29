@@ -240,6 +240,15 @@ function getMyBookings(options) {
   });
 }
 
+/** 管理员/教练：按场馆+日期查看订场记录（可回溯 3 天） */
+function listVenueBookingsByDate(payload) {
+  return wx.cloud.callFunction({
+    name: 'listVenueBookingsByDate',
+    data: payload || {},
+    config: { timeout: 60000 },
+  });
+}
+
 /**
  * 会员取消订场/教练课：首场开始前满 3 小时可取消；已付原路退微信、退课时（云函数内校验）
  * event.action === 'abandonCheckout' + outTradeNo：取消微信支付后关闭待支付单（不校验开场时间）
@@ -605,6 +614,7 @@ module.exports = {
   decryptPhoneNumber,
   updateUserByPhone,
   getMyBookings,
+  listVenueBookingsByDate,
   cancelMemberBooking,
   abandonCheckoutPayment,
   listCoursePurchases,

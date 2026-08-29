@@ -230,7 +230,7 @@
 .court-slots--stacked {
   position: relative;
   width: 180rpx;
-  min-height: 1792rpx;
+  min-height: 1600rpx;
 }
 
 .court-slots--stacked .time-slot-cell {

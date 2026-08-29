@@ -4,6 +4,7 @@
     "pages/location/index",
     "pages/home/index",
     "pages/booking/index",
+    "pages/booking-past-records/index",
     "pages/order-detail/index",
     "pages/coach-session-detail/index",
     "pages/booking-success/index",

@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "订场记录",
+  "usingComponents": {
+    "header": "/components/header/header"
+  }
+}

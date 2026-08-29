@@ -1,0 +1,106 @@
+.page {
+  min-height: 100vh;
+  background: #f7f9ff;
+  overflow: hidden;
+}
+
+.header-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 0 32rpx;
+  box-sizing: border-box;
+}
+
+.body {
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+  padding-bottom: 48rpx;
+  box-sizing: border-box;
+}
+
+.meta {
+  margin-bottom: 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.meta-date {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #134e35;
+}
+
+.meta-filter {
+  font-size: 26rpx;
+  color: #666;
+}
+
+.card {
+  background: #fff;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  margin-bottom: 16rpx;
+  border: 1rpx solid #e8ecf4;
+}
+
+.card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
+.card-name {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #1a1a1a;
+  flex: 1;
+  min-width: 0;
+}
+
+.card-price {
+  font-size: 28rpx;
+  color: #134e35;
+  font-weight: 600;
+}
+
+.card-phone {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #888;
+}
+
+.card-summary {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: #444;
+  line-height: 1.45;
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: 14rpx;
+}
+
+.tag {
+  font-size: 22rpx;
+  color: #666;
+  background: #f0f3f8;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.empty {
+  padding: 48rpx 16rpx;
+  text-align: center;
+  font-size: 28rpx;
+  color: #888;
+}

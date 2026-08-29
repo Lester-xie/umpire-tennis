@@ -61,6 +61,8 @@ Page({
     selectedVenueId: '', // 当前选定的球场 id
     priceLoading: false, // 加载价格规则状态
     isVipUser: false, // db_user.isVip，用于 VIP 时段价与周末价规则
+    /** 管理员/教练：可看过去 3 天订场记录 */
+    isStaffView: false,
   },
   
   // 动画定时器
@@ -192,6 +194,7 @@ Page({
 
     this._realtimeWatchFailCount = 0;
     this._realtimeWatchLoggedNoise = false;
+    this.refreshStaffViewFlag();
 
     if (!this._initialLoadFinished) {
       return;
@@ -333,6 +336,7 @@ Page({
     this.initLoadingAnimation();
     this._initialLoadFinished = true;
     // 首次进入：页面先渲染，再进行异步加载并显示 loading
+    this.refreshStaffViewFlag();
     this.loadSlotPricesAndRender();
   },
   
@@ -413,10 +417,40 @@ Page({
     try {
       const res = await getUserByPhone(phone);
       const user = res && res.data && res.data[0];
+      const isStaff = !!(user && (user.isManager || user.isCoach));
+      if (isStaff !== this.data.isStaffView) {
+        this.setData({ isStaffView: isStaff });
+        this.generateDateList();
+      } else if (isStaff) {
+        this.setData({ isStaffView: true });
+      }
       return !!(user && user.isVip);
     } catch (e) {
       console.warn('fetchVipFlag booking', e);
       return false;
+    }
+  },
+
+  /** 登录态下尽早识别管理员/教练，以便日期条回溯 3 天 */
+  async refreshStaffViewFlag() {
+    const phone = String(wx.getStorageSync('user_phone') || '').trim();
+    if (!phone) {
+      if (this.data.isStaffView) {
+        this.setData({ isStaffView: false });
+        this.generateDateList();
+      }
+      return;
+    }
+    try {
+      const res = await getUserByPhone(phone);
+      const user = res && res.data && res.data[0];
+      const isStaff = !!(user && (user.isManager || user.isCoach));
+      if (isStaff !== !!this.data.isStaffView) {
+        this.setData({ isStaffView: isStaff });
+        this.generateDateList();
+      }
+    } catch (e) {
+      console.warn('refreshStaffViewFlag', e);
     }
   },
 
@@ -789,7 +823,12 @@ Page({
   },
   
   generateDateList() {
-    const { dateList, defaultSelectedDate } = buildBookingDateList(60, this.data.selectedDate);
+    const lookback = this.data.isStaffView ? 3 : 0;
+    const { dateList, defaultSelectedDate } = buildBookingDateList(
+      60,
+      this.data.selectedDate,
+      lookback
+    );
     const patch = { dateList };
     if (!this.data.selectedDate && defaultSelectedDate) {
       patch.selectedDate = defaultSelectedDate;
@@ -802,9 +841,19 @@ Page({
     const { datestr } = e.currentTarget.dataset;
     if (!datestr) return;
 
+    const todayStr = getTodayDateStr();
+    // 非员工不可选过去日期；员工可选近 3 天但不可下单
+    if (datestr < todayStr && !this.data.isStaffView) {
+      return;
+    }
+
     if (this.rippleTimer) {
       clearTimeout(this.rippleTimer);
       this.rippleTimer = null;
+    }
+
+    if (datestr < todayStr) {
+      this.resetSelectedSlots();
     }
 
     this.updateSlotsAvailability(datestr);
@@ -823,6 +872,31 @@ Page({
         setTimeout(playRipple, 16);
       }
     });
+  },
+
+  /** 管理员/教练：点击已过去时段，查看该格订场记录 */
+  handlePastSlotInspect(e) {
+    if (!this.data.isStaffView) return;
+    const { courtid, slotindex } = e.currentTarget.dataset;
+    const venueId = this.data.selectedVenueId;
+    const orderDate = this.data.selectedDate;
+    if (!venueId || !orderDate || courtid == null || slotindex === undefined) return;
+    const courtId = encodeURIComponent(String(courtid));
+    const slotIndex = encodeURIComponent(String(slotindex));
+    wx.navigateTo({
+      url:
+        `/pages/booking-past-records/index?venueId=${encodeURIComponent(venueId)}` +
+        `&orderDate=${encodeURIComponent(orderDate)}` +
+        `&courtId=${courtId}&slotIndex=${slotIndex}`,
+    });
+  },
+
+  handleUnavailableSlotTap(e) {
+    const ds = e.currentTarget.dataset || {};
+    const isPast = ds.past === 1 || ds.past === '1';
+    const isCoach = ds.coach === 1 || ds.coach === '1';
+    if (!this.data.isStaffView || !isPast || isCoach) return;
+    this.handlePastSlotInspect(e);
   },
   
   // 生成时间段和场地数据（可选传入日期，避免与 data 不同步）
@@ -1251,6 +1325,15 @@ Page({
     if (this.data.selectedSlots.length === 0) {
       wx.showToast({
         title: '请选择时间段',
+        icon: 'none',
+      });
+      return;
+    }
+
+    const todayStr = getTodayDateStr();
+    if (this.data.selectedDate && this.data.selectedDate < todayStr) {
+      wx.showToast({
+        title: '过去日期仅可查看记录',
         icon: 'none',
       });
       return;
