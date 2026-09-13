@@ -874,7 +874,7 @@ Page({
     });
   },
 
-  /** 管理员/教练：点击已过去时段，查看该格订场记录 */
+  /** 管理员/教练：点击已订或已过去时段，查看该格订场记录（含未来已订） */
   handlePastSlotInspect(e) {
     if (!this.data.isStaffView) return;
     const { courtid, slotindex } = e.currentTarget.dataset;
@@ -892,11 +892,16 @@ Page({
   },
 
   handleUnavailableSlotTap(e) {
+    if (!this.data.isStaffView) return;
     const ds = e.currentTarget.dataset || {};
-    const isPast = ds.past === 1 || ds.past === '1';
     const isCoach = ds.coach === 1 || ds.coach === '1';
-    if (!this.data.isStaffView || !isPast || isCoach) return;
-    this.handlePastSlotInspect(e);
+    const isVenueLock = ds.venuelock === 1 || ds.venuelock === '1';
+    if (isCoach || isVenueLock) return;
+    const isPast = ds.past === 1 || ds.past === '1';
+    const isBooked = ds.booked === 1 || ds.booked === '1';
+    if (isBooked || isPast) {
+      this.handlePastSlotInspect(e);
+    }
   },
   
   // 生成时间段和场地数据（可选传入日期，避免与 data 不同步）

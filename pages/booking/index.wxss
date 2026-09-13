@@ -326,6 +326,24 @@
   color: #546e7a;
 }
 
+.time-slot-cell.slot-venue-lock {
+  background-color: #eceff1;
+}
+.time-slot-cell.slot-venue-lock .slot-booked {
+  color: #78909c;
+}
+
+.time-slot-cell.slot-booking-inspect {
+  background-color: #fff3e0;
+  border: 2rpx dashed #ffb74d;
+}
+.time-slot-cell.slot-past.slot-booking-inspect {
+  background-color: #fff3e0;
+}
+.time-slot-cell.slot-booking-inspect .slot-booked {
+  color: #e65100;
+}
+
 .time-slot-cell.slot-coach-hold {
   background-color: #e8f5e9;
   border: 2rpx solid #81c784;
