@@ -62,7 +62,14 @@ async function buildVenueNameMap() {
   return map;
 }
 
-async function buildUserNameMap(phones) {
+/** 管理员优先于教练；普通会员无标签 */
+function resolveRoleTag(u) {
+  if (u && u.isManager) return '管理员';
+  if (u && u.isCoach) return '教练';
+  return '';
+}
+
+async function buildUserInfoMap(phones) {
   const unique = [...new Set(phones.map((p) => String(p || '').trim()).filter((p) => /^1\d{10}$/.test(p)))];
   const map = {};
   for (let i = 0; i < unique.length; i += IN_BATCH) {
@@ -76,7 +83,10 @@ async function buildUserNameMap(phones) {
       const phone = u.phone != null ? String(u.phone).trim() : '';
       if (!phone) return;
       const name = u.name != null ? String(u.name).trim() : '';
-      map[phone] = name;
+      map[phone] = {
+        name,
+        roleTag: resolveRoleTag(u),
+      };
     });
   }
   return map;
@@ -154,15 +164,18 @@ exports.main = async (event) => {
         .filter((r) => r.phone && r.remaining > 0);
     }
 
-    const userNameMap = await buildUserNameMap(list.map((r) => r.phone));
+    const userInfoMap = await buildUserInfoMap(list.map((r) => r.phone));
 
     const data = list
       .map((r) => {
-        const name = userNameMap[r.phone] || '';
+        const info = userInfoMap[r.phone] || {};
+        const name = info.name || '';
+        const roleTag = info.roleTag || '';
         const venueName = venueNameMap[r.venueId] || r.venueId || '未知场馆';
         return {
           ...r,
           name,
+          roleTag,
           displayName: name || r.phone,
           venueName,
         };

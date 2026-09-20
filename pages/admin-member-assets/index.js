@@ -188,11 +188,13 @@ Page({
     const name = row.name != null ? String(row.name).trim() : '';
     const displayName = String(row.displayName || name || phone || '会员').trim();
     const venueName = String(row.venueName || row.venueId || '未知场馆').trim();
+    const roleTag = String(row.roleTag || '').trim();
     const base = {
       key: `${type}-${phone}-${row.venueId || ''}-${row.lessonKey || ''}-${index}`,
       phone,
       displayName,
       venueName,
+      roleTag,
     };
     if (type === 'balance') {
       const balanceYuan = Number(row.balanceYuan);

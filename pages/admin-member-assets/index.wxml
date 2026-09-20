@@ -42,7 +42,13 @@
           bindtap="onTapRow"
         >
           <view class="asset-row-main">
-            <text class="asset-name">{{item.displayName}}</text>
+            <view class="asset-name-row">
+              <text class="asset-name">{{item.displayName}}</text>
+              <text
+                wx:if="{{item.roleTag}}"
+                class="asset-role-tag {{item.roleTag === '管理员' ? 'asset-role-tag--admin' : 'asset-role-tag--coach'}}"
+              >{{item.roleTag}}</text>
+            </view>
             <text class="asset-phone">{{item.phone}}</text>
             <text class="asset-venue">{{item.venueName}}</text>
             <text wx:if="{{item.lessonLabel}}" class="asset-lesson">{{item.lessonLabel}}</text>
