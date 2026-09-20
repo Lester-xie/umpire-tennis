@@ -1,0 +1,59 @@
+<view class="admin-sub-page">
+  <view class="header-wrapper">
+    <header showBackButton="{{true}}" title="会员资产查询" />
+  </view>
+  <scroll-view class="admin-scroll" scroll-y="true" style="height: {{scrollHeight}}px;">
+    <view class="tabs">
+      <view
+        wx:for="{{tabLabels}}"
+        wx:key="*this"
+        class="tab {{activeTab === index ? 'tab--active' : ''}}"
+        data-index="{{index}}"
+        bindtap="onTabTap"
+      >{{item}}</view>
+    </view>
+
+    <view class="field">
+      <text class="field-label">场馆筛选</text>
+      <picker
+        wx:if="{{venueNames.length > 0}}"
+        mode="selector"
+        range="{{venueNames}}"
+        value="{{venueIndex}}"
+        bindchange="onVenuePick"
+      >
+        <view class="admin-pick">
+          <text class="admin-pick-text">{{selectedVenueName}}</text>
+          <text class="admin-pick-arrow">›</text>
+        </view>
+      </picker>
+    </view>
+
+    <view wx:if="{{loading}}" class="empty-hint">加载中…</view>
+    <block wx:else>
+      <text wx:if="{{summaryText}}" class="section-sub">{{summaryText}}</text>
+      <block wx:if="{{list.length > 0}}">
+        <view
+          wx:for="{{list}}"
+          wx:key="key"
+          class="asset-row"
+          hover-class="asset-row--hover"
+          data-phone="{{item.phone}}"
+          bindtap="onTapRow"
+        >
+          <view class="asset-row-main">
+            <text class="asset-name">{{item.displayName}}</text>
+            <text class="asset-phone">{{item.phone}}</text>
+            <text class="asset-venue">{{item.venueName}}</text>
+            <text wx:if="{{item.lessonLabel}}" class="asset-lesson">{{item.lessonLabel}}</text>
+          </view>
+          <view class="asset-value">
+            <text class="asset-value-num">{{item.valueLabel}}</text>
+            <text class="asset-value-hint">{{item.valueHint}}</text>
+          </view>
+        </view>
+      </block>
+      <view wx:else class="empty-hint">{{emptyHint}}</view>
+    </block>
+  </scroll-view>
+</view>

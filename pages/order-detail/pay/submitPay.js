@@ -294,7 +294,9 @@ module.exports = Behavior({
         orderItems: this.data.orderItems,
         bookedSlots: this.data.bookedSlots || [],
         totalPrice: this.data.totalPrice,
+        // 团购券匹配用普通价；次卡抵扣金额用订单展示价（含 VIP）
         slotPrices: this.data.courtSlotPrices || [],
+        orderSlotPrices: this.data.courtOrderSlotPrices || [],
       };
       this.beginLoading('提交中...');
       try {

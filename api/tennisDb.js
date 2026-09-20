@@ -480,6 +480,17 @@ function adminGetUserMemberAssets(payload) {
   });
 }
 
+/**
+ * 管理员：列出仍有剩余的会员资产
+ * payload: { type: 'balance' | 'session_card' | 'course_hours', venueId?: string }
+ */
+function adminListMemberAssets(payload) {
+  return wx.cloud.callFunction({
+    name: 'adminListMemberAssets',
+    data: payload || {},
+  });
+}
+
 /** 管理员：保存用户储值余额与课时 */
 function adminSetUserMemberAssets(payload) {
   return wx.cloud.callFunction({
@@ -638,6 +649,7 @@ module.exports = {
   adminGetUserByPhone,
   adminListCoaches,
   adminGetUserMemberAssets,
+  adminListMemberAssets,
   adminSetUserMemberAssets,
   adminUpdateCourse,
   adminCoachHoldForCoach,

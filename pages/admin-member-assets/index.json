@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "会员资产查询",
+  "usingComponents": {
+    "header": "/components/header/header"
+  }
+}

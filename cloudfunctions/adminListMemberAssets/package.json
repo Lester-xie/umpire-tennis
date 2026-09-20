@@ -1,0 +1,9 @@
+{
+  "name": "adminListMemberAssets",
+  "version": "1.0.0",
+  "description": "管理员列出有余额/次卡/课时剩余的会员",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~3.0.4"
+  }
+}

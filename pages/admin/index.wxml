@@ -20,6 +20,10 @@
         <text class="admin-card-title">教练管理</text>
         <text class="admin-card-desc">查看教练列表及各教练按月课量统计</text>
       </navigator>
+      <navigator url="/pages/admin-member-assets/index" class="admin-card" hover-class="admin-card--hover">
+        <text class="admin-card-title">会员资产查询</text>
+        <text class="admin-card-desc">查看余额、次卡、课时仍有剩余的用户</text>
+      </navigator>
     </view>
     <view class="admin-footer-space"></view>
   </scroll-view>

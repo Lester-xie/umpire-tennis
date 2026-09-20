@@ -172,6 +172,13 @@ exports.main = async (event, context) => {
     return { ok: false, errMsg: '团购券数量不能超过预订小时数' };
   }
 
+  // 次卡抵扣金额优先按订单展示价（含 VIP）重算；团购券仍用 slotPrices 普通价匹配
+  const orderSlotPrices = Array.isArray(snapshot.orderSlotPrices)
+    ? snapshot.orderSlotPrices
+    : [];
+  const sessionPriceList =
+    orderSlotPrices.length === bookedSlots.length ? orderSlotPrices : slotPrices;
+
   const mcGate = await assertAndNormalizeMonthCardFree({
     db,
     _,
@@ -182,7 +189,7 @@ exports.main = async (event, context) => {
   });
   if (!mcGate.ok) return mcGate;
   const monthCardFree = mcGate.monthCardFree;
-  const monthCardDeductYuan = monthCardFree ? roundYuan(monthCardFree.deductYuan) : 0;
+  let monthCardDeductYuan = monthCardFree ? roundYuan(monthCardFree.deductYuan) : 0;
   const monthCardFreeSlotKey = monthCardFree ? monthCardFree.slotKey : '';
 
   const scGate = await assertAndNormalizeSessionCard({
@@ -193,13 +200,13 @@ exports.main = async (event, context) => {
     vouchers,
     monthCardFreeSlotKey,
     sessionCard: event && event.sessionCard,
-    slotPrices,
+    slotPrices: sessionPriceList,
   });
   if (!scGate.ok) return scGate;
   const sessionCard = scGate.sessionCard;
   const sessionCardDeductTimes = sessionCard ? sessionCard.deductTimes : 0;
   const sessionCardSlotKeys = sessionCard ? sessionCard.slotKeys : [];
-  const sessionCardDeductYuan = sessionCard ? roundYuan(sessionCard.deductYuan) : 0;
+  let sessionCardDeductYuan = sessionCard ? roundYuan(sessionCard.deductYuan) : 0;
 
   if (
     !vouchers.length &&
@@ -244,15 +251,16 @@ exports.main = async (event, context) => {
     }
   }
 
-  const cashAfterVoucher = roundYuan(totalPrice - voucherSum);
+  const cashAfterVoucher = roundYuan(Math.max(0, totalPrice - voucherSum));
+  // 与前端 recalcCourtPlainPayment 一致：月卡/次卡金额不超过剩余应付（VIP 总价 vs 普通价券面值时尤需）
+  if (monthCardFree) {
+    monthCardDeductYuan = roundYuan(Math.min(monthCardDeductYuan, cashAfterVoucher));
+  }
   const cashAfterMonthCard = roundYuan(Math.max(0, cashAfterVoucher - monthCardDeductYuan));
-  if (monthCardDeductYuan > cashAfterVoucher + 0.011) {
-    return { ok: false, errMsg: '月卡抵扣金额超出应付' };
+  if (sessionCardDeductTimes > 0) {
+    sessionCardDeductYuan = roundYuan(Math.min(sessionCardDeductYuan, cashAfterMonthCard));
   }
   const cashAfterSession = roundYuan(Math.max(0, cashAfterMonthCard - sessionCardDeductYuan));
-  if (sessionCardDeductYuan > cashAfterMonthCard + 0.011) {
-    return { ok: false, errMsg: '次卡抵扣金额超出应付' };
-  }
   if (storedBalanceDeductYuan > cashAfterSession + 0.011) {
     return { ok: false, errMsg: '储值抵扣金额超出应付' };
   }

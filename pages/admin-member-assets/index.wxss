@@ -1,0 +1,170 @@
+.admin-sub-page {
+  min-height: 100vh;
+  background: #f7f9ff;
+}
+
+.header-wrapper {
+  position: relative;
+  z-index: 2;
+  padding-left: 32rpx;
+  padding-right: 32rpx;
+  box-sizing: border-box;
+}
+
+.admin-scroll {
+  box-sizing: border-box;
+  padding: 24rpx 32rpx 48rpx;
+}
+
+.tabs {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 24rpx;
+}
+
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 20rpx 8rpx;
+  font-size: 26rpx;
+  color: #666;
+  background: #fff;
+  border-radius: 14rpx;
+  border: 2rpx solid #e8ecf4;
+  box-sizing: border-box;
+}
+
+.tab--active {
+  color: #134e35;
+  font-weight: 600;
+  background: #eef6f1;
+  border-color: rgba(19, 78, 53, 0.35);
+}
+
+.field {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+  border: 1rpx solid #e8ecf4;
+}
+
+.field-label {
+  display: block;
+  font-size: 26rpx;
+  color: #666;
+  margin-bottom: 12rpx;
+}
+
+.admin-pick {
+  min-height: 88rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+  background: #f4f7fb;
+  border-radius: 12rpx;
+  border: 1rpx solid #c5d0e0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-pick-text {
+  font-size: 30rpx;
+  color: #1a1a1a;
+  flex: 1;
+}
+
+.admin-pick-arrow {
+  font-size: 40rpx;
+  color: #6b778c;
+  line-height: 1;
+  margin-left: 16rpx;
+}
+
+.section-sub {
+  display: block;
+  font-size: 24rpx;
+  color: #888;
+  line-height: 1.45;
+  margin-bottom: 20rpx;
+}
+
+.asset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 28rpx 24rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  border: 1rpx solid #e8ecf4;
+  margin-bottom: 16rpx;
+}
+
+.asset-row--hover {
+  opacity: 0.92;
+}
+
+.asset-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.asset-name {
+  font-size: 32rpx;
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+.asset-phone {
+  font-size: 26rpx;
+  color: #666;
+  font-family: ui-monospace, monospace;
+}
+
+.asset-venue {
+  font-size: 24rpx;
+  color: #888;
+}
+
+.asset-lesson {
+  align-self: flex-start;
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #134e35;
+  background: #eef6f1;
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+}
+
+.asset-value {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6rpx;
+  max-width: 220rpx;
+}
+
+.asset-value-num {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #134e35;
+}
+
+.asset-value-hint {
+  font-size: 22rpx;
+  color: #999;
+  text-align: right;
+}
+
+.empty-hint {
+  font-size: 28rpx;
+  color: #888;
+  padding: 48rpx 16rpx;
+  text-align: center;
+  line-height: 1.5;
+}

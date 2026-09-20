@@ -143,8 +143,17 @@ Page({
     sessionCardTimesInput: '0',
   },
 
-  onLoad() {
-    this.loadVenues();
+  onLoad(options) {
+    const phoneFromQuery =
+      options && options.phone != null ? decodeURIComponent(String(options.phone)).trim() : '';
+    this._pendingQueryPhone = /^1\d{10}$/.test(phoneFromQuery) ? phoneFromQuery : '';
+    this.loadVenues().then(() => {
+      if (!this._pendingQueryPhone) return;
+      this.setData({ targetPhone: this._pendingQueryPhone }, () => {
+        this._pendingQueryPhone = '';
+        this.onQueryUser();
+      });
+    });
   },
 
   onReady() {

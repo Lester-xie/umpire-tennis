@@ -26,6 +26,7 @@
     "pages/admin-course-edit/index",
     "pages/admin-coaches/index",
     "pages/admin-coach-stats/index",
+    "pages/admin-member-assets/index",
     "pages/profile-meituan-verify/index",
     "pages/order-voucher-verify/index",
     "pages/stored-value/index",
